@@ -83,6 +83,8 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAudio); else mountAudio();
 
   async function stationUrlFor(track) {
+    // 阿里云 OSS 固定直链：不需要解析接口，省掉 600ms+ 的往返（音频字节完全一样）
+    if (track.audioOss) return track.audioOss;
     const st = S.audio[track.id] || track.audio;
     if (!st || !st.nid) return null;
     const hit = urlCache.get(String(st.nid));
@@ -108,10 +110,17 @@
     if (!local) { try { const blob = await idbGet(track.id); if (blob) local = URL.createObjectURL(blob); } catch {} }
     if (my !== prepToken) return;
     if (local) { stationLocal = local; stationNid = null; audio.setAttribute('data-tid', track.id); audio.src = local; audio.load(); setState('本地音频已就绪'); return; }
-    if (!nid) { setState('还没绑定音频（可展开下方「音频来源与设置」）'); return; }
-    // 本浏览器还没播过任何东西时，只把地址解析好（省流量）；
-    // 播过一次之后，进页面就真正开始缓冲，点播放几乎立刻出声。
+    // 本浏览器还没播过任何东西时，只把地址准备好（省流量）；播过一次之后进页面就真正开始缓冲
     const eager = !!S.used;
+    if (track.audioOss) {
+      stationLocal = null; stationNid = null;
+      audio.setAttribute('data-tid', track.id);
+      audio.src = track.audioOss;
+      audio.load();
+      setState(eager ? '音频缓冲中，点播放' : '音频已就绪，点播放');
+      return;
+    }
+    if (!nid) { setState('还没绑定音频（可展开下方「音频来源与设置」）'); return; }
     const attach = (url) => {
       stationNid = nid; stationLocal = null;
       audio.setAttribute('data-tid', track.id);
@@ -763,6 +772,7 @@
   }
   function describeSource(t) {
     if (S.local[t.id]) return '当前用本地音频文件（只存在这个浏览器里）';
+    if (t.audioOss) return `当前音频：自建对象存储（${t.audioOssKey || 'OSS'}，固定直链，进页面就预缓冲）`;
     const s = S.audio[t.id] || t.audio;
     if (s && s.nid) return `当前音频：网易云 ${s.nid}${t.netease && t.netease.agreeRate != null ? `（歌词一致度 ${Math.round(t.netease.agreeRate * 100)}%）` : ''}`;
     return '这首还没有音频。可以在下面粘一个网易云链接。';

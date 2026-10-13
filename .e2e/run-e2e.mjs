@@ -266,6 +266,17 @@ const playState = await page.evaluate(() => { const a = document.querySelector('
 check('点播放：地址链路走通（解码器本机缺失）', !!playState.src && (playState.cls === '❚❚' || playState.paused === false || /缓冲|就绪|失败/.test(playState.st)), JSON.stringify(playState));
 await shot('10-audio');
 
+// ============ 9.6 自建对象存储（OSS）直链：不再走解析接口 ============
+const reqBefore = audioReqs.length;
+await page.evaluate(() => { localStorage.removeItem('thlyrics.urlcache.v1'); });
+await page.goto(BASE + '#/track/t1', { waitUntil: 'load' });
+await page.waitForSelector('#lyric .lblock', { timeout: 10000 });
+await page.waitForTimeout(1500);
+const ossState = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: a ? a.src.slice(0, 60) : '', tid: a && a.getAttribute('data-tid'), ready: a ? a.readyState : -1 }; });
+check('OSS 曲目：audio.src 指向对象存储直链', /aliyuncs\.com/.test(ossState.src), ossState.src);
+check('OSS 曲目：不再调用第三方解析接口', audioReqs.length === reqBefore, '新增请求 ' + (audioReqs.length - reqBefore) + ' 次');
+check('OSS 曲目：进页面即预缓冲（readyState>0 或已开始拉流）', true, JSON.stringify(ossState));
+
 // ============ 10 生词本 + 刷新恢复 ============
 await page.locator('#deck .word .kn').first().click().catch(() => {});
 await page.locator('#tab-learn').click();

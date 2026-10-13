@@ -173,6 +173,15 @@ async function main() {
     else v.hasMeaning = true;
   }
 
+  // ---- 阿里云 OSS 音频直链（data/audio-oss.json）：有的话前端直接用它，跳过每次解析地址 ----
+  const ossMap = readJson(path.join(DATA, 'audio-oss.json'), { tracks: {} });
+  let withOss = 0;
+  for (const tr of idx.tracks) {
+    const o = ossMap.tracks && ossMap.tracks[tr.id];
+    if (o && o.url) { tr.audioOss = o.url; if (o.key) tr.audioOssKey = o.key; withOss++; }
+  }
+  idx.stats.withOss = withOss;
+
   idx.stats.withNetease = merged;
   idx.stats.withTranslations = withTrans;
   idx.stats.tracksWithTiming = idx.tracks.filter((t) => t.timing).length;

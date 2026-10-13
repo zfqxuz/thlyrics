@@ -1,0 +1,17 @@
+{
+  "_note": "音频改走阿里云 OSS 的映射表：trackId -> 对象信息。由 scripts/build-web.mjs 合并进 track.audioOss。",
+  "_bucket": "thlyrics-audio",
+  "_region": "oss-cn-hangzhou",
+  "_stage": "阶段A（先上一首，t1）",
+  "_blocker": "阿里云账号级「阻止公共访问」未关闭，公共 URL 现在会被 403；先临时用 10 年有效期的签名 URL。关闭后把 url 换成 https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t1.mp3 并把 signed 改成 false。",
+  "tracks": {
+    "t1": {
+      "key": "audio/t1.mp3",
+      "bytes": 11194036,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t1.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107284294&Signature=I1l4cK4fAcIh1%2F43zXDqlsJNuLg%3D"
+    }
+  }
+}
