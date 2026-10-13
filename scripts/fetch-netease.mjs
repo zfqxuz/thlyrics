@@ -128,10 +128,20 @@ async function main() {
 
     let best = null;
     try {
-      // 两轮搜索：① 曲名 ② 曲名 + 社团（社团名是关键，光搜曲名很容易配到别人的翻唱）
-      let hits = await api({ types: 'search', source: 'netease', name: t.title, count: 10 });
-      const hits2 = await api({ types: 'search', source: 'netease', name: `${t.title} ${t.artist}`.trim(), count: 10 });
-      hits = [...(Array.isArray(hits) ? hits : []), ...(Array.isArray(hits2) ? hits2 : [])];
+      // 多轮搜索：曲名 / 曲名+社团 / 专辑名 / 专辑名+曲名 —— 社团和专辑是识别同人曲的关键
+      const queries = [t.title, `${t.title} ${t.artist}`, t.album, `${t.album} ${t.title}`]
+        .map((q) => (q || '').trim()).filter(Boolean);
+      const seenIds = new Set();
+      const hits = [];
+      for (const q of new Set(queries)) {
+        const r = await api({ types: 'search', source: 'netease', name: q, count: 8 });
+        for (const h of Array.isArray(r) ? r : []) {
+          if (!h || seenIds.has(String(h.id))) continue;
+          seenIds.add(String(h.id));
+          hits.push(h);
+        }
+        await sleep(400);
+      }
       if (Array.isArray(hits)) {
         for (const h of hits) {
           const s = score(t, h);
