@@ -1,0 +1,20 @@
+{
+  "name": "thlyrics",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "东方同人曲 学唱机：从歌词里学日语词、跟唱练句",
+  "homepage": "https://github.com/USER/thlyrics",
+  "scripts": {
+    "fetch": "node scripts/fetch-lyrics.mjs",
+    "index": "node scripts/build-index.mjs",
+    "netease": "node scripts/fetch-netease.mjs",
+    "meanings": "node scripts/fetch-meanings.mjs",
+    "build": "node scripts/build-web.mjs",
+    "all": "node scripts/build-index.mjs && node scripts/fetch-netease.mjs --lyrics && node scripts/build-web.mjs",
+    "serve": "node scripts/serve.mjs 8848"
+  },
+  "dependencies": {
+    "kuromoji": "^0.1.2"
+  }
+}

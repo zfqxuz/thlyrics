@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>东方同人曲学唱机</title>
+<style>
+:root{
+  --bg:#f7f3ec; --card:#fffdf9; --ink:#2f2a26; --muted:#8a8078; --line:#e6ded2;
+  --accent:#b4472f; --accent2:#3b6ea5; --hl:#ffe9a8; --known:#4f8a52; --shadow:0 2px 10px rgba(90,70,45,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;line-height:1.65}
+a{color:var(--accent2)}
+.wrap{max-width:900px;margin:0 auto;padding:14px 14px 90px}
+header.top{display:flex;align-items:baseline;gap:10px;padding:6px 2px 12px;flex-wrap:wrap}
+header.top h1{font-size:18px;letter-spacing:.02em}
+header.top .meta{font-size:12px;color:var(--muted)}
+nav.tabs{display:flex;gap:6px;position:sticky;top:0;z-index:30;background:linear-gradient(var(--bg) 70%,rgba(247,243,236,0));padding:8px 0}
+nav.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--muted);padding:7px 14px;border-radius:999px;font-size:14px;cursor:pointer}
+nav.tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+input.search{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:15px;color:var(--ink);margin-bottom:12px}
+input.search:focus{outline:2px solid #dfd3c0}
+.tracklist{display:flex;flex-direction:column;gap:9px}
+.track{display:flex;gap:11px;padding:11px;cursor:pointer;align-items:center}
+.track:hover{border-color:#d6c9b6}
+.track img{width:52px;height:52px;border-radius:8px;object-fit:cover;background:#e9e2d7;flex:0 0 auto}
+.track .t-main{min-width:0;flex:1}
+.track .t-title{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track .t-sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
+.badge.timing{border-color:#bcd3bd;color:#3f7043}
+.grouphead{font-size:13px;color:var(--muted);margin:16px 4px 7px;letter-spacing:.03em}
+/* 歌词 */
+.lyrictop{display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:10px}
+.lyrictop img{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#e9e2d7}
+.lyrictop h2{font-size:16px}
+.lyrictop .meta{font-size:12px;color:var(--muted)}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 14px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:10px;font-size:13px;cursor:pointer}
+.btn:hover{border-color:#cbbda8}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.on{background:#efe6d6;border-color:#cbbda8}
+.lyric{padding:16px 14px}
+.line{font-size:17px;line-height:2;padding:3px 6px;border-radius:8px;transition:background .18s}
+.line.playing{background:var(--hl)}
+.line .w{cursor:pointer;border-bottom:1px dashed transparent}
+.line .w:hover{border-bottom-color:var(--accent);background:#fdf0e6;border-radius:3px}
+.line .w.known{color:var(--known)}
+.line .w.unknown{border-bottom-color:#dcc6a8}
+.line.en{color:#6d6a7a;font-size:15px}
+.romaji{font-size:12px;color:var(--muted);margin-top:-2px;padding:0 6px 4px;font-family:ui-monospace,Menlo,monospace}
+.space{height:14px}
+/* 单词弹层 */
+#pop{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:min(560px,calc(100% - 24px));
+  background:#2f2a26;color:#fdf9f2;border-radius:14px;padding:13px 15px;box-shadow:0 8px 26px rgba(0,0,0,.25);display:none;z-index:60}
+#pop.on{display:block}
+#pop .wrow{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#pop .w-1{font-size:22px;font-weight:700}
+#pop .w-2{font-size:14px;color:#f0c9a8}
+#pop .w-3{font-size:12px;color:#c9bfb4;font-family:ui-monospace,Menlo,monospace}
+#pop .w-4{font-size:13px;color:#ddd3c8;margin-top:5px}
+#pop .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#pop .acts button{border:1px solid #5d554d;background:#3b342e;color:#f3ece2;padding:5px 11px;border-radius:9px;font-size:12px;cursor:pointer}
+#pop .acts button.k{border-color:#7fae83;color:#c9e6cb}
+/* 单词卡 */
+.cardbox{margin:0 auto;max-width:520px}
+#flipcard{height:270px;perspective:1200px;cursor:pointer;margin-bottom:12px}
+#flipcard .inner{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
+#flipcard.flipped .inner{transform:rotateY(180deg)}
+#flipcard .face{position:absolute;inset:0;backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center}
+#flipcard .back{transform:rotateY(180deg);background:#fff8ee}
+#flipcard .word{font-size:40px;font-weight:700;letter-spacing:.02em}
+#flipcard .reading{font-size:17px;color:var(--accent)}
+#flipcard .romaji{font-size:14px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+#flipcard .pos{font-size:12px;color:var(--muted)}
+#flipcard .meaning{font-size:18px;font-weight:600}
+#flipcard .forms{font-size:13px;color:var(--muted);line-height:1.9}
+.btns{display:flex;gap:10px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+.btns .btn{padding:11px 22px;font-size:15px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-bottom:12px}
+.stats .box{padding:10px 4px}
+.stats .num{font-size:20px;font-weight:700}
+.stats .lbl{font-size:11px;color:var(--muted)}
+.progress{height:7px;background:#ece4d8;border-radius:999px;overflow:hidden;margin:6px 0 14px}
+.progress > i{display:block;height:100%;background:var(--accent);width:0}
+.vocablist{display:flex;flex-direction:column;gap:6px}
+.vrow{display:flex;align-items:center;gap:10px;padding:9px 11px;font-size:14px;cursor:pointer}
+.vrow .vw{font-weight:600;min-width:96px}
+.vrow .vr{color:var(--accent);font-size:13px}
+.vrow .vy{color:var(--muted);font-size:12px;font-family:ui-monospace,Menlo,monospace}
+.vrow .vc{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
+.vrow.done{opacity:.55}
+.hint{font-size:12px;color:var(--muted);margin:8px 4px}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+.foot{font-size:11px;color:var(--muted);text-align:center;margin-top:22px;line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>东方同人曲学唱机</h1>
+    <span class="meta" id="headstat">载入中…</span>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="lyrics" class="active">歌词</button>
+    <button data-tab="cards">单词卡</button>
+    <button data-tab="vocab">词表</button>
+    <button data-tab="stats">进度</button>
+  </nav>
+
+  <section class="panel active" id="panel-lyrics">
+    <div id="lyric-index">
+      <input class="search" id="q" placeholder="搜索曲名 / 社团 / 原曲…">
+      <div id="tracklist" class="tracklist"></div>
+    </div>
+    <div id="lyric-view" style="display:none"></div>
+  </section>
+
+  <section class="panel" id="panel-cards">
+    <div class="cardbox">
+      <div class="stats">
+        <div class="box card"><div class="num" id="s-total">0</div><div class="lbl">词表总数</div></div>
+        <div class="box card"><div class="num" id="s-seen">0</div><div class="lbl">已学</div></div>
+        <div class="box card"><div class="num" id="s-known">0</div><div class="lbl">已掌握</div></div>
+        <div class="box card"><div class="num" id="s-due">0</div><div class="lbl">待复习</div></div>
+      </div>
+      <div class="progress"><i id="p-bar"></i></div>
+      <div id="flipcard" class="card">
+        <div class="inner">
+          <div class="face front">
+            <div class="word" id="c-word">—</div>
+            <div class="pos" id="c-pos"></div>
+            <div class="hint">点卡片翻面</div>
+          </div>
+          <div class="face back">
+            <div class="meaning" id="c-meaning"></div>
+            <div class="reading" id="c-reading"></div>
+            <div class="romaji" id="c-romaji"></div>
+            <div class="forms" id="c-forms"></div>
+          </div>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn" id="b-speak">🔊 发音</button>
+        <button class="btn" id="b-again">还不熟</button>
+        <button class="btn primary" id="b-know">记住了</button>
+      </div>
+      <div class="hint" id="c-src"></div>
+      <div class="hint">点卡片翻面 · 记住了的词会在歌词里变绿 · 复习节奏 1 / 3 / 7 天</div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-vocab">
+    <input class="search" id="vq" placeholder="搜索词 / 读音 / 罗马音…">
+    <div class="hint" id="vcount"></div>
+    <div class="vocablist" id="vocablist"></div>
+  </section>
+
+  <section class="panel" id="panel-stats">
+    <div class="card" style="padding:16px">
+      <div id="statbox"></div>
+      <div class="btns" style="justify-content:flex-start;margin-top:14px">
+        <button class="btn" id="b-export">导出进度</button>
+        <button class="btn" id="b-import">导入进度</button>
+        <button class="btn" id="b-reset">清空进度</button>
+      </div>
+      <input type="file" id="file" accept="application/json" style="display:none">
+    </div>
+  </section>
+
+  <div class="foot">
+    歌词来源：THBWiki 歌词服务（lyrics.thwiki.cc）· 版权归各社团 / 原作者所有，仅供个人学习，请勿传播或商用<br>
+    罗马音与罗马音音节切分由本地脚本生成，<span id="genat"></span>
+  </div>
+</div>
+
+<div id="pop">
+  <div class="wrow">
+    <span class="w-1" id="p-word"></span>
+    <span class="w-2" id="p-reading"></span>
+    <span class="w-3" id="p-romaji"></span>
+  </div>
+  <div class="w-4" id="p-meta"></div>
+  <div class="acts">
+    <button id="p-speak">🔊 发音</button>
+    <button class="k" id="p-known">标为已掌握</button>
+    <button id="p-close">关闭</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

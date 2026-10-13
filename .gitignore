@@ -1,0 +1,5 @@
+node_modules/
+data/raw/*.tmp
+data/netease-lyrics/
+.DS_Store
+*.log

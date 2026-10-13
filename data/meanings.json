@@ -1,0 +1,9662 @@
+{
+ "世界": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "幻想": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "げんそう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "見る": {
+  "meaning": "看到",
+  "pos": "動詞",
+  "reading": "みる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:18.100Z"
+ },
+ "消える": {
+  "meaning": "消失",
+  "pos": "動詞",
+  "reading": "きえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:18.100Z"
+ },
+ "知る": {
+  "meaning": "知道",
+  "pos": "動詞",
+  "reading": "しる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:18.100Z"
+ },
+ "全て": {
+  "meaning": "全部",
+  "pos": "名詞",
+  "reading": "すべて",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:18.100Z"
+ },
+ "輝く": {
+  "meaning": "闪耀",
+  "pos": "動詞",
+  "reading": "かがやく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:18.100Z"
+ },
+ "終わる": {
+  "meaning": "结束",
+  "pos": "動詞",
+  "reading": "おわる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:18.100Z"
+ },
+ "きっと": {
+  "meaning": "绝对",
+  "pos": "副詞",
+  "reading": "きっお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "もう": {
+  "meaning": "已经",
+  "pos": "副詞",
+  "reading": "もう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "明日": {
+  "meaning": "明天",
+  "pos": "名詞",
+  "reading": "あした",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "照らす": {
+  "meaning": "点亮",
+  "pos": "動詞",
+  "reading": "てらす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "紅い": {
+  "meaning": "红色",
+  "pos": "形容詞",
+  "reading": "あかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "無い": {
+  "meaning": "否",
+  "pos": "形容詞",
+  "reading": "ない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "想い": {
+  "meaning": "想法",
+  "pos": "名詞",
+  "reading": "おもい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "生きる": {
+  "meaning": "现场直播",
+  "pos": "動詞",
+  "reading": "いきる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:19.934Z"
+ },
+ "永遠": {
+  "meaning": "永恒",
+  "pos": "名詞",
+  "reading": "えいえん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "散る": {
+  "meaning": "散射",
+  "pos": "動詞",
+  "reading": "ちる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "ずっと": {
+  "meaning": "永恒",
+  "pos": "副詞",
+  "reading": "ずっお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "一つ": {
+  "meaning": "一",
+  "pos": "名詞",
+  "reading": "ひとつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "染まる": {
+  "meaning": "染色",
+  "pos": "動詞",
+  "reading": "そまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "踊る": {
+  "meaning": "舞蹈",
+  "pos": "動詞",
+  "reading": "おどる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "儚い": {
+  "meaning": "惊人",
+  "pos": "形容詞",
+  "reading": "はかない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "時間": {
+  "meaning": "时间",
+  "pos": "名詞",
+  "reading": "じかん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:46:21.627Z"
+ },
+ "揺れる": {
+  "meaning": "摇晃",
+  "pos": "動詞",
+  "reading": "ゆれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "今宵": {
+  "meaning": "今晚",
+  "pos": "名詞",
+  "reading": "こよい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "いい": {
+  "meaning": "好",
+  "pos": "形容詞",
+  "reading": "いい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "遠い": {
+  "meaning": "远",
+  "pos": "形容詞",
+  "reading": "とおい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "夜空": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "よぞら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "いつか": {
+  "meaning": "总有一天",
+  "pos": "名詞",
+  "reading": "いつあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "見える": {
+  "meaning": "看到",
+  "pos": "動詞",
+  "reading": "みえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "光る": {
+  "meaning": "发光",
+  "pos": "動詞",
+  "reading": "ひかる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:04.926Z"
+ },
+ "隠す": {
+  "meaning": "隐藏",
+  "pos": "動詞",
+  "reading": "かくす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "映る": {
+  "meaning": "反映",
+  "pos": "動詞",
+  "reading": "うつる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "記憶": {
+  "meaning": "记忆",
+  "pos": "名詞",
+  "reading": "きおく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "孤独": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "こどく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "変える": {
+  "meaning": "改变",
+  "pos": "動詞",
+  "reading": "かえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "待つ": {
+  "meaning": "等待",
+  "pos": "動詞",
+  "reading": "まつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "飛ぶ": {
+  "meaning": "飞翔",
+  "pos": "動詞",
+  "reading": "とぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "見上げる": {
+  "meaning": "查找",
+  "pos": "動詞",
+  "reading": "みあげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "いつも": {
+  "meaning": "总是",
+  "pos": "副詞",
+  "reading": "いつお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "続く": {
+  "meaning": "继续",
+  "pos": "動詞",
+  "reading": "つづく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:06.589Z"
+ },
+ "境界": {
+  "meaning": "边界",
+  "pos": "名詞",
+  "reading": "きょうかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "残す": {
+  "meaning": "离开",
+  "pos": "動詞",
+  "reading": "のこす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "少し": {
+  "meaning": "一点点",
+  "pos": "副詞",
+  "reading": "すこし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "不死": {
+  "meaning": "不朽",
+  "pos": "名詞",
+  "reading": "ふし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "まだ": {
+  "meaning": "仍然",
+  "pos": "副詞",
+  "reading": "まう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "果てる": {
+  "meaning": "结束",
+  "pos": "動詞",
+  "reading": "はてる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "彷徨く": {
+  "meaning": "漫步",
+  "pos": "名詞",
+  "reading": "ほうこく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "そう": {
+  "meaning": "是",
+  "pos": "副詞",
+  "reading": "そう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "できる": {
+  "meaning": "可以",
+  "pos": "動詞",
+  "reading": "できう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "運命": {
+  "meaning": "命运",
+  "pos": "名詞",
+  "reading": "うんめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:08.649Z"
+ },
+ "求める": {
+  "meaning": "寻求",
+  "pos": "動詞",
+  "reading": "もとめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "景色": {
+  "meaning": "风景",
+  "pos": "名詞",
+  "reading": "けしき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "届く": {
+  "meaning": "触手可及",
+  "pos": "動詞",
+  "reading": "とどく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "抱きしめる": {
+  "meaning": "拥抱",
+  "pos": "動詞",
+  "reading": "だきしめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "繰り返す": {
+  "meaning": "重复",
+  "pos": "動詞",
+  "reading": "くりかえす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "笑う": {
+  "meaning": "大笑",
+  "pos": "動詞",
+  "reading": "わらう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "咲く": {
+  "meaning": "绽放",
+  "pos": "動詞",
+  "reading": "さく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "天空": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "てんくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "届ける": {
+  "meaning": "传递",
+  "pos": "動詞",
+  "reading": "とどける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "強い": {
+  "meaning": "强烈",
+  "pos": "形容詞",
+  "reading": "つよい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:10.657Z"
+ },
+ "迎える": {
+  "meaning": "welcome",
+  "pos": "動詞",
+  "reading": "むかえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "見せる": {
+  "meaning": "show",
+  "pos": "動詞",
+  "reading": "みせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "現実": {
+  "meaning": "reality",
+  "pos": "名詞",
+  "reading": "げんじつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "今日": {
+  "meaning": "today",
+  "pos": "名詞",
+  "reading": "きょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "悲しい": {
+  "meaning": "sad",
+  "pos": "形容詞",
+  "reading": "かなしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "未来": {
+  "meaning": "future",
+  "pos": "名詞",
+  "reading": "みらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "去る": {
+  "meaning": "leave",
+  "pos": "動詞",
+  "reading": "さる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "言う": {
+  "meaning": "say",
+  "pos": "動詞",
+  "reading": "いう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "最後": {
+  "meaning": "last",
+  "pos": "名詞",
+  "reading": "さいご",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "死ぬ": {
+  "meaning": "die",
+  "pos": "動詞",
+  "reading": "しぬ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:12.247Z"
+ },
+ "信じる": {
+  "meaning": "Believe",
+  "pos": "動詞",
+  "reading": "しんじる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "誓う": {
+  "meaning": "Swear",
+  "pos": "動詞",
+  "reading": "ちかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "日々": {
+  "meaning": "Everyday",
+  "pos": "名詞",
+  "reading": "ひ々",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "美しい": {
+  "meaning": "Beautiful",
+  "pos": "形容詞",
+  "reading": "うつくしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "舞う": {
+  "meaning": "Dance",
+  "pos": "動詞",
+  "reading": "まう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "忘れる": {
+  "meaning": "Forget",
+  "pos": "動詞",
+  "reading": "わすれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "流れる": {
+  "meaning": "Flow",
+  "pos": "動詞",
+  "reading": "ながれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "違う": {
+  "meaning": "Different",
+  "pos": "動詞",
+  "reading": "ちがう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "溢れる": {
+  "meaning": "Overflow",
+  "pos": "動詞",
+  "reading": "あふれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "永久": {
+  "meaning": "Forever",
+  "pos": "名詞",
+  "reading": "えいきゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:13.943Z"
+ },
+ "帰る": {
+  "meaning": "return",
+  "pos": "動詞",
+  "reading": "かえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "祈り": {
+  "meaning": "pray",
+  "pos": "名詞",
+  "reading": "いのり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "出る": {
+  "meaning": "exit",
+  "pos": "動詞",
+  "reading": "でる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "包む": {
+  "meaning": "wrap",
+  "pos": "動詞",
+  "reading": "つつむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "眠り": {
+  "meaning": "sleep",
+  "pos": "名詞",
+  "reading": "ねむり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "眠る": {
+  "meaning": "sleep",
+  "pos": "動詞",
+  "reading": "ねむる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "来るくる": {
+  "meaning": "coming",
+  "pos": "動詞",
+  "reading": "くるくる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "なっ": {
+  "meaning": "become",
+  "pos": "動詞",
+  "reading": "なう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "言葉": {
+  "meaning": "words",
+  "pos": "名詞",
+  "reading": "ことば",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "止まる": {
+  "meaning": "stop",
+  "pos": "動詞",
+  "reading": "とまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:15.606Z"
+ },
+ "答え": {
+  "meaning": "答案",
+  "pos": "名詞",
+  "reading": "こたえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "燃える": {
+  "meaning": "燃烧",
+  "pos": "動詞",
+  "reading": "もえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "妖怪": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ようかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "来くる": {
+  "meaning": "即将到来",
+  "pos": "動詞",
+  "reading": "くう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "今夜": {
+  "meaning": "今晚",
+  "pos": "名詞",
+  "reading": "こんや",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "一天": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "いってん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "宇宙": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "うちゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "彼方": {
+  "meaning": "超越",
+  "pos": "名詞",
+  "reading": "かなた",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "響く": {
+  "meaning": "响铃",
+  "pos": "動詞",
+  "reading": "ひびく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "仰望": {
+  "meaning": "查找",
+  "pos": "名詞",
+  "reading": "ぎょうぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:17.230Z"
+ },
+ "月光": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "げっこう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "いら": {
+  "meaning": "艾拉",
+  "pos": "動詞",
+  "reading": "いあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "意味": {
+  "meaning": "含义",
+  "pos": "名詞",
+  "reading": "いみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "歌う": {
+  "meaning": "唱歌",
+  "pos": "動詞",
+  "reading": "うたう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "還る": {
+  "meaning": "回归",
+  "pos": "動詞",
+  "reading": "かえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "笑顔": {
+  "meaning": "微笑",
+  "pos": "名詞",
+  "reading": "えがお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "探す": {
+  "meaning": "看起来",
+  "pos": "動詞",
+  "reading": "さがす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "白い": {
+  "meaning": "白色",
+  "pos": "形容詞",
+  "reading": "しろい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "崩れる": {
+  "meaning": "折叠",
+  "pos": "動詞",
+  "reading": "くずれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "優しい": {
+  "meaning": "温柔",
+  "pos": "形容詞",
+  "reading": "やさしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:18.824Z"
+ },
+ "歴史": {
+  "meaning": "history",
+  "pos": "名詞",
+  "reading": "れきし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "握る": {
+  "meaning": "hold",
+  "pos": "動詞",
+  "reading": "にぎる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "暗闇": {
+  "meaning": "darkness",
+  "pos": "名詞",
+  "reading": "くらやみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "過去": {
+  "meaning": "past",
+  "pos": "名詞",
+  "reading": "かこ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "月明かり": {
+  "meaning": "moonlight",
+  "pos": "名詞",
+  "reading": "つきあかり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "月夜": {
+  "meaning": "moonlight",
+  "pos": "名詞",
+  "reading": "つきよ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "呼ぶ": {
+  "meaning": "call",
+  "pos": "動詞",
+  "reading": "よぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "此処": {
+  "meaning": "here",
+  "pos": "名詞",
+  "reading": "ここ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "赦す": {
+  "meaning": "forgive",
+  "pos": "動詞",
+  "reading": "ゆるす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "深い": {
+  "meaning": "deep",
+  "pos": "形容詞",
+  "reading": "ふかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:20.475Z"
+ },
+ "存在": {
+  "meaning": "EXIST",
+  "pos": "名詞",
+  "reading": "そんざい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "描く": {
+  "meaning": "DRAW",
+  "pos": "動詞",
+  "reading": "えがく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "別れる": {
+  "meaning": "PART",
+  "pos": "動詞",
+  "reading": "わかれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "離す": {
+  "meaning": "LET GO",
+  "pos": "動詞",
+  "reading": "はなす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "巫女": {
+  "meaning": "MAIDEN",
+  "pos": "名詞",
+  "reading": "みこ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "ただ": {
+  "meaning": "JUST",
+  "pos": "名詞",
+  "reading": "たう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "暗い": {
+  "meaning": "DARK",
+  "pos": "形容詞",
+  "reading": "くらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "壊す": {
+  "meaning": "BREAK",
+  "pos": "動詞",
+  "reading": "こわす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "覚める": {
+  "meaning": "WAK",
+  "pos": "動詞",
+  "reading": "さめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "感じる": {
+  "meaning": "",
+  "pos": "動詞",
+  "reading": "かんじる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:22.150Z"
+ },
+ "感情": {
+  "meaning": "情绪",
+  "pos": "名詞",
+  "reading": "かんじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "看る": {
+  "meaning": "查看",
+  "pos": "動詞",
+  "reading": "むる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "季節": {
+  "meaning": "季节",
+  "pos": "名詞",
+  "reading": "きせつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "契り": {
+  "meaning": "巧合",
+  "pos": "名詞",
+  "reading": "ちぎり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "見渡す": {
+  "meaning": "环顾四周",
+  "pos": "動詞",
+  "reading": "みわたす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "幸せ": {
+  "meaning": "幸福",
+  "pos": "名詞",
+  "reading": "しあわせ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "広がる": {
+  "meaning": "扩展",
+  "pos": "動詞",
+  "reading": "ひろがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "自由": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "じゆう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "失う": {
+  "meaning": "失去",
+  "pos": "動詞",
+  "reading": "うしなう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "瞬く": {
+  "meaning": "眨眼",
+  "pos": "動詞",
+  "reading": "まばたく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:23.828Z"
+ },
+ "震える": {
+  "meaning": "颤抖",
+  "pos": "動詞",
+  "reading": "ふるえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "染める": {
+  "meaning": "染色",
+  "pos": "動詞",
+  "reading": "そめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "想う": {
+  "meaning": "思考",
+  "pos": "動詞",
+  "reading": "おもう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "弾幕": {
+  "meaning": "弹幕",
+  "pos": "名詞",
+  "reading": "だんまく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "超える": {
+  "meaning": "长",
+  "pos": "動詞",
+  "reading": "こえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "長い": {
+  "meaning": "委托",
+  "pos": "形容詞",
+  "reading": "ながい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "任せる": {
+  "meaning": "浮动",
+  "pos": "動詞",
+  "reading": "まかせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "浮かぶ": {
+  "meaning": "改变",
+  "pos": "動詞",
+  "reading": "うかぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "変わる": {
+  "meaning": "黎明",
+  "pos": "動詞",
+  "reading": "かわる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "明ける": {
+  "meaning": "",
+  "pos": "動詞",
+  "reading": "あける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:25.441Z"
+ },
+ "遊ぶ": {
+  "meaning": "play",
+  "pos": "動詞",
+  "reading": "あそぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "夕日": {
+  "meaning": "sunset",
+  "pos": "名詞",
+  "reading": "ゆうひ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "遥か": {
+  "meaning": "far",
+  "pos": "副詞",
+  "reading": "はるか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "欲しい": {
+  "meaning": "want",
+  "pos": "形容詞",
+  "reading": "ほしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "理由": {
+  "meaning": "reason",
+  "pos": "名詞",
+  "reading": "りゆう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "歪む": {
+  "meaning": "twist",
+  "pos": "動詞",
+  "reading": "いがむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "さする": {
+  "meaning": "how",
+  "pos": "動詞",
+  "reading": "さすう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "どう": {
+  "meaning": "please",
+  "pos": "副詞",
+  "reading": "どう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "どうか": {
+  "meaning": "night",
+  "pos": "副詞",
+  "reading": "どうあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "一夜": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "いちや",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:27.027Z"
+ },
+ "隠れる": {
+  "meaning": "隐藏",
+  "pos": "動詞",
+  "reading": "かくれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "奥底": {
+  "meaning": "深层",
+  "pos": "名詞",
+  "reading": "おくそこ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "温もり": {
+  "meaning": "温暖",
+  "pos": "名詞",
+  "reading": "ぬくもり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "霞む": {
+  "meaning": "雾霾",
+  "pos": "動詞",
+  "reading": "かすむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "叶う": {
+  "meaning": "成真",
+  "pos": "動詞",
+  "reading": "かなう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "願い": {
+  "meaning": "许愿",
+  "pos": "名詞",
+  "reading": "ねがい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "示す": {
+  "meaning": "表演",
+  "pos": "動詞",
+  "reading": "しめす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "集まる": {
+  "meaning": "聚集",
+  "pos": "動詞",
+  "reading": "あつまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "巡る": {
+  "meaning": "四处走走",
+  "pos": "動詞",
+  "reading": "めぐる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "場所": {
+  "meaning": "地方",
+  "pos": "名詞",
+  "reading": "ばしょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:28.835Z"
+ },
+ "触れる": {
+  "meaning": "触摸",
+  "pos": "動詞",
+  "reading": "ふれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "伸ばす": {
+  "meaning": "伸展",
+  "pos": "動詞",
+  "reading": "のばす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "振りかざす": {
+  "meaning": "摇晃",
+  "pos": "動詞",
+  "reading": "ふりかざす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "振る": {
+  "meaning": "摇晃",
+  "pos": "動詞",
+  "reading": "ふる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "吹く": {
+  "meaning": "吹拂",
+  "pos": "動詞",
+  "reading": "ふく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "吹雪": {
+  "meaning": "暴风雪",
+  "pos": "名詞",
+  "reading": "ふぶき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "辿る": {
+  "meaning": "痕迹",
+  "pos": "動詞",
+  "reading": "たどる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "沈む": {
+  "meaning": "水槽",
+  "pos": "動詞",
+  "reading": "しずむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "痛み": {
+  "meaning": "疼痛",
+  "pos": "名詞",
+  "reading": "いたみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "凍る": {
+  "meaning": "冻结",
+  "pos": "動詞",
+  "reading": "こおる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:30.452Z"
+ },
+ "分かる": {
+  "meaning": "了解",
+  "pos": "動詞",
+  "reading": "わかる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "閉じる": {
+  "meaning": "关闭",
+  "pos": "動詞",
+  "reading": "とじる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "抱く": {
+  "meaning": "拥抱",
+  "pos": "動詞",
+  "reading": "だく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "放つ": {
+  "meaning": "放松",
+  "pos": "動詞",
+  "reading": "はなつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "誘う": {
+  "meaning": "邀请",
+  "pos": "動詞",
+  "reading": "さそう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "老いる": {
+  "meaning": "旧",
+  "pos": "動詞",
+  "reading": "おうる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "縋る": {
+  "meaning": "节日",
+  "pos": "動詞",
+  "reading": "すがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "祭り": {
+  "meaning": "宴会",
+  "pos": "名詞",
+  "reading": "まつり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "宴会": {
+  "meaning": "世界",
+  "pos": "名詞",
+  "reading": "えんかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "世界中": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せかいじゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:32.101Z"
+ },
+ "静か": {
+  "meaning": "安静",
+  "pos": "名詞",
+  "reading": "しずか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "静静": {
+  "meaning": "安静",
+  "pos": "副詞",
+  "reading": "しずしず",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "蓬莱": {
+  "meaning": "凤凰",
+  "pos": "名詞",
+  "reading": "ほうらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "踊れる": {
+  "meaning": "跳舞",
+  "pos": "動詞",
+  "reading": "おどれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "噛む": {
+  "meaning": "咀嚼",
+  "pos": "動詞",
+  "reading": "かむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "帰れる": {
+  "meaning": "回归",
+  "pos": "動詞",
+  "reading": "かえれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "少女": {
+  "meaning": "女孩",
+  "pos": "名詞",
+  "reading": "しょうじょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "笑える": {
+  "meaning": "大笑",
+  "pos": "動詞",
+  "reading": "わらえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "こぼし": {
+  "meaning": "溢出",
+  "pos": "動詞",
+  "reading": "こぼい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "こんなにも": {
+  "meaning": "如此之多",
+  "pos": "副詞",
+  "reading": "こんなにお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:33.744Z"
+ },
+ "悪魔": {
+  "meaning": "devil",
+  "pos": "名詞",
+  "reading": "あくま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "異変": {
+  "meaning": "strange",
+  "pos": "名詞",
+  "reading": "いへん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "何もかも": {
+  "meaning": "everything",
+  "pos": "名詞",
+  "reading": "なにもかも",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "感受": {
+  "meaning": "feel",
+  "pos": "名詞",
+  "reading": "かんじゅ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "故郷": {
+  "meaning": "home",
+  "pos": "名詞",
+  "reading": "こきょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "行く": {
+  "meaning": "go",
+  "pos": "動詞",
+  "reading": "いく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "残酷": {
+  "meaning": "cruel",
+  "pos": "名詞",
+  "reading": "ざんこく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "思う": {
+  "meaning": "think",
+  "pos": "動詞",
+  "reading": "おもう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "思念": {
+  "meaning": "think",
+  "pos": "名詞",
+  "reading": "しねん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "潤す": {
+  "meaning": "moisturize",
+  "pos": "動詞",
+  "reading": "うるおす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:35.315Z"
+ },
+ "大地": {
+  "meaning": "泥土",
+  "pos": "名詞",
+  "reading": "だいち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "満たす": {
+  "meaning": "填充",
+  "pos": "動詞",
+  "reading": "みたす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "予感": {
+  "meaning": "不祥之兆",
+  "pos": "名詞",
+  "reading": "よかん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "あり": {
+  "meaning": "存在",
+  "pos": "動詞",
+  "reading": "あい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "こぼれる": {
+  "meaning": "溢出",
+  "pos": "動詞",
+  "reading": "こぼれう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "すする": {
+  "meaning": "寿司",
+  "pos": "動詞",
+  "reading": "すすう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "せめて": {
+  "meaning": "至少",
+  "pos": "副詞",
+  "reading": "せめえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "愛する": {
+  "meaning": "充满爱心",
+  "pos": "動詞",
+  "reading": "あいする",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "闇夜": {
+  "meaning": "夜晚",
+  "pos": "名詞",
+  "reading": "やみよ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "意識": {
+  "meaning": "意识",
+  "pos": "名詞",
+  "reading": "いしき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:37.060Z"
+ },
+ "一筋": {
+  "meaning": "一次",
+  "pos": "名詞",
+  "reading": "ひとすじ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "一撃": {
+  "meaning": "射门",
+  "pos": "名詞",
+  "reading": "いちげき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "永劫": {
+  "meaning": "永远",
+  "pos": "名詞",
+  "reading": "えいごう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "遠く": {
+  "meaning": "远",
+  "pos": "名詞",
+  "reading": "とおく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "廻る": {
+  "meaning": "四舍五入",
+  "pos": "動詞",
+  "reading": "めぐる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "外れる": {
+  "meaning": "甜蜜",
+  "pos": "動詞",
+  "reading": "はずれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "甘い": {
+  "meaning": "愿望",
+  "pos": "形容詞",
+  "reading": "あまい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "願う": {
+  "meaning": "高贵",
+  "pos": "動詞",
+  "reading": "ねがう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "気高い": {
+  "meaning": "恐惧",
+  "pos": "形容詞",
+  "reading": "けだかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "恐れる": {
+  "meaning": "",
+  "pos": "動詞",
+  "reading": "おそれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:38.729Z"
+ },
+ "近く": {
+  "meaning": "near",
+  "pos": "名詞",
+  "reading": "ちかく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "経つ": {
+  "meaning": "past",
+  "pos": "動詞",
+  "reading": "たつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "隙間": {
+  "meaning": "gap",
+  "pos": "名詞",
+  "reading": "すきま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "結末": {
+  "meaning": "end",
+  "pos": "名詞",
+  "reading": "けつまつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "光芒": {
+  "meaning": "light",
+  "pos": "名詞",
+  "reading": "こうぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "向こう": {
+  "meaning": "beyond",
+  "pos": "名詞",
+  "reading": "むこう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "好き": {
+  "meaning": "like",
+  "pos": "名詞",
+  "reading": "すき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "広げる": {
+  "meaning": "spread",
+  "pos": "動詞",
+  "reading": "ひろげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "香り": {
+  "meaning": "scent",
+  "pos": "名詞",
+  "reading": "かおり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "黒い": {
+  "meaning": "black",
+  "pos": "形容詞",
+  "reading": "くろい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:40.286Z"
+ },
+ "最期": {
+  "meaning": "last",
+  "pos": "名詞",
+  "reading": "さいご",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "持つ": {
+  "meaning": "have",
+  "pos": "動詞",
+  "reading": "もつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "柔らかい": {
+  "meaning": "soft",
+  "pos": "形容詞",
+  "reading": "やわらかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "重なる": {
+  "meaning": "overlap",
+  "pos": "動詞",
+  "reading": "かさなる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "宿る": {
+  "meaning": "dwell",
+  "pos": "動詞",
+  "reading": "やどる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "純粋": {
+  "meaning": "pure",
+  "pos": "名詞",
+  "reading": "じゅんすい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "消去": {
+  "meaning": "erase",
+  "pos": "名詞",
+  "reading": "しょうきょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "成し遂げる": {
+  "meaning": "accomplish",
+  "pos": "動詞",
+  "reading": "なしとげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "選ぶ": {
+  "meaning": "choose",
+  "pos": "動詞",
+  "reading": "えらぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "騒げる": {
+  "meaning": "make a fuss",
+  "pos": "動詞",
+  "reading": "さわげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:41.922Z"
+ },
+ "贈る": {
+  "meaning": "给予",
+  "pos": "動詞",
+  "reading": "おくる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "転がる": {
+  "meaning": "滚动",
+  "pos": "動詞",
+  "reading": "ころがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "凍える": {
+  "meaning": "冻结",
+  "pos": "動詞",
+  "reading": "こごえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "認識": {
+  "meaning": "识别",
+  "pos": "名詞",
+  "reading": "にんしき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "微笑む": {
+  "meaning": "微笑",
+  "pos": "動詞",
+  "reading": "ほほえむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "漂う": {
+  "meaning": "漂移",
+  "pos": "動詞",
+  "reading": "ただよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "不滅": {
+  "meaning": "不朽",
+  "pos": "名詞",
+  "reading": "ふめつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "聞く": {
+  "meaning": "聆听",
+  "pos": "動詞",
+  "reading": "きく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "返る": {
+  "meaning": "返回",
+  "pos": "動詞",
+  "reading": "かる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "捕まえる": {
+  "meaning": "接住",
+  "pos": "動詞",
+  "reading": "つかまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:43.501Z"
+ },
+ "捧ぐ": {
+  "meaning": "献身",
+  "pos": "動詞",
+  "reading": "ささぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "本当": {
+  "meaning": "真实",
+  "pos": "名詞",
+  "reading": "ほんとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "夢見る": {
+  "meaning": "梦想",
+  "pos": "動詞",
+  "reading": "ゆめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "無意味": {
+  "meaning": "无意义",
+  "pos": "名詞",
+  "reading": "むいみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "迷う": {
+  "meaning": "迷失",
+  "pos": "動詞",
+  "reading": "まよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "冷たい": {
+  "meaning": "寒冷",
+  "pos": "形容詞",
+  "reading": "つめたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "連れる": {
+  "meaning": "服用",
+  "pos": "動詞",
+  "reading": "つれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "煌めく": {
+  "meaning": "闪耀",
+  "pos": "動詞",
+  "reading": "きらめく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "くし": {
+  "meaning": "梳子",
+  "pos": "形容詞",
+  "reading": "くい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "せする": {
+  "meaning": "让我们",
+  "pos": "動詞",
+  "reading": "せすう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:45.555Z"
+ },
+ "たどり着く": {
+  "meaning": "到达",
+  "pos": "動詞",
+  "reading": "たどりつく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "つい": {
+  "meaning": "接近",
+  "pos": "動詞",
+  "reading": "つい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "つく": {
+  "meaning": "胶水",
+  "pos": "動詞",
+  "reading": "つう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "とろり": {
+  "meaning": "痣",
+  "pos": "副詞",
+  "reading": "とろい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "なり": {
+  "meaning": "再次",
+  "pos": "動詞",
+  "reading": "ない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "また": {
+  "meaning": "更多",
+  "pos": "副詞",
+  "reading": "まあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "もっと": {
+  "meaning": "黑暗",
+  "pos": "副詞",
+  "reading": "もっお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "やみ": {
+  "meaning": "理解",
+  "pos": "名詞",
+  "reading": "やい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "わかっ": {
+  "meaning": "丝滑",
+  "pos": "動詞",
+  "reading": "わかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "茜色": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "あかねいろ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:47.792Z"
+ },
+ "握り締める": {
+  "meaning": "握紧",
+  "pos": "動詞",
+  "reading": "にぎりしめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "一緒": {
+  "meaning": "一起",
+  "pos": "名詞",
+  "reading": "いっしょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "右手": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "みぎて",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "温柔": {
+  "meaning": "轻柔",
+  "pos": "名詞",
+  "reading": "おんじゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "過ごす": {
+  "meaning": "花费",
+  "pos": "動詞",
+  "reading": "すごす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "過ち": {
+  "meaning": "错误",
+  "pos": "名詞",
+  "reading": "あやまち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "会う": {
+  "meaning": "相遇",
+  "pos": "動詞",
+  "reading": "あう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "解く": {
+  "meaning": "解开",
+  "pos": "動詞",
+  "reading": "とく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "覚える": {
+  "meaning": "记住",
+  "pos": "動詞",
+  "reading": "おぼえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "慣れる": {
+  "meaning": "习惯",
+  "pos": "動詞",
+  "reading": "なれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:49.392Z"
+ },
+ "奇跡": {
+  "meaning": "奇迹",
+  "pos": "名詞",
+  "reading": "きせき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "寄せる": {
+  "meaning": "给予",
+  "pos": "動詞",
+  "reading": "よせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "気づく": {
+  "meaning": "通知",
+  "pos": "動詞",
+  "reading": "きづく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "祈る": {
+  "meaning": "祈祷",
+  "pos": "動詞",
+  "reading": "いのる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "急ぐ": {
+  "meaning": "快点",
+  "pos": "動詞",
+  "reading": "いそぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "救い": {
+  "meaning": "救援",
+  "pos": "名詞",
+  "reading": "すくい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "朽ちる": {
+  "meaning": "腐烂",
+  "pos": "動詞",
+  "reading": "くちる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "泣く": {
+  "meaning": "哭泣",
+  "pos": "動詞",
+  "reading": "なく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "拒む": {
+  "meaning": "拒绝",
+  "pos": "動詞",
+  "reading": "こばむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "許し": {
+  "meaning": "原谅",
+  "pos": "名詞",
+  "reading": "ゆるし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:50.998Z"
+ },
+ "共に": {
+  "meaning": "一起",
+  "pos": "副詞",
+  "reading": "ともに",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "駆ける": {
+  "meaning": "跑步",
+  "pos": "動詞",
+  "reading": "かける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "繋ぐ": {
+  "meaning": "连接",
+  "pos": "動詞",
+  "reading": "つなぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "欠ける": {
+  "meaning": "失踪",
+  "pos": "動詞",
+  "reading": "かける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "見つける": {
+  "meaning": "寻找",
+  "pos": "動詞",
+  "reading": "みつける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "限界": {
+  "meaning": "极限",
+  "pos": "名詞",
+  "reading": "げんかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "古い": {
+  "meaning": "老",
+  "pos": "形容詞",
+  "reading": "ふるい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "枯れる": {
+  "meaning": "垂死",
+  "pos": "動詞",
+  "reading": "かれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "語る": {
+  "meaning": "说话",
+  "pos": "動詞",
+  "reading": "かたる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "紅茶": {
+  "meaning": "茶",
+  "pos": "名詞",
+  "reading": "こうちゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:52.657Z"
+ },
+ "告げよる": {
+  "meaning": "tell",
+  "pos": "動詞",
+  "reading": "つげよる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "塞ぐ": {
+  "meaning": "block",
+  "pos": "動詞",
+  "reading": "ふさぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "砕く": {
+  "meaning": "crush",
+  "pos": "動詞",
+  "reading": "くだく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "作る": {
+  "meaning": "make",
+  "pos": "動詞",
+  "reading": "つくる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "始まり": {
+  "meaning": "start",
+  "pos": "名詞",
+  "reading": "はじまり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "始まる": {
+  "meaning": "start",
+  "pos": "動詞",
+  "reading": "はじまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "思い出": {
+  "meaning": "memories",
+  "pos": "名詞",
+  "reading": "おもいで",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "自覚": {
+  "meaning": "awareness",
+  "pos": "名詞",
+  "reading": "じかく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "寂しい": {
+  "meaning": "loneliness",
+  "pos": "形容詞",
+  "reading": "さびしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "集める": {
+  "meaning": "collect",
+  "pos": "動詞",
+  "reading": "あつめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:54.248Z"
+ },
+ "重ねる": {
+  "meaning": "重叠",
+  "pos": "動詞",
+  "reading": "かさねる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "祝福": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "しゅくふく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "出会う": {
+  "meaning": "遭遇",
+  "pos": "動詞",
+  "reading": "でう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "出来事": {
+  "meaning": "事件",
+  "pos": "名詞",
+  "reading": "できごと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "小さい": {
+  "meaning": "小",
+  "pos": "形容詞",
+  "reading": "ちいさい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "焦がす": {
+  "meaning": "灼烧",
+  "pos": "動詞",
+  "reading": "こがす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "証明": {
+  "meaning": "证明",
+  "pos": "名詞",
+  "reading": "しょうめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "乗せる": {
+  "meaning": "放",
+  "pos": "動詞",
+  "reading": "のせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "状態": {
+  "meaning": "状态",
+  "pos": "名詞",
+  "reading": "じょうたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "振り返る": {
+  "meaning": "回顾",
+  "pos": "動詞",
+  "reading": "ふりかえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:55.930Z"
+ },
+ "真実": {
+  "meaning": "TRUTH",
+  "pos": "名詞",
+  "reading": "しんじつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "進む": {
+  "meaning": "GO",
+  "pos": "動詞",
+  "reading": "すすむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "星屑": {
+  "meaning": "STARDUST",
+  "pos": "名詞",
+  "reading": "ほしくず",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "晴らす": {
+  "meaning": "CLEAR",
+  "pos": "動詞",
+  "reading": "はらす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "晴れる": {
+  "meaning": "CLEAR",
+  "pos": "動詞",
+  "reading": "はれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "戦慄く": {
+  "meaning": "SHUDDER",
+  "pos": "名詞",
+  "reading": "わななく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "蘇る": {
+  "meaning": "RISE",
+  "pos": "動詞",
+  "reading": "よみがえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "増す": {
+  "meaning": "INCREASE",
+  "pos": "動詞",
+  "reading": "ます",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "他人": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "たにん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "大きい": {
+  "meaning": "",
+  "pos": "形容詞",
+  "reading": "おおきい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:57.802Z"
+ },
+ "大好き": {
+  "meaning": "love",
+  "pos": "名詞",
+  "reading": "だいすき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "託す": {
+  "meaning": "entrust",
+  "pos": "動詞",
+  "reading": "たくす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "奪う": {
+  "meaning": "rob",
+  "pos": "動詞",
+  "reading": "うばう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "暖か": {
+  "meaning": "warm",
+  "pos": "形容詞",
+  "reading": "あたたか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "地獄": {
+  "meaning": "hell",
+  "pos": "名詞",
+  "reading": "じごく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "沈み": {
+  "meaning": "sink",
+  "pos": "名詞",
+  "reading": "しずみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "定義": {
+  "meaning": "definition",
+  "pos": "名詞",
+  "reading": "ていぎ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "答案": {
+  "meaning": "answer",
+  "pos": "名詞",
+  "reading": "とうあん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "到来": {
+  "meaning": "coming",
+  "pos": "名詞",
+  "reading": "とうらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "逃れる": {
+  "meaning": "escape",
+  "pos": "動詞",
+  "reading": "のがれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:47:59.378Z"
+ },
+ "日常": {
+  "meaning": "每天",
+  "pos": "名詞",
+  "reading": "にちじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "覗く": {
+  "meaning": "偷看",
+  "pos": "動詞",
+  "reading": "のぞく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "破る": {
+  "meaning": "突破",
+  "pos": "動詞",
+  "reading": "やぶる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "破壊": {
+  "meaning": "破坏",
+  "pos": "名詞",
+  "reading": "はかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "背中": {
+  "meaning": "后退",
+  "pos": "名詞",
+  "reading": "せなか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "抜く": {
+  "meaning": "拉出",
+  "pos": "動詞",
+  "reading": "ぬく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "秘める": {
+  "meaning": "隐藏",
+  "pos": "動詞",
+  "reading": "ひめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "負ける": {
+  "meaning": "失去",
+  "pos": "動詞",
+  "reading": "まける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "聞こえる": {
+  "meaning": "听力",
+  "pos": "動詞",
+  "reading": "きこえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "訪れる": {
+  "meaning": "访问",
+  "pos": "動詞",
+  "reading": "おとずれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:01.012Z"
+ },
+ "傍ら": {
+  "meaning": "旁边",
+  "pos": "名詞",
+  "reading": "かたわら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "忘れ去る": {
+  "meaning": "忘记",
+  "pos": "動詞",
+  "reading": "わすれさらる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "魔王": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "まおう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "魔女": {
+  "meaning": "女巫",
+  "pos": "名詞",
+  "reading": "まじょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "無限": {
+  "meaning": "无限",
+  "pos": "名詞",
+  "reading": "むげん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "名前": {
+  "meaning": "名字",
+  "pos": "名詞",
+  "reading": "なまえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "明かす": {
+  "meaning": "揭露",
+  "pos": "動詞",
+  "reading": "あかす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "明天": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "めいてん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "鳴らす": {
+  "meaning": "戒指",
+  "pos": "動詞",
+  "reading": "ならす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "滅ぼす": {
+  "meaning": "毁灭",
+  "pos": "動詞",
+  "reading": "ほろぼす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:02.698Z"
+ },
+ "目覚める": {
+  "meaning": "唤醒",
+  "pos": "動詞",
+  "reading": "めざめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "夜明け": {
+  "meaning": "黎明",
+  "pos": "名詞",
+  "reading": "よあけ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "躍る": {
+  "meaning": "跳跃",
+  "pos": "動詞",
+  "reading": "おどらる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "勇者": {
+  "meaning": "英雄",
+  "pos": "名詞",
+  "reading": "ゆうしゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "憂い": {
+  "meaning": "悲伤",
+  "pos": "形容詞",
+  "reading": "うい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "遊び": {
+  "meaning": "游戏",
+  "pos": "名詞",
+  "reading": "あそび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "溶ける": {
+  "meaning": "融化",
+  "pos": "動詞",
+  "reading": "とける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "落ちる": {
+  "meaning": "坠落",
+  "pos": "動詞",
+  "reading": "おつる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "理解": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "りかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "流す": {
+  "meaning": "棚屋",
+  "pos": "動詞",
+  "reading": "ながす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:04.263Z"
+ },
+ "旅人": {
+  "meaning": "旅行者",
+  "pos": "名詞",
+  "reading": "たびびと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "零れる": {
+  "meaning": "零",
+  "pos": "動詞",
+  "reading": "こぼれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "綺麗": {
+  "meaning": "美丽",
+  "pos": "名詞",
+  "reading": "きれい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "翳す": {
+  "meaning": "海市蜃楼",
+  "pos": "動詞",
+  "reading": "かざす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "蜃気楼": {
+  "meaning": "海市蜃楼",
+  "pos": "名詞",
+  "reading": "しんきろう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "こい": {
+  "meaning": "来",
+  "pos": "形容詞",
+  "reading": "こい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "切に": {
+  "meaning": "没有",
+  "pos": "副詞",
+  "reading": "せつに",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "煩い": {
+  "meaning": "烦恼",
+  "pos": "形容詞",
+  "reading": "うるさい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "一切": {
+  "meaning": "所有",
+  "pos": "名詞",
+  "reading": "いっさい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "合掌": {
+  "meaning": "一起",
+  "pos": "名詞",
+  "reading": "がっしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:06.030Z"
+ },
+ "さくら": {
+  "meaning": "Sakura",
+  "pos": "名詞",
+  "reading": "さくあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "よい": {
+  "meaning": "Good",
+  "pos": "形容詞",
+  "reading": "よい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "一輪": {
+  "meaning": "One Wheel",
+  "pos": "名詞",
+  "reading": "いちりん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "歌唱": {
+  "meaning": "Singing",
+  "pos": "名詞",
+  "reading": "かしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "かな": {
+  "meaning": "Kana",
+  "pos": "名詞",
+  "reading": "かあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "眺望": {
+  "meaning": "Views",
+  "pos": "名詞",
+  "reading": "ちょうぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "美好": {
+  "meaning": "Beautiful",
+  "pos": "名詞",
+  "reading": "みよし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "おいで": {
+  "meaning": "Come",
+  "pos": "名詞",
+  "reading": "おいえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "なう": {
+  "meaning": "Nau",
+  "pos": "形容詞",
+  "reading": "なう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "ほか": {
+  "meaning": "Others",
+  "pos": "名詞",
+  "reading": "ほあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:07.628Z"
+ },
+ "一番": {
+  "meaning": "大多数",
+  "pos": "名詞",
+  "reading": "いちばん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "引き寄せる": {
+  "meaning": "吸引",
+  "pos": "動詞",
+  "reading": "ひきよせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "何故": {
+  "meaning": "为什么",
+  "pos": "副詞",
+  "reading": "なぜ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "幾日": {
+  "meaning": "天",
+  "pos": "名詞",
+  "reading": "いくにち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "戯れる": {
+  "meaning": "玩",
+  "pos": "動詞",
+  "reading": "たわむれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "禁忌": {
+  "meaning": "禁忌症",
+  "pos": "名詞",
+  "reading": "きんき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "坐臥": {
+  "meaning": "坐",
+  "pos": "名詞",
+  "reading": "ざが",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "出口": {
+  "meaning": "退出",
+  "pos": "名詞",
+  "reading": "でぐち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "順に": {
+  "meaning": "顺序",
+  "pos": "副詞",
+  "reading": "じゅんに",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "戦う": {
+  "meaning": "战斗",
+  "pos": "動詞",
+  "reading": "たたかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:09.252Z"
+ },
+ "呑める": {
+  "meaning": "吞咽",
+  "pos": "動詞",
+  "reading": "のめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "燃えよる": {
+  "meaning": "燃烧",
+  "pos": "動詞",
+  "reading": "もえよる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "方向": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ほうこう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "明月": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "めいげつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "夜光虫": {
+  "meaning": "夜光",
+  "pos": "名詞",
+  "reading": "やこうちゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "喘ぐ": {
+  "meaning": "呻吟",
+  "pos": "動詞",
+  "reading": "あえぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "おどる": {
+  "meaning": "跳舞",
+  "pos": "動詞",
+  "reading": "おどう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "きくる": {
+  "meaning": "来临",
+  "pos": "動詞",
+  "reading": "きくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "したたる": {
+  "meaning": "飞镖",
+  "pos": "形容詞",
+  "reading": "したたう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "たどりつく": {
+  "meaning": "到达",
+  "pos": "動詞",
+  "reading": "たどりつう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:10.997Z"
+ },
+ "のぼっ": {
+  "meaning": "up",
+  "pos": "動詞",
+  "reading": "のぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "まわし": {
+  "meaning": "up",
+  "pos": "動詞",
+  "reading": "まわい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "もくもく": {
+  "meaning": "down",
+  "pos": "副詞",
+  "reading": "もくもう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "愛しい": {
+  "meaning": "love",
+  "pos": "形容詞",
+  "reading": "いとしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "歌声": {
+  "meaning": "singing",
+  "pos": "名詞",
+  "reading": "うたごえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "起きる": {
+  "meaning": "get up",
+  "pos": "動詞",
+  "reading": "おきる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "休み休み": {
+  "meaning": "vacation",
+  "pos": "副詞",
+  "reading": "やすみやすみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "交わり": {
+  "meaning": "fellowship",
+  "pos": "名詞",
+  "reading": "まじわり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "紅蓮": {
+  "meaning": "guren",
+  "pos": "名詞",
+  "reading": "ぐれん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "行ける": {
+  "meaning": "can go",
+  "pos": "動詞",
+  "reading": "いける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:12.706Z"
+ },
+ "祝える": {
+  "meaning": "庆祝",
+  "pos": "動詞",
+  "reading": "いわえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "消す": {
+  "meaning": "擦除",
+  "pos": "動詞",
+  "reading": "けす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "消失": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "しょうしつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "食すする": {
+  "meaning": "吃",
+  "pos": "動詞",
+  "reading": "しょくする",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "人生": {
+  "meaning": "生活",
+  "pos": "名詞",
+  "reading": "じんせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "聖歌": {
+  "meaning": "赞美诗",
+  "pos": "名詞",
+  "reading": "せいか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "潜む": {
+  "meaning": "潜伏",
+  "pos": "動詞",
+  "reading": "ひそむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "奏でよる": {
+  "meaning": "播放",
+  "pos": "動詞",
+  "reading": "かなでる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "騒ぐ": {
+  "meaning": "制造噪音",
+  "pos": "動詞",
+  "reading": "さわぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "打ち砕ける": {
+  "meaning": "粉碎",
+  "pos": "動詞",
+  "reading": "うちくだける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:14.498Z"
+ },
+ "通る": {
+  "meaning": "通过",
+  "pos": "動詞",
+  "reading": "とおる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "透明": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "とうめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "突き立てる": {
+  "meaning": "突出",
+  "pos": "動詞",
+  "reading": "つきたてる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "煩悩": {
+  "meaning": "烦人",
+  "pos": "名詞",
+  "reading": "ぼんのう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "美味": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "びみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "不透明": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ふとうめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "本来": {
+  "meaning": "原始",
+  "pos": "名詞",
+  "reading": "ほんらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "抹消": {
+  "meaning": "抹去",
+  "pos": "名詞",
+  "reading": "まっしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "迷宮": {
+  "meaning": "迷宫",
+  "pos": "名詞",
+  "reading": "めいきゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "面倒": {
+  "meaning": "麻烦",
+  "pos": "名詞",
+  "reading": "めんどう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:16.934Z"
+ },
+ "力量": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "りきりょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "瑠璃": {
+  "meaning": "ruri",
+  "pos": "名詞",
+  "reading": "るり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "滲む": {
+  "meaning": "渗出",
+  "pos": "動詞",
+  "reading": "にじむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "あつあつ": {
+  "meaning": "刺激",
+  "pos": "名詞",
+  "reading": "あつあう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "あてる": {
+  "meaning": "应用",
+  "pos": "動詞",
+  "reading": "あてう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "いただく": {
+  "meaning": "接受",
+  "pos": "動詞",
+  "reading": "いただう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "うぅ": {
+  "meaning": "呃",
+  "pos": "形容詞",
+  "reading": "うう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "えげつない": {
+  "meaning": "令人沮丧",
+  "pos": "形容詞",
+  "reading": "えげつない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "おかしい": {
+  "meaning": "有趣",
+  "pos": "形容詞",
+  "reading": "おかしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "かき消す": {
+  "meaning": "溺水",
+  "pos": "動詞",
+  "reading": "かきけす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:18.674Z"
+ },
+ "かご": {
+  "meaning": "篮子",
+  "pos": "名詞",
+  "reading": "かお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "かごめ": {
+  "meaning": "kagome",
+  "pos": "名詞",
+  "reading": "かごえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "かみ": {
+  "meaning": "kami",
+  "pos": "動詞",
+  "reading": "かい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "げろ": {
+  "meaning": "gelo",
+  "pos": "名詞",
+  "reading": "げお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "こうじる": {
+  "meaning": "geko",
+  "pos": "動詞",
+  "reading": "こうじう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "さかずき": {
+  "meaning": "shakuzuki",
+  "pos": "名詞",
+  "reading": "さかずい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "ささげ": {
+  "meaning": "sacrifice",
+  "pos": "名詞",
+  "reading": "ささえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "ささやか": {
+  "meaning": "small",
+  "pos": "名詞",
+  "reading": "ささやあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "じっと": {
+  "meaning": "gentle",
+  "pos": "副詞",
+  "reading": "じっお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "すごい": {
+  "meaning": "awesome",
+  "pos": "形容詞",
+  "reading": "すごい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:20.490Z"
+ },
+ "すでに": {
+  "meaning": "已经",
+  "pos": "副詞",
+  "reading": "すでい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "そろそろ": {
+  "meaning": "关于",
+  "pos": "副詞",
+  "reading": "そろそお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "ちょい": {
+  "meaning": "一点点",
+  "pos": "副詞",
+  "reading": "ちょい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "つなぐ": {
+  "meaning": "连接",
+  "pos": "動詞",
+  "reading": "つなう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "でっかい": {
+  "meaning": "大",
+  "pos": "形容詞",
+  "reading": "でっかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "てらす": {
+  "meaning": "到",
+  "pos": "動詞",
+  "reading": "てらう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "どうも": {
+  "meaning": "谢谢",
+  "pos": "副詞",
+  "reading": "どうお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "どき": {
+  "meaning": "没有",
+  "pos": "動詞",
+  "reading": "どい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "なけなし": {
+  "meaning": "什么",
+  "pos": "名詞",
+  "reading": "なけない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "なにか": {
+  "meaning": "",
+  "pos": "副詞",
+  "reading": "なにあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:22.203Z"
+ },
+ "なんにも": {
+  "meaning": "任何",
+  "pos": "副詞",
+  "reading": "なんにお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "はるか": {
+  "meaning": "远",
+  "pos": "副詞",
+  "reading": "はるあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "ひとつ": {
+  "meaning": "一个",
+  "pos": "名詞",
+  "reading": "ひとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "ひらひら": {
+  "meaning": "平平",
+  "pos": "副詞",
+  "reading": "ひらひあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "ぷるりん": {
+  "meaning": "瘙痒素",
+  "pos": "名詞",
+  "reading": "ぷるりう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "まれ": {
+  "meaning": "罕见",
+  "pos": "名詞",
+  "reading": "まえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "もし": {
+  "meaning": "如果",
+  "pos": "副詞",
+  "reading": "もい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "やがて": {
+  "meaning": "很快",
+  "pos": "副詞",
+  "reading": "やがえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "ゆらり": {
+  "meaning": "在黑暗中波动",
+  "pos": "副詞",
+  "reading": "ゆらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "暗中": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "あんちゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:23.915Z"
+ },
+ "委ねる": {
+  "meaning": "委托",
+  "pos": "動詞",
+  "reading": "ゆだねる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "一体": {
+  "meaning": "ONE",
+  "pos": "副詞",
+  "reading": "いったい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "一片": {
+  "meaning": "单品",
+  "pos": "名詞",
+  "reading": "いっぺん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "引く": {
+  "meaning": "拉力",
+  "pos": "動詞",
+  "reading": "ひく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "飲む": {
+  "meaning": "饮料",
+  "pos": "動詞",
+  "reading": "のむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "運動会": {
+  "meaning": "运动会",
+  "pos": "名詞",
+  "reading": "うんどうかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "雲の上": {
+  "meaning": "云",
+  "pos": "名詞",
+  "reading": "くものうえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "音速": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "おんそく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "歌える": {
+  "meaning": "唱歌",
+  "pos": "動詞",
+  "reading": "うたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "壊せる": {
+  "meaning": "休息",
+  "pos": "動詞",
+  "reading": "こわせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:25.962Z"
+ },
+ "喝采": {
+  "meaning": "欢呼",
+  "pos": "名詞",
+  "reading": "かっさい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "寒冷": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "かんれい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "感覚": {
+  "meaning": "感觉",
+  "pos": "名詞",
+  "reading": "かんかく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "貫く": {
+  "meaning": "穿透",
+  "pos": "動詞",
+  "reading": "つらぬく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "丸出し": {
+  "meaning": "圆圈",
+  "pos": "名詞",
+  "reading": "まるだし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "気付く": {
+  "meaning": "通知",
+  "pos": "動詞",
+  "reading": "きづく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "記念": {
+  "meaning": "纪念",
+  "pos": "名詞",
+  "reading": "きねん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "記録": {
+  "meaning": "记录",
+  "pos": "名詞",
+  "reading": "きろく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "偽り": {
+  "meaning": "假",
+  "pos": "名詞",
+  "reading": "いつわり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "吉日": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "きちじつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:27.984Z"
+ },
+ "救う": {
+  "meaning": "保存",
+  "pos": "動詞",
+  "reading": "すくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "虚しい": {
+  "meaning": "void",
+  "pos": "形容詞",
+  "reading": "むなしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "虚空": {
+  "meaning": "void",
+  "pos": "名詞",
+  "reading": "こくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "虚無": {
+  "meaning": "void",
+  "pos": "名詞",
+  "reading": "きょむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "叫ぶ": {
+  "meaning": "scream",
+  "pos": "動詞",
+  "reading": "さけぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "狂う": {
+  "meaning": "mad",
+  "pos": "動詞",
+  "reading": "くるう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "愚者": {
+  "meaning": "fool",
+  "pos": "名詞",
+  "reading": "ぐしゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "掲げる": {
+  "meaning": "hold",
+  "pos": "動詞",
+  "reading": "かかげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "経験": {
+  "meaning": "experience",
+  "pos": "名詞",
+  "reading": "けいけん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "決める": {
+  "meaning": "decide",
+  "pos": "動詞",
+  "reading": "きめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:29.756Z"
+ },
+ "結界": {
+  "meaning": "屏障",
+  "pos": "名詞",
+  "reading": "けっかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "結晶": {
+  "meaning": "晶体",
+  "pos": "名詞",
+  "reading": "けっしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "見逃す": {
+  "meaning": "错过",
+  "pos": "動詞",
+  "reading": "みのがす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "賢者": {
+  "meaning": "明智",
+  "pos": "名詞",
+  "reading": "けんじゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "個体": {
+  "meaning": "个人",
+  "pos": "名詞",
+  "reading": "こたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "乞い": {
+  "meaning": "乞讨",
+  "pos": "名詞",
+  "reading": "こい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "交じる": {
+  "meaning": "性交",
+  "pos": "動詞",
+  "reading": "まじる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "交わす": {
+  "meaning": "走向",
+  "pos": "動詞",
+  "reading": "かわす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "向く": {
+  "meaning": "广泛",
+  "pos": "動詞",
+  "reading": "むく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "広い": {
+  "meaning": "",
+  "pos": "形容詞",
+  "reading": "ひろい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:31.363Z"
+ },
+ "行き交う": {
+  "meaning": "go",
+  "pos": "動詞",
+  "reading": "いきかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "轟く": {
+  "meaning": "roar",
+  "pos": "動詞",
+  "reading": "とどろく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "今頃": {
+  "meaning": "now",
+  "pos": "名詞",
+  "reading": "いまごろ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "再び": {
+  "meaning": "again",
+  "pos": "副詞",
+  "reading": "ふたたび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "最強": {
+  "meaning": "strongest",
+  "pos": "名詞",
+  "reading": "さいきょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "最速": {
+  "meaning": "fastest",
+  "pos": "名詞",
+  "reading": "さいそく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "罪人": {
+  "meaning": "sinner",
+  "pos": "名詞",
+  "reading": "ざいにん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "晒す": {
+  "meaning": "expose",
+  "pos": "動詞",
+  "reading": "さらす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "産声": {
+  "meaning": "vocalize",
+  "pos": "名詞",
+  "reading": "うぶごえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "仕草": {
+  "meaning": "gesture",
+  "pos": "名詞",
+  "reading": "しぐさ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:34.191Z"
+ },
+ "刺す": {
+  "meaning": "刺伤",
+  "pos": "動詞",
+  "reading": "さす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "思い": {
+  "meaning": "思想",
+  "pos": "名詞",
+  "reading": "おもい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "支配": {
+  "meaning": "控制",
+  "pos": "名詞",
+  "reading": "しはい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "死去": {
+  "meaning": "死亡",
+  "pos": "名詞",
+  "reading": "しきょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "私情": {
+  "meaning": "私事",
+  "pos": "名詞",
+  "reading": "しじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "至る": {
+  "meaning": "全部",
+  "pos": "動詞",
+  "reading": "いたる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "時計": {
+  "meaning": "观看",
+  "pos": "名詞",
+  "reading": "とけい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "写真": {
+  "meaning": "照片",
+  "pos": "名詞",
+  "reading": "しゃしん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "邪魔": {
+  "meaning": "障碍物",
+  "pos": "名詞",
+  "reading": "じゃま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "手繰り": {
+  "meaning": "抓地力",
+  "pos": "名詞",
+  "reading": "てぐり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:35.866Z"
+ },
+ "受ける": {
+  "meaning": "拿下",
+  "pos": "動詞",
+  "reading": "うける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "住人": {
+  "meaning": "居民",
+  "pos": "名詞",
+  "reading": "じゅうにん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "重要": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "じゅうよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "勝利": {
+  "meaning": "胜利",
+  "pos": "名詞",
+  "reading": "しょうり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "焼く": {
+  "meaning": "烘焙",
+  "pos": "動詞",
+  "reading": "やく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "上げる": {
+  "meaning": "加薪",
+  "pos": "動詞",
+  "reading": "あげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "信用": {
+  "meaning": "积分",
+  "pos": "名詞",
+  "reading": "しんよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "真紅": {
+  "meaning": "深红色",
+  "pos": "名詞",
+  "reading": "しんく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "身体": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "しんたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "人形": {
+  "meaning": "娃娃",
+  "pos": "名詞",
+  "reading": "にんぎょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:37.472Z"
+ },
+ "人知れず": {
+  "meaning": "unknown",
+  "pos": "副詞",
+  "reading": "ひとしれず",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "須臾": {
+  "meaning": "must",
+  "pos": "名詞",
+  "reading": "しゅゆ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "生ける": {
+  "meaning": "living",
+  "pos": "動詞",
+  "reading": "いける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "逝く": {
+  "meaning": "departing",
+  "pos": "動詞",
+  "reading": "ゆく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "積もる": {
+  "meaning": "accumulating",
+  "pos": "動詞",
+  "reading": "つもる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "赤ちゃん": {
+  "meaning": "baby",
+  "pos": "名詞",
+  "reading": "あかちゃん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "雪白": {
+  "meaning": "snow-white",
+  "pos": "名詞",
+  "reading": "せっぱく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "絶望": {
+  "meaning": "despair",
+  "pos": "名詞",
+  "reading": "ぜつぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "染め上げる": {
+  "meaning": "dyeing",
+  "pos": "動詞",
+  "reading": "そめあげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "鮮明": {
+  "meaning": "vivid",
+  "pos": "名詞",
+  "reading": "せんめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:39.496Z"
+ },
+ "全部": {
+  "meaning": "all",
+  "pos": "名詞",
+  "reading": "ぜんぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "続ける": {
+  "meaning": "continue",
+  "pos": "動詞",
+  "reading": "つづける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "太鼓": {
+  "meaning": "drums",
+  "pos": "名詞",
+  "reading": "たいこ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "待ち": {
+  "meaning": "wait",
+  "pos": "名詞",
+  "reading": "まち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "大家": {
+  "meaning": "everyone",
+  "pos": "名詞",
+  "reading": "おおや",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "大丈夫": {
+  "meaning": "okay",
+  "pos": "名詞",
+  "reading": "だいじょうぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "誰か": {
+  "meaning": "someone",
+  "pos": "名詞",
+  "reading": "だれか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "弾ける": {
+  "meaning": "play",
+  "pos": "動詞",
+  "reading": "ひける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "知れる": {
+  "meaning": "know",
+  "pos": "動詞",
+  "reading": "しれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "置く": {
+  "meaning": "put",
+  "pos": "動詞",
+  "reading": "おく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:41.055Z"
+ },
+ "追いつける": {
+  "meaning": "超车",
+  "pos": "動詞",
+  "reading": "おいつける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "痛い": {
+  "meaning": "痛苦",
+  "pos": "形容詞",
+  "reading": "いたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "痛感": {
+  "meaning": "痛苦",
+  "pos": "名詞",
+  "reading": "つうかん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "吊る": {
+  "meaning": "上吊",
+  "pos": "動詞",
+  "reading": "つる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "定め": {
+  "meaning": "决定",
+  "pos": "名詞",
+  "reading": "さだめ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "伝える": {
+  "meaning": "沟通",
+  "pos": "動詞",
+  "reading": "つたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "怒り": {
+  "meaning": "愤怒",
+  "pos": "名詞",
+  "reading": "いかり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "凍てつく": {
+  "meaning": "冻结",
+  "pos": "動詞",
+  "reading": "いてつく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "桃源郷": {
+  "meaning": "桃子国",
+  "pos": "名詞",
+  "reading": "とうげんきょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "淘汰": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "とうた",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:42.793Z"
+ },
+ "灯る": {
+  "meaning": "光",
+  "pos": "動詞",
+  "reading": "ともれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.665Z"
+ },
+ "灯火": {
+  "meaning": "光",
+  "pos": "名詞",
+  "reading": "ともしび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "独立": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "どくりつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "匂い": {
+  "meaning": "气味",
+  "pos": "名詞",
+  "reading": "におい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "熱い": {
+  "meaning": "热",
+  "pos": "形容詞",
+  "reading": "あつい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "燃えろる": {
+  "meaning": "烧伤",
+  "pos": "動詞",
+  "reading": "もえろる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "燃やす": {
+  "meaning": "烧伤",
+  "pos": "動詞",
+  "reading": "もやす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "白紙": {
+  "meaning": "空白",
+  "pos": "名詞",
+  "reading": "はくし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "判る": {
+  "meaning": "理解",
+  "pos": "動詞",
+  "reading": "わからる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "犯人": {
+  "meaning": "罪魁祸首",
+  "pos": "名詞",
+  "reading": "はんにん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:44.666Z"
+ },
+ "比べれる": {
+  "meaning": "比较",
+  "pos": "動詞",
+  "reading": "くらべる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "疲れる": {
+  "meaning": "疲倦",
+  "pos": "動詞",
+  "reading": "つかれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "飛び出す": {
+  "meaning": "弹出",
+  "pos": "動詞",
+  "reading": "とびだす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "美味し": {
+  "meaning": "美味",
+  "pos": "形容詞",
+  "reading": "おいし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "必然": {
+  "meaning": "不可避免",
+  "pos": "名詞",
+  "reading": "ひつぜん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "不安": {
+  "meaning": "焦虑",
+  "pos": "名詞",
+  "reading": "ふあん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "不知": {
+  "meaning": "未知",
+  "pos": "名詞",
+  "reading": "ふち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "怖い": {
+  "meaning": "可怕",
+  "pos": "形容詞",
+  "reading": "こわい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "舞い上がる": {
+  "meaning": "飙升",
+  "pos": "動詞",
+  "reading": "まいあがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "別に": {
+  "meaning": "否则",
+  "pos": "副詞",
+  "reading": "べつに",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:46.359Z"
+ },
+ "変態": {
+  "meaning": "变态",
+  "pos": "名詞",
+  "reading": "へんたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "歩く": {
+  "meaning": "漫步",
+  "pos": "動詞",
+  "reading": "あるく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "冒険": {
+  "meaning": "冒险",
+  "pos": "名詞",
+  "reading": "ぼうけん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "没頭": {
+  "meaning": "沉浸式体验",
+  "pos": "名詞",
+  "reading": "ぼっとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "魔法": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "まほう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "味見": {
+  "meaning": "品味",
+  "pos": "名詞",
+  "reading": "あじみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "無粋": {
+  "meaning": "无情",
+  "pos": "名詞",
+  "reading": "ぶすい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "無数": {
+  "meaning": "无数",
+  "pos": "名詞",
+  "reading": "むすう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "明け方": {
+  "meaning": "黎明",
+  "pos": "名詞",
+  "reading": "あけがた",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "問う": {
+  "meaning": "询问",
+  "pos": "動詞",
+  "reading": "とう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:48.360Z"
+ },
+ "夜桜": {
+  "meaning": "Yozakura",
+  "pos": "名詞",
+  "reading": "よざくら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "夕方": {
+  "meaning": "晚上",
+  "pos": "名詞",
+  "reading": "ゆうがた",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "妖し": {
+  "meaning": "恶魔",
+  "pos": "形容詞",
+  "reading": "あやし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "踊れよる": {
+  "meaning": "跳舞",
+  "pos": "動詞",
+  "reading": "おどれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "頼り": {
+  "meaning": "依靠",
+  "pos": "名詞",
+  "reading": "たより",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "頼る": {
+  "meaning": "依靠",
+  "pos": "動詞",
+  "reading": "たよる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "流星": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "りゅうせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "両手": {
+  "meaning": "双手",
+  "pos": "名詞",
+  "reading": "りょうて",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "和永": {
+  "meaning": "Kazunaga",
+  "pos": "名詞",
+  "reading": "かずえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "和声": {
+  "meaning": "和谐",
+  "pos": "名詞",
+  "reading": "わせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:50.473Z"
+ },
+ "歪曲": {
+  "meaning": "扭曲",
+  "pos": "名詞",
+  "reading": "わいきょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "佇む": {
+  "meaning": "站立",
+  "pos": "動詞",
+  "reading": "たたずむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "咎人": {
+  "meaning": "有罪",
+  "pos": "名詞",
+  "reading": "とがにん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "貪る": {
+  "meaning": "贪婪",
+  "pos": "動詞",
+  "reading": "むさぼる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "あさる": {
+  "meaning": "ashigaru",
+  "pos": "動詞",
+  "reading": "あさう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "あっ": {
+  "meaning": "啊",
+  "pos": "動詞",
+  "reading": "あう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "あの世": {
+  "meaning": "来世",
+  "pos": "名詞",
+  "reading": "あのよ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "あふれる": {
+  "meaning": "完整",
+  "pos": "動詞",
+  "reading": "あふれう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "いう": {
+  "meaning": "说",
+  "pos": "動詞",
+  "reading": "いう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "いえ": {
+  "meaning": "不",
+  "pos": "動詞",
+  "reading": "いえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:52.101Z"
+ },
+ "いける": {
+  "meaning": "我可以",
+  "pos": "動詞",
+  "reading": "いけう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いじる": {
+  "meaning": "我可以",
+  "pos": "動詞",
+  "reading": "いじう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いち": {
+  "meaning": "我可以",
+  "pos": "名詞",
+  "reading": "いい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いっしょ": {
+  "meaning": "我可以",
+  "pos": "名詞",
+  "reading": "いっしう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いっとき": {
+  "meaning": "我可以",
+  "pos": "名詞",
+  "reading": "いっとい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いとしい": {
+  "meaning": "我可以",
+  "pos": "形容詞",
+  "reading": "いとしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "ぃな": {
+  "meaning": "我可以",
+  "pos": "名詞",
+  "reading": "ぃあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いね": {
+  "meaning": "我可以",
+  "pos": "名詞",
+  "reading": "いえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "いのち": {
+  "meaning": "我可以",
+  "pos": "名詞",
+  "reading": "いのい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "うごめく": {
+  "meaning": "我可以",
+  "pos": "動詞",
+  "reading": "うごめう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:53.861Z"
+ },
+ "うそ": {
+  "meaning": "吵闹",
+  "pos": "名詞",
+  "reading": "うお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "うっ": {
+  "meaning": "呃",
+  "pos": "動詞",
+  "reading": "うう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "うつむく": {
+  "meaning": "丑陋",
+  "pos": "動詞",
+  "reading": "うつむう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おいしい": {
+  "meaning": "美味",
+  "pos": "形容詞",
+  "reading": "おいしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おか": {
+  "meaning": "okara",
+  "pos": "動詞",
+  "reading": "おあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おきる": {
+  "meaning": "okaru",
+  "pos": "動詞",
+  "reading": "おきう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おしい": {
+  "meaning": "美味",
+  "pos": "形容詞",
+  "reading": "おしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おっ": {
+  "meaning": "哎呀",
+  "pos": "動詞",
+  "reading": "おう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おなか": {
+  "meaning": "饿了",
+  "pos": "名詞",
+  "reading": "おなあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "おろせる": {
+  "meaning": "我可以把它放下",
+  "pos": "動詞",
+  "reading": "おろせう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:55.597Z"
+ },
+ "お願い": {
+  "meaning": "请",
+  "pos": "名詞",
+  "reading": "おねがい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "お話": {
+  "meaning": "交谈",
+  "pos": "名詞",
+  "reading": "おはなし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "かかる": {
+  "meaning": "拿走",
+  "pos": "動詞",
+  "reading": "かかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "かき集める": {
+  "meaning": "收集",
+  "pos": "動詞",
+  "reading": "かきあつめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "かくし": {
+  "meaning": "隐藏",
+  "pos": "動詞",
+  "reading": "かくい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "かけ": {
+  "meaning": "打电话",
+  "pos": "名詞",
+  "reading": "かえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "がむしゃら": {
+  "meaning": "gamushara",
+  "pos": "名詞",
+  "reading": "がむしゃあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "きゅう": {
+  "meaning": "cum",
+  "pos": "名詞",
+  "reading": "きゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "くらくら": {
+  "meaning": "kurakura",
+  "pos": "副詞",
+  "reading": "くらくあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "くるくる": {
+  "meaning": "kurukuru",
+  "pos": "副詞",
+  "reading": "くるくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:57.273Z"
+ },
+ "くれよる": {
+  "meaning": "给",
+  "pos": "動詞",
+  "reading": "くれよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "この上ない": {
+  "meaning": "最好的",
+  "pos": "形容詞",
+  "reading": "このうえない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "この世": {
+  "meaning": "世界",
+  "pos": "名詞",
+  "reading": "このよ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "さびしい": {
+  "meaning": "孤独",
+  "pos": "形容詞",
+  "reading": "さびしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "さまよう": {
+  "meaning": "流浪",
+  "pos": "動詞",
+  "reading": "さまよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "ざん": {
+  "meaning": "赞山",
+  "pos": "名詞",
+  "reading": "ざう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "しかめっ面": {
+  "meaning": "鬼脸",
+  "pos": "名詞",
+  "reading": "しかめっつら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "しずく": {
+  "meaning": "滴水",
+  "pos": "名詞",
+  "reading": "しずう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "しまい": {
+  "meaning": "收缩",
+  "pos": "動詞",
+  "reading": "しまい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "しよう": {
+  "meaning": "让我们",
+  "pos": "名詞",
+  "reading": "しよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:48:58.916Z"
+ },
+ "しょうもない": {
+  "meaning": "糟糕",
+  "pos": "形容詞",
+  "reading": "しょうもない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "しよする": {
+  "meaning": "做",
+  "pos": "動詞",
+  "reading": "しよすう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "すい": {
+  "meaning": "好",
+  "pos": "動詞",
+  "reading": "すい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "すぐ": {
+  "meaning": "很快",
+  "pos": "副詞",
+  "reading": "すう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "すこし": {
+  "meaning": "很少",
+  "pos": "副詞",
+  "reading": "すこい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "すべて": {
+  "meaning": "全部",
+  "pos": "名詞",
+  "reading": "すべえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "せん": {
+  "meaning": "不是",
+  "pos": "名詞",
+  "reading": "せう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "ぜんぶ": {
+  "meaning": "全部",
+  "pos": "名詞",
+  "reading": "ぜんう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "そっと": {
+  "meaning": "轻轻地",
+  "pos": "副詞",
+  "reading": "そっお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "そのまま": {
+  "meaning": "按原样",
+  "pos": "副詞",
+  "reading": "そのまあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:00.616Z"
+ },
+ "それだけ": {
+  "meaning": "这就是所有",
+  "pos": "副詞",
+  "reading": "それだえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "それなり": {
+  "meaning": "好",
+  "pos": "副詞",
+  "reading": "それない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "ぞろぞろ": {
+  "meaning": "所有",
+  "pos": "副詞",
+  "reading": "ぞろぞお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "そんなに": {
+  "meaning": "这么多",
+  "pos": "副詞",
+  "reading": "そんない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "だい": {
+  "meaning": "只是",
+  "pos": "名詞",
+  "reading": "だい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "たぎる": {
+  "meaning": "甚至",
+  "pos": "動詞",
+  "reading": "たぎう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "たとえ": {
+  "meaning": "你",
+  "pos": "副詞",
+  "reading": "たとえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "たまえ": {
+  "meaning": "有时",
+  "pos": "名詞",
+  "reading": "たまえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "たまに": {
+  "meaning": "难以忍受",
+  "pos": "副詞",
+  "reading": "たまい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "たまらない": {
+  "meaning": "",
+  "pos": "形容詞",
+  "reading": "たまらない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:02.299Z"
+ },
+ "ちぎる": {
+  "meaning": "碎",
+  "pos": "動詞",
+  "reading": "ちぎう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "ちや": {
+  "meaning": "屎",
+  "pos": "名詞",
+  "reading": "ちあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "ちょっと": {
+  "meaning": "一点点",
+  "pos": "副詞",
+  "reading": "ちょっお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "つける": {
+  "meaning": "胶水",
+  "pos": "動詞",
+  "reading": "つけう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "つなご": {
+  "meaning": "连字",
+  "pos": "動詞",
+  "reading": "つなお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "つられる": {
+  "meaning": "缠结",
+  "pos": "動詞",
+  "reading": "つられう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "つる": {
+  "meaning": "藤蔓",
+  "pos": "名詞",
+  "reading": "つう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "どうして": {
+  "meaning": "为什么",
+  "pos": "副詞",
+  "reading": "どうしえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "どうせ": {
+  "meaning": "总之",
+  "pos": "副詞",
+  "reading": "どうえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "とっ": {
+  "meaning": "到",
+  "pos": "動詞",
+  "reading": "とう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:03.972Z"
+ },
+ "とらわれる": {
+  "meaning": "被困",
+  "pos": "動詞",
+  "reading": "とらわれう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "とろける": {
+  "meaning": "融化",
+  "pos": "動詞",
+  "reading": "とろけう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "どん": {
+  "meaning": "什么都不",
+  "pos": "名詞",
+  "reading": "どう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "なし": {
+  "meaning": "然后",
+  "pos": "形容詞",
+  "reading": "ない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "なら": {
+  "meaning": "是",
+  "pos": "動詞",
+  "reading": "なあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "なれ": {
+  "meaning": "为什么",
+  "pos": "動詞",
+  "reading": "なえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "なんで": {
+  "meaning": "弯曲",
+  "pos": "副詞",
+  "reading": "なんえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "にじむ": {
+  "meaning": "散装",
+  "pos": "動詞",
+  "reading": "にじう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "のさばる": {
+  "meaning": "向上",
+  "pos": "動詞",
+  "reading": "のさばう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "のぼる": {
+  "meaning": "",
+  "pos": "動詞",
+  "reading": "のぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:05.666Z"
+ },
+ "ばね": {
+  "meaning": "春天",
+  "pos": "名詞",
+  "reading": "ばえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "はやしたてる": {
+  "meaning": "春天",
+  "pos": "動詞",
+  "reading": "はやしたてう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "はらっ": {
+  "meaning": "原",
+  "pos": "動詞",
+  "reading": "はらう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "ひい": {
+  "meaning": "光",
+  "pos": "動詞",
+  "reading": "ひい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "ひかり": {
+  "meaning": "hikikomori",
+  "pos": "名詞",
+  "reading": "ひかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "ひきこもる": {
+  "meaning": "hikikomori",
+  "pos": "動詞",
+  "reading": "ひきこもう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "ひどく": {
+  "meaning": "可怕的",
+  "pos": "副詞",
+  "reading": "ひどう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "ぶつかる": {
+  "meaning": "颠簸",
+  "pos": "動詞",
+  "reading": "ぶつかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "へこん": {
+  "meaning": "hakon",
+  "pos": "動詞",
+  "reading": "へこう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "へべれけ": {
+  "meaning": "hake",
+  "pos": "名詞",
+  "reading": "へべれえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:07.483Z"
+ },
+ "へんじる": {
+  "meaning": "肿胀",
+  "pos": "動詞",
+  "reading": "へんじう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "まえる": {
+  "meaning": "瞥见",
+  "pos": "動詞",
+  "reading": "まえう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "まどい": {
+  "meaning": "泥泞",
+  "pos": "動詞",
+  "reading": "まどい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "まぶた": {
+  "meaning": "眼睑",
+  "pos": "名詞",
+  "reading": "まぶあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "まるで": {
+  "meaning": "仿佛",
+  "pos": "副詞",
+  "reading": "まるえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "みい": {
+  "meaning": "看到",
+  "pos": "名詞",
+  "reading": "みい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "みつける": {
+  "meaning": "发现",
+  "pos": "動詞",
+  "reading": "みつけう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "みろる": {
+  "meaning": "瞥见",
+  "pos": "動詞",
+  "reading": "みろう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "むき出し": {
+  "meaning": "裸露",
+  "pos": "名詞",
+  "reading": "むきだし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "もう一度": {
+  "meaning": "再次",
+  "pos": "副詞",
+  "reading": "もういちど",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:09.274Z"
+ },
+ "もやもや": {
+  "meaning": "moyamoya",
+  "pos": "副詞",
+  "reading": "もやもあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "やってきくる": {
+  "meaning": "来",
+  "pos": "動詞",
+  "reading": "やってきくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "やり": {
+  "meaning": "做",
+  "pos": "動詞",
+  "reading": "やい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "やろ": {
+  "meaning": "做",
+  "pos": "動詞",
+  "reading": "やお",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "ゃん": {
+  "meaning": "松",
+  "pos": "名詞",
+  "reading": "ゃう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "ゆる": {
+  "meaning": "好",
+  "pos": "動詞",
+  "reading": "ゆう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "よく": {
+  "meaning": "做",
+  "pos": "副詞",
+  "reading": "よう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "よる": {
+  "meaning": "rin",
+  "pos": "動詞",
+  "reading": "よう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "らん": {
+  "meaning": "rin",
+  "pos": "名詞",
+  "reading": "らう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "りん": {
+  "meaning": "",
+  "pos": "副詞",
+  "reading": "りう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:10.909Z"
+ },
+ "ろう": {
+  "meaning": "我",
+  "pos": "名詞",
+  "reading": "ろう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "わから": {
+  "meaning": "知道",
+  "pos": "動詞",
+  "reading": "わかあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "わかる": {
+  "meaning": "我",
+  "pos": "動詞",
+  "reading": "わかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "わかん": {
+  "meaning": "不知道",
+  "pos": "動詞",
+  "reading": "わかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "わく": {
+  "meaning": "我",
+  "pos": "動詞",
+  "reading": "わう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "わずか": {
+  "meaning": "一点点",
+  "pos": "副詞",
+  "reading": "わずあ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "わるい": {
+  "meaning": "一点点",
+  "pos": "形容詞",
+  "reading": "わるい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "哀しみ": {
+  "meaning": "怜悯",
+  "pos": "名詞",
+  "reading": "かなしみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "哀れ": {
+  "meaning": "怜悯",
+  "pos": "名詞",
+  "reading": "あわれ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "愛し合う": {
+  "meaning": "怜悯",
+  "pos": "動詞",
+  "reading": "あいしあう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:13.170Z"
+ },
+ "愛す": {
+  "meaning": "爱",
+  "pos": "動詞",
+  "reading": "あいす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "愛情": {
+  "meaning": "爱",
+  "pos": "名詞",
+  "reading": "あいじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "悪戯": {
+  "meaning": "恶作剧",
+  "pos": "名詞",
+  "reading": "いたずら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "悪霊": {
+  "meaning": "邪灵",
+  "pos": "名詞",
+  "reading": "あくりょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "安全": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "あんぜん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "安眠": {
+  "meaning": "睡眠",
+  "pos": "名詞",
+  "reading": "あんみん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "暗証": {
+  "meaning": "秘密",
+  "pos": "名詞",
+  "reading": "あんしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "暗夜": {
+  "meaning": "黑夜",
+  "pos": "名詞",
+  "reading": "あんや",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "案外": {
+  "meaning": "意外",
+  "pos": "副詞",
+  "reading": "あんがい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "偉大": {
+  "meaning": "很棒",
+  "pos": "名詞",
+  "reading": "いだい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:14.816Z"
+ },
+ "囲む": {
+  "meaning": "环绕",
+  "pos": "動詞",
+  "reading": "かこむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "意見": {
+  "meaning": "意见",
+  "pos": "名詞",
+  "reading": "いけん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "畏怖": {
+  "meaning": "敬畏",
+  "pos": "名詞",
+  "reading": "いふ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "異国": {
+  "meaning": "异国情调",
+  "pos": "名詞",
+  "reading": "いこく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "移り住む": {
+  "meaning": "迁移",
+  "pos": "動詞",
+  "reading": "うつりすむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "衣装": {
+  "meaning": "服装",
+  "pos": "名詞",
+  "reading": "いしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "遺す": {
+  "meaning": "传奇",
+  "pos": "動詞",
+  "reading": "のこす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "一起": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "かずき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "一隅": {
+  "meaning": "角落",
+  "pos": "名詞",
+  "reading": "いちぐう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "一瞬": {
+  "meaning": "时刻",
+  "pos": "名詞",
+  "reading": "いっしゅん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:16.435Z"
+ },
+ "一定": {
+  "meaning": "必须",
+  "pos": "名詞",
+  "reading": "いってい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "一堂": {
+  "meaning": "走到一起",
+  "pos": "名詞",
+  "reading": "いちどう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "引き裂く": {
+  "meaning": "撕裂",
+  "pos": "動詞",
+  "reading": "ひきさく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "飲み込む": {
+  "meaning": "吞咽",
+  "pos": "動詞",
+  "reading": "のみこむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "飲み明かす": {
+  "meaning": "吞咽",
+  "pos": "動詞",
+  "reading": "のみあかす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "隠し": {
+  "meaning": "隐藏",
+  "pos": "名詞",
+  "reading": "かくし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "雨降り": {
+  "meaning": "雨",
+  "pos": "名詞",
+  "reading": "あめふり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "栄華": {
+  "meaning": "荣耀",
+  "pos": "名詞",
+  "reading": "えいが",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "永い": {
+  "meaning": "永远",
+  "pos": "形容詞",
+  "reading": "ながい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "鋭い": {
+  "meaning": "锋利",
+  "pos": "形容詞",
+  "reading": "するどい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:18.062Z"
+ },
+ "越える": {
+  "meaning": "over",
+  "pos": "動詞",
+  "reading": "こえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "延びる": {
+  "meaning": "stretch",
+  "pos": "動詞",
+  "reading": "のぶる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "怨み": {
+  "meaning": "resent",
+  "pos": "名詞",
+  "reading": "うらみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "往く": {
+  "meaning": "go",
+  "pos": "動詞",
+  "reading": "ゆく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "応えよる": {
+  "meaning": "answer",
+  "pos": "動詞",
+  "reading": "こたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "王子": {
+  "meaning": "prince",
+  "pos": "名詞",
+  "reading": "おうじ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "臆病者": {
+  "meaning": "coward",
+  "pos": "名詞",
+  "reading": "おくびょうもの",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "乙女": {
+  "meaning": "maiden",
+  "pos": "名詞",
+  "reading": "おとめ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "温泉": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "おんせん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "温暖": {
+  "meaning": "warm",
+  "pos": "名詞",
+  "reading": "おんだん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:19.766Z"
+ },
+ "何もの": {
+  "meaning": "what",
+  "pos": "名詞",
+  "reading": "なにもの",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "何気ない": {
+  "meaning": "casual",
+  "pos": "形容詞",
+  "reading": "なにげない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "何故か": {
+  "meaning": "why",
+  "pos": "副詞",
+  "reading": "なぜか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "価値": {
+  "meaning": "value",
+  "pos": "名詞",
+  "reading": "かち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "可能": {
+  "meaning": "possible",
+  "pos": "名詞",
+  "reading": "かのう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "家内": {
+  "meaning": "wife",
+  "pos": "名詞",
+  "reading": "かない",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "火花": {
+  "meaning": "sparks",
+  "pos": "名詞",
+  "reading": "ひばな",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "花火": {
+  "meaning": "fireworks",
+  "pos": "名詞",
+  "reading": "はなび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "花見": {
+  "meaning": "赏樱",
+  "pos": "名詞",
+  "reading": "はなみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "花咲": {
+  "meaning": "hanasaki",
+  "pos": "名詞",
+  "reading": "はなさき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:21.492Z"
+ },
+ "花弁": {
+  "meaning": "花瓣",
+  "pos": "名詞",
+  "reading": "はなびら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "華麗": {
+  "meaning": "辉煌",
+  "pos": "名詞",
+  "reading": "かれい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "過ぎる": {
+  "meaning": "过去",
+  "pos": "動詞",
+  "reading": "すぎる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "過ぎ去る": {
+  "meaning": "传球",
+  "pos": "動詞",
+  "reading": "すぎさる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "我が身": {
+  "meaning": "自我",
+  "pos": "名詞",
+  "reading": "わがみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "芽生える": {
+  "meaning": "萌芽",
+  "pos": "動詞",
+  "reading": "めばえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "解決": {
+  "meaning": "解决方案",
+  "pos": "名詞",
+  "reading": "かいけつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "回帰": {
+  "meaning": "回归",
+  "pos": "名詞",
+  "reading": "かいき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "回廊": {
+  "meaning": "走廊",
+  "pos": "名詞",
+  "reading": "かいろう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "壊れる": {
+  "meaning": "破碎",
+  "pos": "動詞",
+  "reading": "こわれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:23.213Z"
+ },
+ "悔しい": {
+  "meaning": "恼人",
+  "pos": "形容詞",
+  "reading": "くやしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "懐かしい": {
+  "meaning": "怀旧",
+  "pos": "形容詞",
+  "reading": "なつかしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "改札": {
+  "meaning": "检票口",
+  "pos": "名詞",
+  "reading": "かいさつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "開く": {
+  "meaning": "开放",
+  "pos": "動詞",
+  "reading": "あく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "開放": {
+  "meaning": "开放",
+  "pos": "名詞",
+  "reading": "かいほう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "確率": {
+  "meaning": "概率",
+  "pos": "名詞",
+  "reading": "かくりつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "隔てる": {
+  "meaning": "单独",
+  "pos": "動詞",
+  "reading": "へだてる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "革命": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "かくめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "学業": {
+  "meaning": "学术",
+  "pos": "名詞",
+  "reading": "がくぎょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "楽しい": {
+  "meaning": "乐趣",
+  "pos": "形容詞",
+  "reading": "たのしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:25.263Z"
+ },
+ "楽しけりゃ": {
+  "meaning": "有趣",
+  "pos": "形容詞",
+  "reading": "たのしけりゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "楽しみ": {
+  "meaning": "有趣",
+  "pos": "名詞",
+  "reading": "たのしみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "額づく": {
+  "meaning": "框架",
+  "pos": "動詞",
+  "reading": "ぬかづく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "渇き": {
+  "meaning": "口渴",
+  "pos": "名詞",
+  "reading": "かわき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "噛み締める": {
+  "meaning": "咬伤",
+  "pos": "動詞",
+  "reading": "かみしめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "寒気": {
+  "meaning": "寒冷",
+  "pos": "名詞",
+  "reading": "さむけ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "完了": {
+  "meaning": "完成",
+  "pos": "名詞",
+  "reading": "かんりょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "甘美": {
+  "meaning": "甜蜜",
+  "pos": "名詞",
+  "reading": "かんび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "関係": {
+  "meaning": "关系",
+  "pos": "名詞",
+  "reading": "かんけい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "眼睛": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "がんせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:26.843Z"
+ },
+ "頑張る": {
+  "meaning": "争取",
+  "pos": "動詞",
+  "reading": "がんる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "喜び": {
+  "meaning": "快乐",
+  "pos": "名詞",
+  "reading": "よろこび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "奇妙": {
+  "meaning": "奇怪",
+  "pos": "名詞",
+  "reading": "きみょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "寄せ付ける": {
+  "meaning": "捐赠",
+  "pos": "動詞",
+  "reading": "よせつける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "寄り道": {
+  "meaning": "绕行",
+  "pos": "名詞",
+  "reading": "よりみち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "寄る": {
+  "meaning": "方法",
+  "pos": "動詞",
+  "reading": "よる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "希薄": {
+  "meaning": "稀释",
+  "pos": "名詞",
+  "reading": "きはく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "希望": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "きぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "幾つ": {
+  "meaning": "一些",
+  "pos": "名詞",
+  "reading": "いくつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "幾何": {
+  "meaning": "几何形状",
+  "pos": "名詞",
+  "reading": "きか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:28.517Z"
+ },
+ "幾夜": {
+  "meaning": "几晚",
+  "pos": "名詞",
+  "reading": "いくよ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "期待": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "きたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "気まま": {
+  "meaning": "无拘无束",
+  "pos": "名詞",
+  "reading": "きまま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "気合い": {
+  "meaning": "心情",
+  "pos": "名詞",
+  "reading": "きあい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "祈祷": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "きとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "規範": {
+  "meaning": "正常",
+  "pos": "名詞",
+  "reading": "きはん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "貴女": {
+  "meaning": "你",
+  "pos": "名詞",
+  "reading": "きじょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "起きれる": {
+  "meaning": "起床",
+  "pos": "動詞",
+  "reading": "おきれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "起き上がる": {
+  "meaning": "闪耀",
+  "pos": "動詞",
+  "reading": "おきあがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "輝き": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "かがやき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:30.220Z"
+ },
+ "飢える": {
+  "meaning": "饥饿",
+  "pos": "動詞",
+  "reading": "うえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "偽善": {
+  "meaning": "虚伪",
+  "pos": "名詞",
+  "reading": "ぎぜん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "偽物": {
+  "meaning": "假",
+  "pos": "名詞",
+  "reading": "にせもの",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "犠牲": {
+  "meaning": "牺牲",
+  "pos": "名詞",
+  "reading": "ぎせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "逆さま": {
+  "meaning": "颠倒",
+  "pos": "名詞",
+  "reading": "さかさま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "逆らえる": {
+  "meaning": "反抗",
+  "pos": "動詞",
+  "reading": "さからる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "吸う": {
+  "meaning": "吸吮",
+  "pos": "動詞",
+  "reading": "すう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "朽ち果てる": {
+  "meaning": "腐烂",
+  "pos": "動詞",
+  "reading": "くちはてる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "泣かす": {
+  "meaning": "哭泣",
+  "pos": "動詞",
+  "reading": "なかす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "究竟": {
+  "meaning": "最后",
+  "pos": "名詞",
+  "reading": "くっきょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:31.958Z"
+ },
+ "旧い": {
+  "meaning": "旧",
+  "pos": "形容詞",
+  "reading": "ふるい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "居場所": {
+  "meaning": "地方",
+  "pos": "名詞",
+  "reading": "いばしょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "挙る": {
+  "meaning": "引用",
+  "pos": "動詞",
+  "reading": "こぞる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "虚実": {
+  "meaning": "虚假",
+  "pos": "名詞",
+  "reading": "きょじつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "許す": {
+  "meaning": "原谅",
+  "pos": "動詞",
+  "reading": "ゆるす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "叫び声": {
+  "meaning": "尖叫",
+  "pos": "名詞",
+  "reading": "さけびごえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "峡谷": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "きょうこく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "強き": {
+  "meaning": "强大",
+  "pos": "名詞",
+  "reading": "つよき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "強請る": {
+  "meaning": "敲诈",
+  "pos": "動詞",
+  "reading": "ねだる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "強敵": {
+  "meaning": "强大敌人",
+  "pos": "名詞",
+  "reading": "きょうてき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:33.978Z"
+ },
+ "狂おしい": {
+  "meaning": "疯狂",
+  "pos": "形容詞",
+  "reading": "くるおしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "狭い": {
+  "meaning": "狭窄",
+  "pos": "形容詞",
+  "reading": "せまい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "狭間": {
+  "meaning": "狭窄",
+  "pos": "名詞",
+  "reading": "はざま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "胸元": {
+  "meaning": "胸部",
+  "pos": "名詞",
+  "reading": "むなもと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "脅かす": {
+  "meaning": "威胁",
+  "pos": "動詞",
+  "reading": "おびやかす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "仰ぐ": {
+  "meaning": "倾斜",
+  "pos": "動詞",
+  "reading": "あおぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "極楽": {
+  "meaning": "幸福",
+  "pos": "名詞",
+  "reading": "ごくらく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "極上": {
+  "meaning": "优秀",
+  "pos": "名詞",
+  "reading": "ごくじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "僅か": {
+  "meaning": "轻微",
+  "pos": "副詞",
+  "reading": "わずか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "近づける": {
+  "meaning": "接近",
+  "pos": "動詞",
+  "reading": "ちかづる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:35.605Z"
+ },
+ "近付く": {
+  "meaning": "接近",
+  "pos": "動詞",
+  "reading": "ちかづく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "区切る": {
+  "meaning": "分裂",
+  "pos": "動詞",
+  "reading": "くぎらる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "苦しい": {
+  "meaning": "痛苦",
+  "pos": "形容詞",
+  "reading": "くるしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "苦しめる": {
+  "meaning": "折磨",
+  "pos": "動詞",
+  "reading": "くるしる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "駆けだす": {
+  "meaning": "匆忙",
+  "pos": "動詞",
+  "reading": "かけだす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "愚かしい": {
+  "meaning": "愚蠢",
+  "pos": "形容詞",
+  "reading": "おろかしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "愚痴": {
+  "meaning": "抱怨",
+  "pos": "名詞",
+  "reading": "ぐち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "空中": {
+  "meaning": "空气",
+  "pos": "名詞",
+  "reading": "くうちゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "屈辱": {
+  "meaning": "羞辱",
+  "pos": "名詞",
+  "reading": "くつじょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "繰り返し": {
+  "meaning": "重复",
+  "pos": "名詞",
+  "reading": "くりかえし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:37.326Z"
+ },
+ "群がる": {
+  "meaning": "畜群",
+  "pos": "動詞",
+  "reading": "むらがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "群れ": {
+  "meaning": "畜群",
+  "pos": "名詞",
+  "reading": "むれ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "傾く": {
+  "meaning": "精益",
+  "pos": "動詞",
+  "reading": "かたむく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "啓示": {
+  "meaning": "天启",
+  "pos": "名詞",
+  "reading": "けいじ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "形見": {
+  "meaning": "形式",
+  "pos": "名詞",
+  "reading": "かたみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "繋ぎ": {
+  "meaning": "债券",
+  "pos": "名詞",
+  "reading": "つなぎ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "激情": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "げきじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "激闘": {
+  "meaning": "凶猛",
+  "pos": "名詞",
+  "reading": "げきとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "欠片": {
+  "meaning": "碎片",
+  "pos": "名詞",
+  "reading": "かけら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "月蝕": {
+  "meaning": "月食",
+  "pos": "名詞",
+  "reading": "げっしょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:39.089Z"
+ },
+ "嫌い": {
+  "meaning": "不喜欢",
+  "pos": "名詞",
+  "reading": "きらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "検討": {
+  "meaning": "考虑",
+  "pos": "名詞",
+  "reading": "けんとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "研ぎ澄ます": {
+  "meaning": "锐化",
+  "pos": "動詞",
+  "reading": "とぎすます",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "見やる": {
+  "meaning": "看",
+  "pos": "動詞",
+  "reading": "みやる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "見下ろす": {
+  "meaning": "往下看",
+  "pos": "動詞",
+  "reading": "みおろす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "見守る": {
+  "meaning": "看",
+  "pos": "動詞",
+  "reading": "みまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "見送る": {
+  "meaning": "移开视线",
+  "pos": "動詞",
+  "reading": "みおくる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "見付け": {
+  "meaning": "找到",
+  "pos": "名詞",
+  "reading": "みつけ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "元気": {
+  "meaning": "开朗",
+  "pos": "名詞",
+  "reading": "げんき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "幻影": {
+  "meaning": "错觉",
+  "pos": "名詞",
+  "reading": "げんえい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:41.328Z"
+ },
+ "現象": {
+  "meaning": "现象",
+  "pos": "名詞",
+  "reading": "げんしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "現状": {
+  "meaning": "现状",
+  "pos": "名詞",
+  "reading": "げんじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "言霊": {
+  "meaning": "精神",
+  "pos": "名詞",
+  "reading": "ことだま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "古代": {
+  "meaning": "古老",
+  "pos": "名詞",
+  "reading": "こだい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "呼び止める": {
+  "meaning": "停止",
+  "pos": "動詞",
+  "reading": "よびとめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "固い": {
+  "meaning": "困难",
+  "pos": "形容詞",
+  "reading": "かたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "戸惑い": {
+  "meaning": "困惑",
+  "pos": "名詞",
+  "reading": "とまどい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "後ろ姿": {
+  "meaning": "背部",
+  "pos": "名詞",
+  "reading": "うしろすがた",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "御身": {
+  "meaning": "身体",
+  "pos": "名詞",
+  "reading": "おんみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "悟る": {
+  "meaning": "启蒙",
+  "pos": "動詞",
+  "reading": "さとる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:43.225Z"
+ },
+ "護る": {
+  "meaning": "保护",
+  "pos": "動詞",
+  "reading": "まもる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "交差": {
+  "meaning": "交叉",
+  "pos": "名詞",
+  "reading": "こうさ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "光陰": {
+  "meaning": "时间",
+  "pos": "名詞",
+  "reading": "こういん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "光景": {
+  "meaning": "视力",
+  "pos": "名詞",
+  "reading": "こうけい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "口笛": {
+  "meaning": "口哨",
+  "pos": "名詞",
+  "reading": "くちぶえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "向き合う": {
+  "meaning": "脸部",
+  "pos": "動詞",
+  "reading": "むきう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "抗う": {
+  "meaning": "抵抗",
+  "pos": "動詞",
+  "reading": "あらがう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "硬い": {
+  "meaning": "努力",
+  "pos": "形容詞",
+  "reading": "かたい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "考える": {
+  "meaning": "思考",
+  "pos": "動詞",
+  "reading": "かんがえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "考え出す": {
+  "meaning": "思考",
+  "pos": "動詞",
+  "reading": "かんがえだす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:44.810Z"
+ },
+ "考察": {
+  "meaning": "考虑",
+  "pos": "名詞",
+  "reading": "こうさつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "考慮": {
+  "meaning": "考虑",
+  "pos": "名詞",
+  "reading": "こうりょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "降り注ぐ": {
+  "meaning": "雨",
+  "pos": "動詞",
+  "reading": "ふりそそぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "降り立つ": {
+  "meaning": "看台",
+  "pos": "動詞",
+  "reading": "おりつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "合わす": {
+  "meaning": "比赛",
+  "pos": "動詞",
+  "reading": "あわす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "合わせる": {
+  "meaning": "比赛",
+  "pos": "動詞",
+  "reading": "あわせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "合図": {
+  "meaning": "提示",
+  "pos": "名詞",
+  "reading": "あいず",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "差別": {
+  "meaning": "歧视",
+  "pos": "名詞",
+  "reading": "さべつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "砂糖": {
+  "meaning": "糖",
+  "pos": "名詞",
+  "reading": "さとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "詐欺": {
+  "meaning": "欺诈",
+  "pos": "名詞",
+  "reading": "さぎ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:46.501Z"
+ },
+ "再生": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "さいせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "災い": {
+  "meaning": "woe",
+  "pos": "名詞",
+  "reading": "わざわい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "砕ける": {
+  "meaning": "crush",
+  "pos": "動詞",
+  "reading": "くだける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "細長い": {
+  "meaning": "slender",
+  "pos": "形容詞",
+  "reading": "ほそながい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "菜の花": {
+  "meaning": "canola",
+  "pos": "名詞",
+  "reading": "なのはな",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "咲かす": {
+  "meaning": "bloom",
+  "pos": "動詞",
+  "reading": "さかす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "咲き誇る": {
+  "meaning": "bloom",
+  "pos": "動詞",
+  "reading": "さきほこれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "撮る": {
+  "meaning": "photo",
+  "pos": "動詞",
+  "reading": "とる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "殺し合い": {
+  "meaning": "kill",
+  "pos": "名詞",
+  "reading": "ころしあい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "殺す": {
+  "meaning": "kill",
+  "pos": "動詞",
+  "reading": "ころす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:48.477Z"
+ },
+ "錆びる": {
+  "meaning": "rust",
+  "pos": "動詞",
+  "reading": "さぶる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "錆び付く": {
+  "meaning": "rust",
+  "pos": "動詞",
+  "reading": "さびつく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "参加": {
+  "meaning": "join",
+  "pos": "名詞",
+  "reading": "さんか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "讃えよる": {
+  "meaning": "celebrate",
+  "pos": "動詞",
+  "reading": "たたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "残せる": {
+  "meaning": "leave",
+  "pos": "動詞",
+  "reading": "のこせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "四季": {
+  "meaning": "seasons",
+  "pos": "名詞",
+  "reading": "しき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "始めよる": {
+  "meaning": "begin",
+  "pos": "動詞",
+  "reading": "はじめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "始める": {
+  "meaning": "begin",
+  "pos": "動詞",
+  "reading": "はじめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "子供": {
+  "meaning": "children",
+  "pos": "名詞",
+  "reading": "こども",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "思い描く": {
+  "meaning": "envision",
+  "pos": "動詞",
+  "reading": "おもいえがく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:50.697Z"
+ },
+ "指切り": {
+  "meaning": "手指切割",
+  "pos": "名詞",
+  "reading": "ゆびきり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "指先": {
+  "meaning": "手指尖",
+  "pos": "名詞",
+  "reading": "ゆびさき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "指輪": {
+  "meaning": "戒指",
+  "pos": "名詞",
+  "reading": "ゆびわ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "指令": {
+  "meaning": "命令",
+  "pos": "名詞",
+  "reading": "しれい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "止む": {
+  "meaning": "停止",
+  "pos": "動詞",
+  "reading": "やむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "止めよる": {
+  "meaning": "停止",
+  "pos": "動詞",
+  "reading": "とめよる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "止める": {
+  "meaning": "停止",
+  "pos": "動詞",
+  "reading": "とめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "死する": {
+  "meaning": "模具",
+  "pos": "動詞",
+  "reading": "しする",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "視界": {
+  "meaning": "视觉",
+  "pos": "名詞",
+  "reading": "しかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "試す": {
+  "meaning": "尝试",
+  "pos": "動詞",
+  "reading": "ためす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:52.295Z"
+ },
+ "事情": {
+  "meaning": "事物",
+  "pos": "名詞",
+  "reading": "じじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "似る": {
+  "meaning": "相似",
+  "pos": "動詞",
+  "reading": "ぬる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "持ち合わせ": {
+  "meaning": "一起",
+  "pos": "名詞",
+  "reading": "もちあわせ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "時に": {
+  "meaning": "有时",
+  "pos": "副詞",
+  "reading": "ときに",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "時代": {
+  "meaning": "次",
+  "pos": "名詞",
+  "reading": "じだい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "自己": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "じこ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "自分": {
+  "meaning": "自己",
+  "pos": "名詞",
+  "reading": "じぶん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "識者": {
+  "meaning": "专家",
+  "pos": "名詞",
+  "reading": "しきしゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "失敗": {
+  "meaning": "失败",
+  "pos": "名詞",
+  "reading": "しっぱい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "灼熱": {
+  "meaning": "燃烧",
+  "pos": "名詞",
+  "reading": "しゃくねつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:53.890Z"
+ },
+ "若い": {
+  "meaning": "年轻",
+  "pos": "形容詞",
+  "reading": "わかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "取り入れる": {
+  "meaning": "领养",
+  "pos": "動詞",
+  "reading": "とりいれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "守る": {
+  "meaning": "保护",
+  "pos": "動詞",
+  "reading": "まもる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "手のひら": {
+  "meaning": "掌心",
+  "pos": "名詞",
+  "reading": "てのひら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "手の内": {
+  "meaning": "掌心",
+  "pos": "名詞",
+  "reading": "てのうち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "手の平": {
+  "meaning": "掌心",
+  "pos": "名詞",
+  "reading": "てのひら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "手繰る": {
+  "meaning": "抓握",
+  "pos": "動詞",
+  "reading": "たぐる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "手折る": {
+  "meaning": "手",
+  "pos": "動詞",
+  "reading": "たおる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "手放す": {
+  "meaning": "给予",
+  "pos": "動詞",
+  "reading": "てばなす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "種族": {
+  "meaning": "放手",
+  "pos": "名詞",
+  "reading": "しゅぞく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:55.623Z"
+ },
+ "酒盛り": {
+  "meaning": "酒鬼",
+  "pos": "名詞",
+  "reading": "さかもり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "首筋": {
+  "meaning": "脖子",
+  "pos": "名詞",
+  "reading": "くびすじ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "受けとる": {
+  "meaning": "收到",
+  "pos": "動詞",
+  "reading": "うけとる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "受け止める": {
+  "meaning": "收到",
+  "pos": "動詞",
+  "reading": "うけとめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "受け入れる": {
+  "meaning": "接受",
+  "pos": "動詞",
+  "reading": "うけいれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "受信": {
+  "meaning": "收到",
+  "pos": "名詞",
+  "reading": "じゅしん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "受難": {
+  "meaning": "受苦",
+  "pos": "名詞",
+  "reading": "じゅなん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "授けよる": {
+  "meaning": "给予",
+  "pos": "動詞",
+  "reading": "さづける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "愁眉": {
+  "meaning": "悲伤",
+  "pos": "名詞",
+  "reading": "しゅうび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "拾う": {
+  "meaning": "接送",
+  "pos": "動詞",
+  "reading": "ひう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:57.232Z"
+ },
+ "終始": {
+  "meaning": "end",
+  "pos": "副詞",
+  "reading": "しゅうし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "終末": {
+  "meaning": "end",
+  "pos": "名詞",
+  "reading": "しゅうまつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "集う": {
+  "meaning": "gather",
+  "pos": "動詞",
+  "reading": "つどう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "集える": {
+  "meaning": "gather",
+  "pos": "動詞",
+  "reading": "つどえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "柔らか": {
+  "meaning": "soft",
+  "pos": "名詞",
+  "reading": "やわらか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "熟す": {
+  "meaning": "ripen",
+  "pos": "動詞",
+  "reading": "じゅくす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "出来る": {
+  "meaning": "can",
+  "pos": "動詞",
+  "reading": "でくる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "春風": {
+  "meaning": "spring",
+  "pos": "名詞",
+  "reading": "しゅんぷう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "準備": {
+  "meaning": "prepare",
+  "pos": "名詞",
+  "reading": "じゅんび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "初め": {
+  "meaning": "begin",
+  "pos": "名詞",
+  "reading": "はじめ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:49:58.792Z"
+ },
+ "書く": {
+  "meaning": "write",
+  "pos": "動詞",
+  "reading": "かく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "諸共": {
+  "meaning": "shoko",
+  "pos": "名詞",
+  "reading": "もろとも",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "傷つく": {
+  "meaning": "hurt",
+  "pos": "動詞",
+  "reading": "きずつく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "小説": {
+  "meaning": "novel",
+  "pos": "名詞",
+  "reading": "しょうせつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "小麦色": {
+  "meaning": "wheat",
+  "pos": "名詞",
+  "reading": "こむぎいろ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "招く": {
+  "meaning": "invites",
+  "pos": "動詞",
+  "reading": "まねく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "昇る": {
+  "meaning": "ascend",
+  "pos": "動詞",
+  "reading": "のぼる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "消し": {
+  "meaning": "erase",
+  "pos": "名詞",
+  "reading": "けし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "焼き付く": {
+  "meaning": "burn",
+  "pos": "動詞",
+  "reading": "やきつく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "焼跡": {
+  "meaning": "burn",
+  "pos": "名詞",
+  "reading": "やけあと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:00.442Z"
+ },
+ "焦がれる": {
+  "meaning": "痛苦",
+  "pos": "動詞",
+  "reading": "こがれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "称え": {
+  "meaning": "赞美",
+  "pos": "名詞",
+  "reading": "となえ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "上がる": {
+  "meaning": "崛起",
+  "pos": "動詞",
+  "reading": "あがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "乗っ取る": {
+  "meaning": "接管",
+  "pos": "動詞",
+  "reading": "のっとる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "情け": {
+  "meaning": "怜悯",
+  "pos": "名詞",
+  "reading": "なさけ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "拭く": {
+  "meaning": "擦拭",
+  "pos": "動詞",
+  "reading": "ふく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "食べる": {
+  "meaning": "吃",
+  "pos": "動詞",
+  "reading": "たべる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "伸びる": {
+  "meaning": "伸展",
+  "pos": "動詞",
+  "reading": "のびる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "侵略": {
+  "meaning": "入侵",
+  "pos": "名詞",
+  "reading": "しんりゃく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "寝転ぶ": {
+  "meaning": "躺下",
+  "pos": "動詞",
+  "reading": "ねころぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:02.214Z"
+ },
+ "心事": {
+  "meaning": "mind",
+  "pos": "名詞",
+  "reading": "しんじ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "心臓": {
+  "meaning": "heart",
+  "pos": "名詞",
+  "reading": "しんぞう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "心配": {
+  "meaning": "worry",
+  "pos": "名詞",
+  "reading": "しんぱい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "振りまく": {
+  "meaning": "spin",
+  "pos": "動詞",
+  "reading": "ふりまく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "振舞う": {
+  "meaning": "behave",
+  "pos": "動詞",
+  "reading": "ふるまう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "新月": {
+  "meaning": "new moon",
+  "pos": "名詞",
+  "reading": "しんげつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "新鮮": {
+  "meaning": "fresh",
+  "pos": "名詞",
+  "reading": "しんせん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "浸す": {
+  "meaning": "soak",
+  "pos": "動詞",
+  "reading": "ひたす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "真っ暗": {
+  "meaning": "dark",
+  "pos": "名詞",
+  "reading": "まっくら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "真夏": {
+  "meaning": "midsummer",
+  "pos": "名詞",
+  "reading": "まなつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:03.857Z"
+ },
+ "真空": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "しんくう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "真正": {
+  "meaning": "真实",
+  "pos": "名詞",
+  "reading": "しんせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "真相": {
+  "meaning": "真理",
+  "pos": "名詞",
+  "reading": "しんそう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "真冬": {
+  "meaning": "仲冬",
+  "pos": "名詞",
+  "reading": "まふゆ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "神社": {
+  "meaning": "神殿",
+  "pos": "名詞",
+  "reading": "じんじゃ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "神風": {
+  "meaning": "神风",
+  "pos": "名詞",
+  "reading": "かみかぜ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "神頼み": {
+  "meaning": "神圣的帮助",
+  "pos": "名詞",
+  "reading": "かみだのみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "身勝手": {
+  "meaning": "自私",
+  "pos": "名詞",
+  "reading": "みがって",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "進める": {
+  "meaning": "前进",
+  "pos": "動詞",
+  "reading": "すすめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "進化": {
+  "meaning": "进化",
+  "pos": "名詞",
+  "reading": "しんか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:05.510Z"
+ },
+ "人間": {
+  "meaning": "人类",
+  "pos": "名詞",
+  "reading": "にんげん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "人達": {
+  "meaning": "人",
+  "pos": "名詞",
+  "reading": "ひとたち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "垂れろる": {
+  "meaning": "悬挂",
+  "pos": "動詞",
+  "reading": "たれろる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "数える": {
+  "meaning": "计数",
+  "pos": "動詞",
+  "reading": "かぞえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "数えれる": {
+  "meaning": "计数",
+  "pos": "動詞",
+  "reading": "かぞえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "数式": {
+  "meaning": "公式",
+  "pos": "名詞",
+  "reading": "すうしき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "裾野": {
+  "meaning": "裙子",
+  "pos": "名詞",
+  "reading": "すその",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "成功": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せいこう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "成就": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "じょうじゅ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "星座": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せいざ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:07.104Z"
+ },
+ "星霜": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せいそう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "正々堂々": {
+  "meaning": "直立",
+  "pos": "副詞",
+  "reading": "せいせいどうど々",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "正義": {
+  "meaning": "正义",
+  "pos": "名詞",
+  "reading": "せいぎ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "正面": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "しょうめん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "生き血": {
+  "meaning": "活血",
+  "pos": "名詞",
+  "reading": "いきち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "生き残る": {
+  "meaning": "生存",
+  "pos": "動詞",
+  "reading": "いきのこる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "生まれ": {
+  "meaning": "出生",
+  "pos": "名詞",
+  "reading": "うまれ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "生み出す": {
+  "meaning": "繁殖",
+  "pos": "動詞",
+  "reading": "うみだす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "生温い": {
+  "meaning": "变暖",
+  "pos": "形容詞",
+  "reading": "なまぬるい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "盛り上がる": {
+  "meaning": "振奋人心",
+  "pos": "動詞",
+  "reading": "もりあがる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:09.036Z"
+ },
+ "盛る": {
+  "meaning": "full",
+  "pos": "動詞",
+  "reading": "もる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "精神": {
+  "meaning": "spirit",
+  "pos": "名詞",
+  "reading": "せいしん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "精度": {
+  "meaning": "precision",
+  "pos": "名詞",
+  "reading": "せいど",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "精霊": {
+  "meaning": "spirit",
+  "pos": "名詞",
+  "reading": "せいれい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "青い": {
+  "meaning": "blue",
+  "pos": "形容詞",
+  "reading": "あおい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "静寂": {
+  "meaning": "silence",
+  "pos": "名詞",
+  "reading": "せいじゃく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "静的": {
+  "meaning": "silent",
+  "pos": "名詞",
+  "reading": "せいてき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "脆弱": {
+  "meaning": "fragile",
+  "pos": "名詞",
+  "reading": "ぜいじゃく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "赤い": {
+  "meaning": "red",
+  "pos": "形容詞",
+  "reading": "あかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "切り捨てる": {
+  "meaning": "truncate",
+  "pos": "動詞",
+  "reading": "きりすてる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:10.722Z"
+ },
+ "切り裂く": {
+  "meaning": "撕开",
+  "pos": "動詞",
+  "reading": "きりさく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "接触": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せっしょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "折る": {
+  "meaning": "折叠",
+  "pos": "動詞",
+  "reading": "おる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "絶え間": {
+  "meaning": "恒定",
+  "pos": "名詞",
+  "reading": "たえま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "絶対": {
+  "meaning": "绝对",
+  "pos": "名詞",
+  "reading": "ぜったい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "宣誓": {
+  "meaning": "誓言",
+  "pos": "名詞",
+  "reading": "せんせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "川辺": {
+  "meaning": "川边",
+  "pos": "名詞",
+  "reading": "かわべ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "戦い": {
+  "meaning": "战斗",
+  "pos": "名詞",
+  "reading": "たたかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "潜める": {
+  "meaning": "潜伏",
+  "pos": "動詞",
+  "reading": "ひそめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "潜伏": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "せんぷく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:12.329Z"
+ },
+ "線引き": {
+  "meaning": "边界",
+  "pos": "名詞",
+  "reading": "せんひき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "選手": {
+  "meaning": "运动员",
+  "pos": "名詞",
+  "reading": "せんしゅ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "鮮やか": {
+  "meaning": "生动",
+  "pos": "名詞",
+  "reading": "あざやか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "前向き": {
+  "meaning": "积极",
+  "pos": "名詞",
+  "reading": "まえむき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "全然": {
+  "meaning": "一点也不",
+  "pos": "副詞",
+  "reading": "ぜんぜん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "疎い": {
+  "meaning": "不熟悉",
+  "pos": "形容詞",
+  "reading": "うとい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "疎ましい": {
+  "meaning": "消极",
+  "pos": "形容詞",
+  "reading": "うとましい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "創る": {
+  "meaning": "创造",
+  "pos": "動詞",
+  "reading": "つくる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "創始": {
+  "meaning": "创始",
+  "pos": "名詞",
+  "reading": "そうし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "双眼": {
+  "meaning": "双筒望远镜",
+  "pos": "名詞",
+  "reading": "そうがん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:14.054Z"
+ },
+ "双手": {
+  "meaning": "手",
+  "pos": "名詞",
+  "reading": "そうしゅ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "想像": {
+  "meaning": "富有想象力",
+  "pos": "名詞",
+  "reading": "そうぞう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "操れる": {
+  "meaning": "操纵性",
+  "pos": "動詞",
+  "reading": "あやつれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "走り抜ける": {
+  "meaning": "跑步",
+  "pos": "動詞",
+  "reading": "はしりぬける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "走狗": {
+  "meaning": "跑步灯",
+  "pos": "名詞",
+  "reading": "そうく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "走馬灯": {
+  "meaning": "嘈杂",
+  "pos": "名詞",
+  "reading": "そうまとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "騒がしい": {
+  "meaning": "增加",
+  "pos": "形容詞",
+  "reading": "さわがしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "増える": {
+  "meaning": "胆量",
+  "pos": "動詞",
+  "reading": "ふえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "臓物": {
+  "meaning": "呼吸",
+  "pos": "名詞",
+  "reading": "ぞうもつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "息吹": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "いぶき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:15.670Z"
+ },
+ "捉える": {
+  "meaning": "捕获",
+  "pos": "動詞",
+  "reading": "とらえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "束ねる": {
+  "meaning": "领带",
+  "pos": "動詞",
+  "reading": "たばねる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "足りる": {
+  "meaning": "足够",
+  "pos": "動詞",
+  "reading": "たう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "足跡": {
+  "meaning": "脚印",
+  "pos": "名詞",
+  "reading": "あしあと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "速い": {
+  "meaning": "快速",
+  "pos": "形容詞",
+  "reading": "はやい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "村人": {
+  "meaning": "村民",
+  "pos": "名詞",
+  "reading": "むらびと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "太陽": {
+  "meaning": "太阳",
+  "pos": "名詞",
+  "reading": "たいよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "堕ちる": {
+  "meaning": "秋天",
+  "pos": "動詞",
+  "reading": "おちる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "打ち上げ花火": {
+  "meaning": "发射烟花",
+  "pos": "名詞",
+  "reading": "うちあげはなび",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "打つ": {
+  "meaning": "罢工",
+  "pos": "動詞",
+  "reading": "うつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:17.260Z"
+ },
+ "耐える": {
+  "meaning": "忍受",
+  "pos": "動詞",
+  "reading": "たえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "怠る": {
+  "meaning": "忽视",
+  "pos": "動詞",
+  "reading": "おこたらる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "退屈": {
+  "meaning": "无聊",
+  "pos": "名詞",
+  "reading": "たいくつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "退散": {
+  "meaning": "消散",
+  "pos": "名詞",
+  "reading": "たいさん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "大分": {
+  "meaning": "",
+  "pos": "副詞",
+  "reading": "だいぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "沢山": {
+  "meaning": "许多",
+  "pos": "副詞",
+  "reading": "たくさん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "谷間": {
+  "meaning": "山谷",
+  "pos": "名詞",
+  "reading": "たにま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "単純": {
+  "meaning": "简单",
+  "pos": "名詞",
+  "reading": "たんじゅん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "端居": {
+  "meaning": "住宅",
+  "pos": "名詞",
+  "reading": "はしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "鍛える": {
+  "meaning": "培训",
+  "pos": "動詞",
+  "reading": "きたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:18.927Z"
+ },
+ "断ち切る": {
+  "meaning": "剪下",
+  "pos": "動詞",
+  "reading": "たちきる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "断ち切れる": {
+  "meaning": "剪下",
+  "pos": "動詞",
+  "reading": "たちきれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "断罪": {
+  "meaning": "谴责",
+  "pos": "名詞",
+  "reading": "だんざい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "馳せる": {
+  "meaning": "建造",
+  "pos": "動詞",
+  "reading": "はせる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "築く": {
+  "meaning": "秩序",
+  "pos": "動詞",
+  "reading": "きずく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "秩序": {
+  "meaning": "中途",
+  "pos": "名詞",
+  "reading": "ちつじょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "中途半端": {
+  "meaning": "仲夏",
+  "pos": "名詞",
+  "reading": "ちゅうとはんぱ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "仲夏": {
+  "meaning": "征兆",
+  "pos": "名詞",
+  "reading": "ちゅうか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "兆し": {
+  "meaning": "哀悼",
+  "pos": "名詞",
+  "reading": "きざし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "弔う": {
+  "meaning": "",
+  "pos": "動詞",
+  "reading": "とむらう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:20.520Z"
+ },
+ "懲罰": {
+  "meaning": "惩罚",
+  "pos": "名詞",
+  "reading": "ちょうばつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "朝陽": {
+  "meaning": "日出",
+  "pos": "名詞",
+  "reading": "あさひ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "眺める": {
+  "meaning": "凝视",
+  "pos": "動詞",
+  "reading": "ながめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "調和": {
+  "meaning": "和谐",
+  "pos": "名詞",
+  "reading": "ちょうわ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "超克": {
+  "meaning": "窒息",
+  "pos": "名詞",
+  "reading": "ちょうこく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "長生き": {
+  "meaning": "长寿",
+  "pos": "名詞",
+  "reading": "ながいき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "珍しい": {
+  "meaning": "不寻常",
+  "pos": "形容詞",
+  "reading": "めずらしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "追いかける": {
+  "meaning": "追逐",
+  "pos": "動詞",
+  "reading": "おいかける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "追う": {
+  "meaning": "追逐",
+  "pos": "動詞",
+  "reading": "おう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "痛む": {
+  "meaning": "痛苦",
+  "pos": "動詞",
+  "reading": "いたむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:22.140Z"
+ },
+ "通ずるする": {
+  "meaning": "pass",
+  "pos": "動詞",
+  "reading": "つうずう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "掴む": {
+  "meaning": "grab",
+  "pos": "動詞",
+  "reading": "つかむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "低い": {
+  "meaning": "low",
+  "pos": "形容詞",
+  "reading": "ひくい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "定めし": {
+  "meaning": "set",
+  "pos": "副詞",
+  "reading": "さだめし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "締め付ける": {
+  "meaning": "tighten",
+  "pos": "動詞",
+  "reading": "しめつける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "滴下": {
+  "meaning": "drop",
+  "pos": "名詞",
+  "reading": "てきか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "適切": {
+  "meaning": "appropriate",
+  "pos": "名詞",
+  "reading": "てきせつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "天狗": {
+  "meaning": "tengu",
+  "pos": "名詞",
+  "reading": "てんぐ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "天国": {
+  "meaning": "heaven",
+  "pos": "名詞",
+  "reading": "てんごく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "天幕": {
+  "meaning": "tent",
+  "pos": "名詞",
+  "reading": "てんまく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:23.850Z"
+ },
+ "纏う": {
+  "meaning": "连衣裙",
+  "pos": "動詞",
+  "reading": "まとう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "伝わる": {
+  "meaning": "传送",
+  "pos": "動詞",
+  "reading": "つたわる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "屠る": {
+  "meaning": "屠宰",
+  "pos": "動詞",
+  "reading": "ほふる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "登る": {
+  "meaning": "攀爬",
+  "pos": "動詞",
+  "reading": "のる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "途絶える": {
+  "meaning": "休息",
+  "pos": "動詞",
+  "reading": "とだえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "倒れる": {
+  "meaning": "秋天",
+  "pos": "動詞",
+  "reading": "たおれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "藤原": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ふじわら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "踏み出す": {
+  "meaning": "阶梯",
+  "pos": "動詞",
+  "reading": "ふみだす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "逃げだす": {
+  "meaning": "逃生",
+  "pos": "動詞",
+  "reading": "にげだす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "逃げる": {
+  "meaning": "逃生",
+  "pos": "動詞",
+  "reading": "にげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:25.585Z"
+ },
+ "逃す": {
+  "meaning": "miss",
+  "pos": "動詞",
+  "reading": "のがす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "頭上": {
+  "meaning": "overhead",
+  "pos": "名詞",
+  "reading": "ずじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "働く": {
+  "meaning": "work",
+  "pos": "動詞",
+  "reading": "はたらく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "動き": {
+  "meaning": "move",
+  "pos": "名詞",
+  "reading": "うごき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "導く": {
+  "meaning": "guide",
+  "pos": "動詞",
+  "reading": "みちびく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "導ける": {
+  "meaning": "guide",
+  "pos": "動詞",
+  "reading": "みちびける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "道徳": {
+  "meaning": "moral",
+  "pos": "名詞",
+  "reading": "どうとく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "道標": {
+  "meaning": "signpost",
+  "pos": "名詞",
+  "reading": "どうひょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "得る": {
+  "meaning": "get",
+  "pos": "動詞",
+  "reading": "える",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "独り": {
+  "meaning": "alone",
+  "pos": "名詞",
+  "reading": "ひとり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:27.159Z"
+ },
+ "突き刺す": {
+  "meaning": "刺伤",
+  "pos": "動詞",
+  "reading": "つきさす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "突き放す": {
+  "meaning": "推力",
+  "pos": "動詞",
+  "reading": "つきはなす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "突然": {
+  "meaning": "",
+  "pos": "副詞",
+  "reading": "とつぜん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "呑む": {
+  "meaning": "吞咽",
+  "pos": "動詞",
+  "reading": "のむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "曇る": {
+  "meaning": "多云",
+  "pos": "動詞",
+  "reading": "くもる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "奈落": {
+  "meaning": "狭窄",
+  "pos": "名詞",
+  "reading": "ならく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "二股": {
+  "meaning": "裆部",
+  "pos": "名詞",
+  "reading": "ふたまた",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "日差し": {
+  "meaning": "阳光",
+  "pos": "名詞",
+  "reading": "ひざし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "入れる": {
+  "meaning": "放入",
+  "pos": "動詞",
+  "reading": "いれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "忍ぶ": {
+  "meaning": "忍受",
+  "pos": "動詞",
+  "reading": "しのぶ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:28.797Z"
+ },
+ "濡れる": {
+  "meaning": "潮湿",
+  "pos": "動詞",
+  "reading": "ぬれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "年月": {
+  "meaning": "年份",
+  "pos": "名詞",
+  "reading": "としつき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "年表": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ねんぴょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "破れ": {
+  "meaning": "撕裂",
+  "pos": "名詞",
+  "reading": "やぶれ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "破滅": {
+  "meaning": "废墟",
+  "pos": "名詞",
+  "reading": "はめつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "配列": {
+  "meaning": "校准",
+  "pos": "名詞",
+  "reading": "はいれつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "薄まる": {
+  "meaning": "稀释",
+  "pos": "動詞",
+  "reading": "うすまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "薄れる": {
+  "meaning": "褪色",
+  "pos": "動詞",
+  "reading": "うすれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.893Z"
+ },
+ "薄暗い": {
+  "meaning": "暗淡",
+  "pos": "形容詞",
+  "reading": "うすぐらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.894Z"
+ },
+ "爆雷": {
+  "meaning": "矿井",
+  "pos": "名詞",
+  "reading": "ばくらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:30.894Z"
+ },
+ "抜ける": {
+  "meaning": "出",
+  "pos": "動詞",
+  "reading": "ぬける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "抜け殻": {
+  "meaning": "棚",
+  "pos": "名詞",
+  "reading": "ぬけがら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "煩わしい": {
+  "meaning": "讨厌",
+  "pos": "形容詞",
+  "reading": "わずらわしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "番号": {
+  "meaning": "数字",
+  "pos": "名詞",
+  "reading": "ばんごう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "悲しむ": {
+  "meaning": "悲伤",
+  "pos": "動詞",
+  "reading": "かなしむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "悲願": {
+  "meaning": "悲伤",
+  "pos": "名詞",
+  "reading": "ひがん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "皮肉": {
+  "meaning": "愤世嫉俗",
+  "pos": "名詞",
+  "reading": "ひにく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "秘訣": {
+  "meaning": "秘密",
+  "pos": "名詞",
+  "reading": "ひけつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "秘薬": {
+  "meaning": "药水",
+  "pos": "名詞",
+  "reading": "ひやく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "飛び立つ": {
+  "meaning": "苍蝇",
+  "pos": "動詞",
+  "reading": "とびたつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:32.512Z"
+ },
+ "微か": {
+  "meaning": "微妙",
+  "pos": "名詞",
+  "reading": "かすか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "必ず": {
+  "meaning": "必要",
+  "pos": "副詞",
+  "reading": "かならず",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "必要": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ひつよう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "表情": {
+  "meaning": "表达",
+  "pos": "名詞",
+  "reading": "ひょうじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "貧困": {
+  "meaning": "贫困",
+  "pos": "名詞",
+  "reading": "ひんこん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "不意": {
+  "meaning": "意外",
+  "pos": "名詞",
+  "reading": "ふい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "不可思議": {
+  "meaning": "神秘",
+  "pos": "名詞",
+  "reading": "ふかしぎ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "不幸せ": {
+  "meaning": "不快乐",
+  "pos": "名詞",
+  "reading": "ふしあわせ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "不定": {
+  "meaning": "无限期",
+  "pos": "名詞",
+  "reading": "ふてい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "付く": {
+  "meaning": "附加",
+  "pos": "動詞",
+  "reading": "つく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:34.119Z"
+ },
+ "富士": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ふじ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "富士見": {
+  "meaning": "Fujimi",
+  "pos": "名詞",
+  "reading": "ふじみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "普通": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ふつう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "浮く": {
+  "meaning": "漂浮",
+  "pos": "動詞",
+  "reading": "うく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "撫でる": {
+  "meaning": "抚摸",
+  "pos": "動詞",
+  "reading": "なでる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "舞い戻る": {
+  "meaning": "漂浮",
+  "pos": "動詞",
+  "reading": "まいもどる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "舞曲": {
+  "meaning": "舞蹈",
+  "pos": "名詞",
+  "reading": "ぶきょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "封じ込める": {
+  "meaning": "遏制",
+  "pos": "動詞",
+  "reading": "ふうじこめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "服従": {
+  "meaning": "服从",
+  "pos": "名詞",
+  "reading": "ふくじゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "物の怪": {
+  "meaning": "奇异",
+  "pos": "名詞",
+  "reading": "もののけ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:35.763Z"
+ },
+ "分かれる": {
+  "meaning": "divide",
+  "pos": "動詞",
+  "reading": "わかれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "分かれ目": {
+  "meaning": "divide",
+  "pos": "名詞",
+  "reading": "わかれめ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "分ける": {
+  "meaning": "divide",
+  "pos": "動詞",
+  "reading": "わける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "閉ざす": {
+  "meaning": "close",
+  "pos": "動詞",
+  "reading": "とざす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "閉じれる": {
+  "meaning": "be closed",
+  "pos": "動詞",
+  "reading": "とじれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "閉じ込める": {
+  "meaning": "trapped",
+  "pos": "動詞",
+  "reading": "とじこめる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "辺り": {
+  "meaning": "around",
+  "pos": "名詞",
+  "reading": "あたり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "保つ": {
+  "meaning": "keep",
+  "pos": "動詞",
+  "reading": "たもつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "捕捉": {
+  "meaning": "capture",
+  "pos": "名詞",
+  "reading": "ほそく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "歩ける": {
+  "meaning": "walk",
+  "pos": "動詞",
+  "reading": "あるける",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:38.024Z"
+ },
+ "暮らす": {
+  "meaning": "活着",
+  "pos": "動詞",
+  "reading": "くらす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "暮れる": {
+  "meaning": "黄昏",
+  "pos": "動詞",
+  "reading": "くれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "抱える": {
+  "meaning": "拥抱",
+  "pos": "動詞",
+  "reading": "かかえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "捧げよる": {
+  "meaning": "牺牲",
+  "pos": "動詞",
+  "reading": "ささげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "捧げる": {
+  "meaning": "奉献",
+  "pos": "動詞",
+  "reading": "ささげる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "放任": {
+  "meaning": "放手",
+  "pos": "名詞",
+  "reading": "ほうにん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "法則": {
+  "meaning": "法律",
+  "pos": "名詞",
+  "reading": "ほうそく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "泡沫": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ほうまつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "縫う": {
+  "meaning": "缝纫",
+  "pos": "動詞",
+  "reading": "ぬう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "豊か": {
+  "meaning": "丰富",
+  "pos": "名詞",
+  "reading": "ゆたか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:39.633Z"
+ },
+ "亡くす": {
+  "meaning": "失去",
+  "pos": "動詞",
+  "reading": "なくす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "亡骸": {
+  "meaning": "尸体",
+  "pos": "名詞",
+  "reading": "なきがら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "暴く": {
+  "meaning": "揭露",
+  "pos": "動詞",
+  "reading": "あばく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "暴れる": {
+  "meaning": "横冲直撞",
+  "pos": "動詞",
+  "reading": "あばれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "暴君": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ぼうくん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "暴力": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ぼうりょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "望み": {
+  "meaning": "希望",
+  "pos": "名詞",
+  "reading": "のぞみ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "頬擦り": {
+  "meaning": "脸颊上的摩擦",
+  "pos": "名詞",
+  "reading": "ほおずり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "本日": {
+  "meaning": "今天",
+  "pos": "名詞",
+  "reading": "ほんじつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "魔力": {
+  "meaning": "魔法",
+  "pos": "名詞",
+  "reading": "まりょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:47.833Z"
+ },
+ "毎日": {
+  "meaning": "每日",
+  "pos": "名詞",
+  "reading": "まいにち",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "万里": {
+  "meaning": "英里",
+  "pos": "名詞",
+  "reading": "ばんり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "満ちる": {
+  "meaning": "满",
+  "pos": "動詞",
+  "reading": "みつる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "満ち欠け": {
+  "meaning": "相位",
+  "pos": "名詞",
+  "reading": "みちかけ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "満月": {
+  "meaning": "满月",
+  "pos": "名詞",
+  "reading": "まんげつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "満杯": {
+  "meaning": "满",
+  "pos": "名詞",
+  "reading": "まんぱい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "未醒": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "みせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "務め": {
+  "meaning": "职责",
+  "pos": "名詞",
+  "reading": "つとめ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "夢幻": {
+  "meaning": "梦幻般",
+  "pos": "名詞",
+  "reading": "むげん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "無機質": {
+  "meaning": "无机",
+  "pos": "名詞",
+  "reading": "むきしつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:49.437Z"
+ },
+ "無常": {
+  "meaning": "无常",
+  "pos": "名詞",
+  "reading": "むじょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "無念": {
+  "meaning": "无情",
+  "pos": "名詞",
+  "reading": "むねん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "無法者": {
+  "meaning": "不法之徒",
+  "pos": "名詞",
+  "reading": "むほうもの",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "無様": {
+  "meaning": "不配",
+  "pos": "名詞",
+  "reading": "ぶざま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "無頼": {
+  "meaning": "无助",
+  "pos": "名詞",
+  "reading": "ぶらい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "無力": {
+  "meaning": "无能",
+  "pos": "名詞",
+  "reading": "むりょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "無礼講": {
+  "meaning": "粗鲁",
+  "pos": "名詞",
+  "reading": "ぶれいこう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "名残": {
+  "meaning": "痕迹",
+  "pos": "名詞",
+  "reading": "なごり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "明かり": {
+  "meaning": "浅色",
+  "pos": "名詞",
+  "reading": "あかり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "明る": {
+  "meaning": "浅色",
+  "pos": "形容詞",
+  "reading": "あかる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:51.171Z"
+ },
+ "明るい": {
+  "meaning": "明亮",
+  "pos": "形容詞",
+  "reading": "あかるい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "迷惑": {
+  "meaning": "恼人",
+  "pos": "名詞",
+  "reading": "めいわく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "滅びる": {
+  "meaning": "注定",
+  "pos": "動詞",
+  "reading": "ほろる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "妄執": {
+  "meaning": "偏执狂",
+  "pos": "名詞",
+  "reading": "もうしゅう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "猛火": {
+  "meaning": "火热",
+  "pos": "名詞",
+  "reading": "もうか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "木の下": {
+  "meaning": "在树下",
+  "pos": "名詞",
+  "reading": "このした",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "木霊": {
+  "meaning": "树精",
+  "pos": "名詞",
+  "reading": "こだま",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "目眩": {
+  "meaning": "耀眼",
+  "pos": "名詞",
+  "reading": "めまい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "戻る": {
+  "meaning": "背部",
+  "pos": "動詞",
+  "reading": "もどる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "野望": {
+  "meaning": "野心",
+  "pos": "名詞",
+  "reading": "やぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:52.810Z"
+ },
+ "約束": {
+  "meaning": "承诺",
+  "pos": "名詞",
+  "reading": "やくそく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "約束事": {
+  "meaning": "承诺",
+  "pos": "名詞",
+  "reading": "やくそくごと",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "油菜": {
+  "meaning": "油菜籽",
+  "pos": "名詞",
+  "reading": "あぶらな",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "唯一": {
+  "meaning": "独特",
+  "pos": "名詞",
+  "reading": "ゆいいつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "優し": {
+  "meaning": "善良",
+  "pos": "形容詞",
+  "reading": "やさし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "優雅": {
+  "meaning": "优雅",
+  "pos": "名詞",
+  "reading": "ゆうが",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "優勝": {
+  "meaning": "制胜",
+  "pos": "名詞",
+  "reading": "ゆうしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "優曇華": {
+  "meaning": "多云",
+  "pos": "名詞",
+  "reading": "うどんげ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "幽か": {
+  "meaning": "阴沉",
+  "pos": "名詞",
+  "reading": "かすか",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "幽霊": {
+  "meaning": "幽灵",
+  "pos": "名詞",
+  "reading": "ゆうれい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:54.410Z"
+ },
+ "憂鬱": {
+  "meaning": "忧郁",
+  "pos": "名詞",
+  "reading": "ゆううつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "誘える": {
+  "meaning": "邀请",
+  "pos": "動詞",
+  "reading": "さそえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "夕飯": {
+  "meaning": "晚餐",
+  "pos": "名詞",
+  "reading": "ゆうはん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "夕暮": {
+  "meaning": "黄昏",
+  "pos": "名詞",
+  "reading": "ゆうぐれ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "夕暮れ": {
+  "meaning": "黄昏",
+  "pos": "名詞",
+  "reading": "ゆうぐれ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "与える": {
+  "meaning": "给予",
+  "pos": "動詞",
+  "reading": "あたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "与那": {
+  "meaning": "yona",
+  "pos": "名詞",
+  "reading": "よな",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "幼子": {
+  "meaning": "幼儿",
+  "pos": "名詞",
+  "reading": "おさなご",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "幼女": {
+  "meaning": "幼儿",
+  "pos": "名詞",
+  "reading": "ようじょ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "妖しい": {
+  "meaning": "恶魔",
+  "pos": "形容詞",
+  "reading": "あやしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:56.068Z"
+ },
+ "妖艶": {
+  "meaning": "高飞",
+  "pos": "名詞",
+  "reading": "ようえん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "妖怪変化": {
+  "meaning": "妖怪变身",
+  "pos": "名詞",
+  "reading": "ようかいへんげ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "妖精": {
+  "meaning": "仙子",
+  "pos": "名詞",
+  "reading": "ようせい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "揺ぎ": {
+  "meaning": "摇晃",
+  "pos": "名詞",
+  "reading": "ゆるぎ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "揺らめく": {
+  "meaning": "闪闪发光",
+  "pos": "動詞",
+  "reading": "ゆらめく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "溶かす": {
+  "meaning": "融化",
+  "pos": "動詞",
+  "reading": "とかす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "謡える": {
+  "meaning": "唱歌",
+  "pos": "動詞",
+  "reading": "うたえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "踊り": {
+  "meaning": "跳舞",
+  "pos": "名詞",
+  "reading": "おどり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "陽炎": {
+  "meaning": "阳热",
+  "pos": "名詞",
+  "reading": "かげろう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "陽射し": {
+  "meaning": "阳光",
+  "pos": "名詞",
+  "reading": "ひざし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:57.896Z"
+ },
+ "抑圧": {
+  "meaning": "压抑",
+  "pos": "名詞",
+  "reading": "よくあつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "欲望": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "よくぼう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "螺旋": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "らせん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "絡まる": {
+  "meaning": "纠缠",
+  "pos": "動詞",
+  "reading": "からまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "理想": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "りそう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "裏腹": {
+  "meaning": "后退",
+  "pos": "名詞",
+  "reading": "うらはら",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "裏返す": {
+  "meaning": "翻转",
+  "pos": "動詞",
+  "reading": "うらがえす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "離れる": {
+  "meaning": "离开",
+  "pos": "動詞",
+  "reading": "はなれる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "率直": {
+  "meaning": "直言不讳",
+  "pos": "名詞",
+  "reading": "そっちょく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "立ち向かう": {
+  "meaning": "对抗",
+  "pos": "動詞",
+  "reading": "たちむかう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:50:59.618Z"
+ },
+ "立ち尽くす": {
+  "meaning": "站立",
+  "pos": "動詞",
+  "reading": "たちつくす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "立つ": {
+  "meaning": "站立",
+  "pos": "動詞",
+  "reading": "たつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "立てる": {
+  "meaning": "站立",
+  "pos": "動詞",
+  "reading": "たてる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "流離": {
+  "meaning": "流浪",
+  "pos": "名詞",
+  "reading": "りゅうり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "溜め息": {
+  "meaning": "叹息",
+  "pos": "名詞",
+  "reading": "ためいき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "留まる": {
+  "meaning": "停留",
+  "pos": "動詞",
+  "reading": "とまる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "料理": {
+  "meaning": "烹饪",
+  "pos": "名詞",
+  "reading": "りょうり",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "涼しい": {
+  "meaning": "酷",
+  "pos": "形容詞",
+  "reading": "すずしい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "量子": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "りょうし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "輪廻": {
+  "meaning": "轮回",
+  "pos": "名詞",
+  "reading": "りんね",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:01.416Z"
+ },
+ "冷える": {
+  "meaning": "寒冷",
+  "pos": "動詞",
+  "reading": "ひえる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "霊夢": {
+  "meaning": "灵梦",
+  "pos": "名詞",
+  "reading": "れいむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "連れ戻す": {
+  "meaning": "带回",
+  "pos": "動詞",
+  "reading": "つれもどす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "連れ立つ": {
+  "meaning": "带回",
+  "pos": "動詞",
+  "reading": "つれだつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "連続": {
+  "meaning": "持续",
+  "pos": "名詞",
+  "reading": "れんぞく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "篭る": {
+  "meaning": "打喷嚏",
+  "pos": "動詞",
+  "reading": "こもる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "老少": {
+  "meaning": "老人",
+  "pos": "名詞",
+  "reading": "ろうしょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "惑う": {
+  "meaning": "困惑",
+  "pos": "動詞",
+  "reading": "まどう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "俯く": {
+  "meaning": "弯腰",
+  "pos": "動詞",
+  "reading": "うつむく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "刹那": {
+  "meaning": "瞬间",
+  "pos": "名詞",
+  "reading": "せつな",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:03.124Z"
+ },
+ "嘯く": {
+  "meaning": "尖叫",
+  "pos": "動詞",
+  "reading": "うそぶく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "囃子": {
+  "meaning": "剃须刀",
+  "pos": "名詞",
+  "reading": "はやし",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "徘徊": {
+  "meaning": "流浪",
+  "pos": "名詞",
+  "reading": "はいかい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "擲つ": {
+  "meaning": "投掷",
+  "pos": "動詞",
+  "reading": "なげうつ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "曖昧": {
+  "meaning": "歧义",
+  "pos": "名詞",
+  "reading": "あいまい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "朧月": {
+  "meaning": "月亮",
+  "pos": "名詞",
+  "reading": "おぼろづき",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "涅槃": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ねはん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "滔々": {
+  "meaning": "巨大",
+  "pos": "名詞",
+  "reading": "とうと々",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "甦る": {
+  "meaning": "复活",
+  "pos": "動詞",
+  "reading": "よみがえらる",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "疼く": {
+  "meaning": "痛苦",
+  "pos": "動詞",
+  "reading": "うずく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:04.859Z"
+ },
+ "竦む": {
+  "meaning": "筹集资金",
+  "pos": "動詞",
+  "reading": "すくむ",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "賽銭": {
+  "meaning": "赎罪",
+  "pos": "名詞",
+  "reading": "さいせん",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "贖罪": {
+  "meaning": "跪下",
+  "pos": "名詞",
+  "reading": "しょくざい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "跪く": {
+  "meaning": "点头",
+  "pos": "動詞",
+  "reading": "ひざまずく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "躱す": {
+  "meaning": "吊饰",
+  "pos": "動詞",
+  "reading": "かわす",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "頷く": {
+  "meaning": "黎明",
+  "pos": "動詞",
+  "reading": "うなずく",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "魑魅魍魎": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "ちみもうりょう",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ },
+ "黎明": {
+  "meaning": "",
+  "pos": "名詞",
+  "reading": "れいめい",
+  "src": "mymemory",
+  "at": "2026-10-13T16:51:06.423Z"
+ }
+}

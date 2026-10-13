@@ -1,0 +1,10 @@
+{
+  "name": "thlyrics-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "东方同人曲学唱工具前端（静态，直接开 index.html 也能用）",
+  "scripts": {
+    "serve": "node ../scripts/serve.mjs",
+    "build": "node ../scripts/build-index.mjs"
+  }
+}

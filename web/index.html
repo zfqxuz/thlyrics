@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>东方同人曲 学唱机</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#171a21; --panel2:#1d212a; --line:#2a2f3a; --ink:#e8e6e3; --muted:#9aa3b2;
+  --accent:#e0553f; --accent2:#5aa9e6; --hl:#3a2f24; --hl-line:#ffd48a; --ok:#63b97a;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.6}
+a{color:var(--accent2);text-decoration:none}
+.wrap{max-width:860px;margin:0 auto;padding:12px 12px 120px}
+header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:4px 2px 10px}
+header h1{font-size:17px;font-weight:700}
+header .meta{font-size:12px;color:var(--muted)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:9px;font-size:13px;cursor:pointer}
+.btn:hover{border-color:#3d4453;background:var(--panel2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.on{background:#2b3a4d;border-color:#3d5a7a;color:#cfe6ff}
+.btn.sm{padding:4px 9px;font-size:12px}
+input.q{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:14px;margin-bottom:10px}
+input.q:focus{outline:2px solid #33405a}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.track{display:flex;gap:10px;align-items:center;padding:9px 10px;margin-bottom:7px;cursor:pointer}
+.track:hover{border-color:#3d4453}
+.track img{width:48px;height:48px;border-radius:7px;object-fit:cover;background:#232833;flex:0 0 auto}
+.track .tm{min-width:0;flex:1}
+.track .tt{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track .ts{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:5px;border:1px solid var(--line);color:var(--muted);margin-left:5px;vertical-align:1px}
+.tag.a{border-color:#3d5a7a;color:#8cc4f0}
+.tag.t{border-color:#4a6b4e;color:#8fd39a}
+.tag.z{border-color:#6b5a3a;color:#e0c07a}
+.grouphead{font-size:12px;color:var(--muted);margin:14px 3px 6px;letter-spacing:.02em}
+/* 播放条 */
+#player{position:fixed;left:0;right:0;bottom:0;background:rgba(20,23,29,.97);border-top:1px solid var(--line);backdrop-filter:blur(8px);z-index:50;padding:8px 12px 10px;display:none}
+#player.on{display:block}
+#player .prow{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#player .now{font-size:12px;color:var(--muted);flex:1;min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player input[type=range]{flex:2;min-width:120px;accent-color:var(--accent)}
+#player .t{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* 歌词 */
+.lyrtop{display:flex;gap:11px;align-items:center;padding:10px;margin-bottom:8px}
+.lyrtop img{width:60px;height:60px;border-radius:9px;object-fit:cover;background:#232833}
+.lyrtop h2{font-size:15px}
+.lyrtop .m{font-size:11.5px;color:var(--muted)}
+#lyric{padding:12px 10px}
+.line{font-size:16.5px;line-height:1.95;padding:3px 7px;border-radius:7px;cursor:pointer;transition:background .15s}
+.line:hover{background:#1e2330}
+.line.playing{background:var(--hl);box-shadow:inset 3px 0 0 var(--hl-line)}
+.line.zh{font-size:12.5px;color:var(--muted);line-height:1.5;padding:0 7px 6px 7px;font-style:normal}
+.line.en{color:#8f9bb0;font-size:14.5px}
+.romaji{font-size:11.5px;color:#7f8a9c;padding:0 7px 5px;font-family:ui-monospace,Menlo,monospace}
+.space{height:12px}
+.w{cursor:pointer;border-bottom:1px dashed transparent;padding:0 1px}
+.w:hover{background:#2a2130;border-bottom-color:var(--accent)}
+.w.learning{border-bottom-color:#7a6a4a}
+.w.known{color:var(--ok);border-bottom-color:transparent}
+/* 词条弹层 */
+#pop{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);width:min(520px,calc(100% - 20px));background:#22262f;border:1px solid #39404e;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;z-index:60}
+#pop.on{display:block}
+#pop .r1{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+#pop .w1{font-size:20px;font-weight:700}
+#pop .w2{font-size:13.5px;color:var(--accent2)}
+#pop .w3{font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+#pop .mg{font-size:14px;margin-top:6px;color:#f0e6d8}
+#pop .mt{font-size:11.5px;color:var(--muted);margin-top:5px}
+#pop .mt a{color:var(--accent2)}
+#pop .acts{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+#pop .acts button{border:1px solid var(--line);background:#1b1f27;color:#e8e6e3;padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer}
+#pop .acts button.k{border-color:#4a6b4e;color:#a5dfae}
+/* 词表 */
+.vrow{display:flex;align-items:center;gap:9px;padding:7px 10px;margin-bottom:5px;font-size:13px;cursor:pointer}
+.vrow .vw{font-weight:600;min-width:88px}
+.vrow .vr{color:var(--accent2);font-size:12.5px}
+.vrow .vy{color:var(--muted);font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
+.vrow .vm{color:#cfc6b8;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .vc{color:var(--muted);font-size:11px;white-space:nowrap}
+.vrow.known{opacity:.6}
+.hint{font-size:11.5px;color:var(--muted);margin:6px 3px}
+.empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:13px}
+.foot{font-size:11px;color:var(--muted);text-align:center;margin-top:20px;line-height:1.8}
+details.src{font-size:12px;color:var(--muted);margin:8px 0}
+details.src summary{cursor:pointer;padding:6px 2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.row label{font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>东方同人曲 学唱机</h1>
+    <span class="meta" id="headstat">载入中…</span>
+  </header>
+
+  <div id="view-list">
+    <input class="q" id="q" placeholder="搜索曲名 / 社团 / 专辑 / 原曲…">
+    <div class="toolbar">
+      <button class="btn on" id="f-all">全部</button>
+      <button class="btn" id="f-audio">有音频</button>
+      <button class="btn" id="f-zh">有中文翻译</button>
+      <button class="btn" id="f-known">隐藏已掌握词多的</button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div id="view-track" style="display:none"></div>
+
+  <details class="src" id="srcbox">
+    <summary>音频来源与设置</summary>
+    <div class="row"><span id="srcinfo" style="font-size:12px;color:var(--muted)"></span></div>
+    <div class="row">
+      <label>网易云歌曲 ID／链接</label>
+      <input class="q" id="nidinput" style="flex:1;min-width:180px;margin:0" placeholder="把网易云那首歌的链接或数字 ID 粘进来">
+      <button class="btn sm" id="nidsave">绑定到这首</button>
+    </div>
+    <div class="row">
+      <label>本地音频</label>
+      <input type="file" id="audiofile" accept="audio/*">
+      <button class="btn sm" id="audioclear">清除本地音频</button>
+    </div>
+    <div class="hint">音频地址走公开中转接口按需取（永久地址会失效，所以每次播放前重新取）。绑定关系只存在你自己的浏览器里。</div>
+  </details>
+
+  <div class="foot">
+    歌词/时间轴/译文：THBWiki 歌词服务 + 网易云 · 版权归各社团与原作者所有，仅供个人学习，请勿传播或商用<br>
+    <span id="genat"></span>
+  </div>
+</div>
+
+<div id="player">
+  <div class="prow">
+    <button class="btn sm" id="p-play">▶</button>
+    <button class="btn sm" id="p-prev">⟨</button>
+    <button class="btn sm" id="p-loop">单句循环 关</button>
+    <span class="now" id="p-now">—</span>
+    <input type="range" id="p-seek" min="0" max="1000" value="0">
+    <span class="t" id="p-time">0:00</span>
+    <button class="btn sm" id="p-rate">1.0x</button>
+    <button class="btn sm" id="p-next">⟩</button>
+    <button class="btn sm" id="p-close">×</button>
+  </div>
+</div>
+
+<div id="pop">
+  <div class="r1">
+    <span class="w1" id="p-word"></span>
+    <span class="w2" id="p-reading"></span>
+    <span class="w3" id="p-romaji"></span>
+  </div>
+  <div class="mg" id="p-meaning"></div>
+  <div class="mt" id="p-ex"></div>
+  <div class="mt" id="p-meta"></div>
+  <div class="acts">
+    <button id="p-speak">🔊 读这个词</button>
+    <button id="p-lines">看它出现在哪几句</button>
+    <button class="k" id="p-known">标为已掌握</button>
+    <button id="p-close2">关闭</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
