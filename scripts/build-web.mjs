@@ -67,6 +67,8 @@ async function main() {
   let merged = 0, withTrans = 0, withTiming = 0;
 
   for (const tr of idx.tracks) {
+    // 每轮重新判定，清掉可能从旧产物带过来的运行时字段
+    delete tr.audio; delete tr.netease;
     // ---- 音频：本地优先，其次网易云按需取 ----
     if (fs.existsSync(AUDIO_DIR)) {
       const f = fs.readdirSync(AUDIO_DIR).find((x) => x.replace(/\.[^.]+$/, '') === tr.id);
@@ -177,7 +179,6 @@ async function main() {
 
   fs.mkdirSync(WEB_DATA, { recursive: true });
   fs.writeFileSync(path.join(WEB_DATA, 'index.json'), JSON.stringify(idx), 'utf8');
-  fs.writeFileSync(path.join(DATA, 'index.json'), JSON.stringify(idx), 'utf8');
 
   // 封面：优先网易云的（版权图更准），否则用 THBWiki 的
   if (WANT_COVERS) {
@@ -203,7 +204,6 @@ async function main() {
       await new Promise((r) => setTimeout(r, 200));
     }
     fs.writeFileSync(path.join(WEB_DATA, 'index.json'), JSON.stringify(idx), 'utf8');
-    fs.writeFileSync(path.join(DATA, 'index.json'), JSON.stringify(idx), 'utf8');
     console.log(`封面：本次下载 ${got} 张`);
   } else {
     for (const tr of idx.tracks) {
@@ -211,7 +211,6 @@ async function main() {
       if (fs.existsSync(p)) tr.coverFile = `covers/${tr.id}.jpg`;
     }
     fs.writeFileSync(path.join(WEB_DATA, 'index.json'), JSON.stringify(idx), 'utf8');
-    fs.writeFileSync(path.join(DATA, 'index.json'), JSON.stringify(idx), 'utf8');
   }
 
   const s = idx.stats;

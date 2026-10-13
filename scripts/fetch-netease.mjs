@@ -101,7 +101,10 @@ async function main() {
     const m = store.matches[t.id];
     if (!m || !m.nid) continue;
     const f = path.join(LY, t.id + '.json');
-    if (!FORCE && fs.existsSync(f)) continue;
+    if (!FORCE && fs.existsSync(f)) {
+      // 缓存里的 nid 得和当前匹配一致，否则是换了歌，必须重抓
+      try { const c = JSON.parse(fs.readFileSync(f, 'utf8')); if (String(c.nid) === String(m.nid)) continue; } catch {}
+    }
     try {
       const r = await api({ types: 'lyric', source: 'netease', id: m.nid });
       fs.writeFileSync(f, JSON.stringify({ nid: m.nid, lyric: r.lyric || '', tlyric: r.tlyric || '', at: new Date().toISOString() }), 'utf8');

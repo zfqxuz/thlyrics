@@ -4,8 +4,8 @@
  *
  * 输入：data/raw/*.lrc（由 fetch-lyrics.mjs 抓取，带 ti/al/ar/cv/re 元数据 + 歌词行）
  * 输出：data/index.json        —— 完整数据集（原曲 / 曲目 / 歌词 / 句子分词 / 词表）
- *       web/data/index.json    —— 同一份，给静态前端直接 fetch
- *       web/data/covers/*.jpg  —— 专辑封面（可选，--covers 时下载）
+ *       docs/data/index.json    —— 同一份，给静态前端直接 fetch
+ *       docs/data/covers/*.jpg  —— 专辑封面（可选，--covers 时下载）
  *
  * 分词：kuromoji（IPADIC），给出 表面形 / 读音假名 / 罗马音 / 辞书形 / 词性。
  * 词表只收「值得背的词」：名词、动词、形容词、副词，过滤助词助动词与单假名虚词。
@@ -25,7 +25,7 @@ import { kanaToRomaji } from './kana-romaji.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW_DIR = path.join(ROOT, 'data', 'raw');
 const DATA_DIR = path.join(ROOT, 'data');
-const WEB_DATA = path.join(ROOT, 'web', 'data');
+const WEB_DATA = path.join(ROOT, 'docs', 'data');
 const COVER_DIR = path.join(WEB_DATA, 'covers');
 const DICT = path.join(ROOT, 'node_modules', 'kuromoji', 'dict');
 
@@ -728,7 +728,7 @@ async function main() {
 
   const s = index.stats;
   console.log(`曲目 ${s.tracks}（有时间轴 ${s.withTiming}）· 歌词行 ${s.lines} · 词表 ${s.vocab} · 原曲组 ${s.originals}`);
-  console.log(`输出：${path.relative(ROOT, path.join(DATA_DIR, 'index.json'))} + web/data/index.json`);
+  console.log(`输出：${path.relative(ROOT, path.join(DATA_DIR, 'index.json'))} + docs/data/index.json`);
 
   if (WANT_STATS) {
     console.log('\n出现最广的 15 个词：');
