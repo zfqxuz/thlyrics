@@ -1,0 +1,14 @@
+{
+  "name": "thlyrics-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "thlyrics 的端到端测试环境（Chromium + 缺库补齐脚本）",
+  "scripts": {
+    "setup": "bash setup-libs.sh",
+    "test": "node run-e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
+  }
+}

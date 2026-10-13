@@ -25,9 +25,12 @@
   let curLines = [];          // 当前曲目的歌词行（带上 t/segments）
   let loopLine = null;        // 单句循环的行下标，null=不循环
   let raf = null;
-  let audio = new Audio();
-  audio.preload = 'metadata';
-  audio.crossOrigin = 'anonymous';
+  const audio = new Audio();
+  audio.preload = 'auto';                       // 提前缓冲，点播放不用等
+  audio.setAttribute('playsinline', '');
+  audio.id = 'audio';
+  const mountAudio = () => { if (document.body && !audio.isConnected) document.body.appendChild(audio); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAudio); else mountAudio();
 
   // ---------- 本地状态 ----------
   function load() {
@@ -51,66 +54,154 @@
     speechSynthesis.speak(u);
   }
 
-  // ---------- 音频：按需取地址 ----------
-  async function neteaseUrl(nid) {
-    const res = await fetch(`${GD}?types=url&source=netease&id=${encodeURIComponent(nid)}&br=320`);
-    const j = await res.json();
+  // ---------- 音频：一次取地址、可复用、带状态 ----------
+  // 事实（实测）：
+  //   ① music-api 每次给的签名地址都不同，且会过期 -> 每首歌解析一次，缓存到播放结束/换歌为止，不要每点一次就重取
+  //   ② 真正的音频源（m*.music.126.net）支持 Range（206），所以中途 seek 不会重下整首
+  //   ③ 首字节很快、整首 10MB 需要几秒 -> 必须有「缓冲中」状态，否则用户以为卡死
+  const urlCache = new Map();          // nid -> {url, at}
+  const URL_TTL = 18 * 60 * 1000;      // 签名地址约 20 分钟过期，留点余量
+  async function stationUrlFor(track) {
+    const st = S.audio[track.id] || track.audio;
+    if (!st || !st.nid) return null;
+    const hit = urlCache.get(String(st.nid));
+    if (hit && Date.now() - hit.at < URL_TTL) return hit.url;
+    const res = await fetch(`${GD}?types=url&source=netease&id=${encodeURIComponent(st.nid)}&br=320`);
+    const j = await res.json().catch(() => null);
     if (!j || !j.url) throw new Error('取不到音频地址');
+    urlCache.set(String(st.nid), { url: j.url, at: Date.now() });
     return j.url;
   }
-  async function playTrack(track, opts = {}) {
-    const station = S.audio[track.id] || track.audio;
-    let local = S.local[track.id];
-    if (!local) { try { const blob = await idbGet(track.id); if (blob) local = URL.createObjectURL(blob); } catch {} }
-    try {
-      if (local) { audio.src = local; }
-      else if (station && station.nid) { setNow('正在取音频地址…'); audio.src = await neteaseUrl(station.nid); }
-      else if (station && station.type === 'netease' && station.nid) { setNow('正在取音频地址…'); audio.src = await neteaseUrl(station.nid); }
-      else { setNow('这首还没绑定音频，展开下面「音频来源与设置」粘个网易云链接'); return; }
-      audio.playbackRate = Number(S.rate || 1);
-      if (opts.at != null) audio.currentTime = opts.at;
-      await audio.play();
-      $('player').classList.add('on');
-    } catch (e) {
-      setNow('播放失败：' + e.message);
+
+  let stationNid = null, stationLocal = null;
+  let seekTime = null, wantPlay = false, lastErr = null, hideTimer = null;
+
+  function setNow(t) { const el = $('p-now'); if (el) el.textContent = t; }
+  function setLoad(on, text) {
+    const b = $('p-play');
+    if (on) {
+      $('player').classList.add('loading');
+      if (text) setNow(text);
+      if (b) b.textContent = '⋯';
+    } else {
+      $('player').classList.remove('loading');
+      if (b) b.textContent = audio.paused ? '▶' : '❚❚';
     }
   }
-  function setNow(t) { $('p-now').textContent = t; }
+  function jump(t) {
+    if (t == null || !isFinite(t)) return;
+    if (audio.readyState >= 1) { try { audio.currentTime = t; } catch {} }
+    else seekTime = t;                  // 还没就绪先记着
+  }
+  // 就绪后把待跳转的时间落地（之前这里漏了，导致"点了句子不动"）
+  function applySeek() {
+    if (seekTime == null || audio.readyState < 1) return;
+    const t = seekTime;
+    seekTime = null;
+    try { audio.currentTime = t; } catch {}
+  }
+  function bufferedAhead(t) {
+    try {
+      for (let i = 0; i < audio.buffered.length; i++) {
+        if (t >= audio.buffered.start(i) - 0.2 && t <= audio.buffered.end(i) + 0.2) return audio.buffered.end(i) - t;
+      }
+    } catch {}
+    return 0;
+  }
+  function bindAudioEvents() {
+    audio.addEventListener('waiting', () => setLoad(true, '缓冲中…'));
+    audio.addEventListener('stalled', () => setLoad(true, '缓冲中…'));
+    audio.addEventListener('canplay', () => { applySeek(); setLoad(false); });
+    audio.addEventListener('loadedmetadata', applySeek);
+    audio.addEventListener('loadeddata', applySeek);
+    audio.addEventListener('seeked', () => { setLoad(false); });
+    audio.addEventListener('playing', () => { setLoad(false); $('player').classList.add('on'); });
+    audio.addEventListener('play', () => { $('p-play').textContent = '❚❚'; });
+    audio.addEventListener('pause', () => { $('p-play').textContent = '▶'; });
+    audio.addEventListener('error', () => {
+      // 地址过期/网络断：清掉缓存，下次重取
+      if (stationNid) urlCache.delete(String(stationNid));
+      setLoad(false);
+      setNow('音频加载失败，点播放重试（会自动换新地址）');
+    });
+  }
+  // 换歌：本地优先，其次网易云；同曲目重复调用直接跳位置，不再重取地址
+  async function playTrack(track, opts = {}) {
+    const localId = 'local:' + track.id;
+    const nid = (S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null;
+    const idNow = localId in S.local || await idbGet(track.id).catch(() => null) ? localId : nid;
+    if (audio.getAttribute('data-tid') !== track.id || (idNow && idNow !== stationLocal && idNow !== stationNid)) {
+      // 需要换源
+      let local = S.local[track.id];
+      if (!local) { try { const blob = await idbGet(track.id); if (blob) local = URL.createObjectURL(blob); } catch {} }
+      audio.pause();
+      stationNid = null; stationLocal = null; seekTime = null; lastErr = null;
+      audio.setAttribute('data-tid', track.id);
+      setLoad(true, '正在取音频地址…');
+      try {
+        if (local) { stationLocal = local; audio.src = local; }
+        else {
+          const url = await stationUrlFor(track);
+          if (!url) { setLoad(false); setNow('这首还没绑定音频，展开页面下方「音频来源与设置」粘个网易云链接'); return; }
+          stationNid = nid; audio.src = url;
+        }
+        wantPlay = true;
+      } catch (e) { lastErr = e; setLoad(false); setNow('取地址失败：' + e.message); return; }
+    }
+    audio.playbackRate = Number(S.rate || 1);
+    if (opts.at != null) jump(opts.at);
+    // 让 UI 先响应，真正的播放交给事件驱动，避免点击卡住
+    try { await audio.play(); } catch { /* 用户没交互/还在缓冲，等 canplay 自己播 */ }
+    $('player').classList.add('on');
+  }
 
   // ---------- 单句循环 ----------
   function lineEndTime(i) {
     const next = curLines[i + 1];
-    if (next && next.t != null) return next.t;
-    return null;
-  }
-  function tick() {
-    raf = requestAnimationFrame(tick);
-    if (!audio.duration) return;
-    const t = audio.currentTime;
-    $('p-seek').value = String(Math.round((t / audio.duration) * 1000));
-    $('p-time').textContent = fmtTime(t);
-    if (loopLine == null) return;
-    const start = curLines[loopLine].t;
-    const end = lineEndTime(loopLine);
-    if (start == null) return;
-    if (end != null) {
-      if (t >= end - 0.05 || t < start - 0.35) audio.currentTime = start;   // 到本句结束就回到句首
-    } else if (t < start - 0.35) audio.currentTime = start;
+    return next && next.t != null ? next.t : null;
   }
   function setLoop(i) {
     loopLine = i;
     $('p-loop').textContent = i == null ? '单句循环 关' : '单句循环 开';
     $('p-loop').classList.toggle('on', i != null);
-    highlight();
-    if (i != null && curLines[i].t != null) {
-      audio.currentTime = curLines[i].t;
-      if (audio.paused) audio.play().catch(() => {});
-    }
+    highlight(true);
+    if (i == null) return;
+    const t = curLines[i].t;
+    if (t == null) { setNow('这句没有时间轴，只能手动拖进度条'); return; }
+    jump(t);
+    if (audio.paused) audio.play().catch(() => {});
   }
-  function highlight() {
-    document.querySelectorAll('#lyric .line').forEach((el, i) => el.classList.toggle('playing', i === loopLine));
+  function highlight(doScroll) {
+    // 行号用元素上的 data-i 判断（中文行也是 .line，DOM 序号会错位）
+    document.querySelectorAll('#lyric .line').forEach((el) => {
+      el.classList.toggle('playing', el.dataset.i != null && Number(el.dataset.i) === loopLine);
+    });
     const el = document.querySelector('#lyric .line.playing');
-    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (!el || !doScroll) return;                  // 只有用户主动切行才滚，循环回跳/播放不滚，页面才不晃
+    const r = el.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    if (r.top < 80 || r.bottom > vh - 90) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  // 时间驱动的进度/循环：读 audio.currentTime（不做插值，避免和真实播放错位）
+  function frame() {
+    raf = requestAnimationFrame(frame);
+    const el = audio;
+    if (el && typeof el.currentTime === 'number' && el.duration > 0) {
+      const t = el.currentTime;
+      $('p-seek').value = String(Math.round((t / el.duration) * 1000));
+      $('p-time').textContent = fmtTime(t);
+      if (audio.paused) setLoad(false);
+      else if (bufferedAhead(t) < 0.25 && !audio.seeking) setLoad(true, '缓冲中…');
+      else setLoad(false);
+    }
+    if (loopLine == null || !curLines[loopLine]) return;
+    const start = curLines[loopLine].t;
+    if (start == null) return;
+    const end = lineEndTime(loopLine);
+    const now = el ? el.currentTime : 0;
+    if (end != null) {
+      if (now >= end - 0.06 || now < start - 0.4) el.currentTime = start;
+    } else if (now < start - 0.4) el.currentTime = start;
   }
 
   // ---------- 列表 ----------
@@ -181,6 +272,7 @@
       <div class="hint">点句子 = 从这句开始单句循环 · 点词 = 看读音和释义 · 再点一次「单句循环」可关掉</div>
       <div class="card" id="lyric"></div>
     `;
+    bindLyricClicks();
     drawLyric(t);
     $('b-back').onclick = () => { audio.pause(); setLoop(null); $('player').classList.remove('on'); $('view-track').style.display = 'none'; $('view-list').style.display = 'block'; renderList(); };
     $('b-play').onclick = () => playTrack(t);
@@ -191,7 +283,7 @@
     $('player').classList.add('on');
     $('srcinfo').textContent = describeSource(t);
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
-    if (!raf) raf = requestAnimationFrame(tick);
+    if (!raf) raf = requestAnimationFrame(frame);
   }
 
   function describeSource(t) {
@@ -199,6 +291,26 @@
     const s = S.audio[t.id] || t.audio;
     if (s && s.nid) return `当前音频：网易云 ${s.nid}${t.netease && t.netease.agreeRate != null ? `（歌词一致度 ${Math.round(t.netease.agreeRate * 100)}%）` : ''}`;
     return '这首还没有音频。可以在下面粘一个网易云链接。';
+  }
+
+  // 歌词点击：用事件委托，避免每行单独绑 onclick 在频繁重绘时丢事件
+  function bindLyricClicks() {
+    const host = $('lyric');
+    if (!host || host.dataset.bound === '1') return;
+    host.dataset.bound = '1';
+    host.addEventListener('click', (e) => {
+      const wEl = e.target.closest('.w[data-w]');
+      if (wEl) {
+        const w = VBY.get(wEl.dataset.w);
+        try { if (w) showPop(w, curTrack); else speak(wEl.textContent); } catch (err) { /* 查词失败不能影响点行 */ }
+        return;                                       // 点词=查词，绝不切循环行
+      }
+      const lineEl = e.target.closest('.line[data-i]');
+      if (!lineEl) return;
+      const i = Number(lineEl.dataset.i);
+      if (!Number.isFinite(i)) return;
+      setLoop(loopLine === i ? null : i);
+    });
   }
 
   function drawLyric(t) {
@@ -215,16 +327,18 @@
           const span = document.createElement('span');
           span.className = 'w' + (w ? (isKnown(w) ? ' known' : ' learning') : '');
           span.textContent = sg.s;
-          span.onclick = (e) => { e.stopPropagation(); if (w) showPop(w, t); else speak(sg.s); };
+          span.dataset.w = sg.b || '';
           div.appendChild(span);
         }
       } else div.textContent = l.text;
-      div.onclick = () => { setLoop(loopLine === i ? null : i); };
-      host.appendChild(div);
-
+      div.dataset.i = String(i);                                     // 行号挂元素上，点击用委托识别（见 bindLyricClicks）
+      // 中文翻译挂在同一句下面（不单独占一行，避免行号错位、点击打到译文上）
       if (l.zh && S.zh !== false) {
-        const z = document.createElement('div'); z.className = 'line zh'; z.textContent = l.zh; host.appendChild(z);
+        const z = document.createElement('div'); z.className = 'zh'; z.textContent = l.zh;
+        z.style.pointerEvents = 'none';
+        div.appendChild(z);
       }
+      host.appendChild(div);
       if (S.romaji !== false && l.romaji && l.jp) {
         const r = document.createElement('div'); r.className = 'romaji'; r.textContent = l.romaji; host.appendChild(r);
       }
@@ -234,6 +348,7 @@
   // ---------- 词条弹层 ----------
   let popWord = null;
   function showPop(w, t) {
+    if (!w) return;
     popWord = w;
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
@@ -280,13 +395,25 @@
       };
     });
 
-    // 播放条
-    $('p-play').onclick = () => { if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
-    audio.onplay = () => { $('p-play').textContent = '❚❚'; };
-    audio.onpause = () => { $('p-play').textContent = '▶'; };
-    audio.onerror = () => setNow('音频加载失败（地址可能过期了，再点一次播放重新取）');
-    $('p-seek').oninput = (e) => { if (audio.duration) audio.currentTime = (Number(e.target.value) / 1000) * audio.duration; };
-    $('p-loop').onclick = () => setLoop(loopLine == null ? (curLines.findIndex((l) => l.text) >= 0 ? curLines.findIndex((l) => l.text) : 0) : null);
+    // —— 播放条 ——（所有状态都由 audio 事件驱动，点击只做最小动作，避免卡顿）
+    bindAudioEvents();
+    $('p-play').onclick = () => {
+      if (!audio.getAttribute('data-tid')) { if (curTrack) playTrack(curTrack); return; }
+      if (audio.paused) {
+        wantPlay = true;
+        if (audio.error || audio.readyState === 0) { if (stationNid) urlCache.delete(String(stationNid)); playTrack(curTrack); }
+        else audio.play().catch(() => {});
+      } else { wantPlay = false; audio.pause(); }
+    };
+    $('p-seek').oninput = (e) => {
+      if (!audio.duration) return;
+      jump((Number(e.target.value) / 1000) * audio.duration);
+    };
+    $('p-loop').onclick = () => {
+      if (loopLine != null) return setLoop(null);
+      const first = curLines.findIndex((l) => l.text && l.t != null);
+      setLoop(first >= 0 ? first : 0);
+    };
     $('p-prev').onclick = () => step(-1);
     $('p-next').onclick = () => step(1);
     $('p-rate').onclick = () => {
@@ -294,10 +421,10 @@
       const i = rates.indexOf(Number(S.rate || 1));
       const r = rates[(i + 1) % rates.length];
       S.rate = r; save(); audio.playbackRate = r; $('p-rate').textContent = r.toFixed(1) + 'x';
+      setNow('语速 ' + r.toFixed(1) + 'x');
     };
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
-    $('p-close').onclick = () => { audio.pause(); $('player').classList.remove('on'); };
-
+    $('p-close').onclick = () => { wantPlay = false; audio.pause(); $('player').classList.remove('on'); };
     // 词条弹层
     $('p-speak').onclick = () => popWord && speak(popWord.word);
     $('p-close2').onclick = hidePop;
@@ -357,7 +484,7 @@
     if (!curLines.length) return;
     const textLines = curLines.map((l, i) => ({ l, i })).filter((x) => x.l.text.trim() && x.l.t != null);
     if (!textLines.length) return;
-    const cur = loopLine == null ? -1 : loopLine;
+    const cur = loopLine == null ? -1 : loopLine;   // loopLine 就是行数组下标
     let pos = textLines.findIndex((x) => x.i === cur);
     if (pos < 0) pos = dir > 0 ? -1 : textLines.length;
     let next = pos + dir;

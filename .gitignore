@@ -1,5 +1,8 @@
 node_modules/
-data/raw/*.tmp
+.e2e/node_modules/
+.e2e/root/
+.e2e/debs/
+.e2e/shots/
 data/netease-lyrics/
 .DS_Store
 *.log
