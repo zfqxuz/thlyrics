@@ -123,6 +123,18 @@ https://zfqxuz.github.io/thlyrics/ （GitHub Pages，从 docs/ 发布）
 - 快捷键：空格播放暂停、↑↓ 切句、L 开关循环
 - 本地音频（自己的完整版）可以直接选文件，存在浏览器 IndexedDB 里
 
+
+## 释义是怎么来的（重要）
+
+1380 个词的释义**全部是手工翻译**，存在 data/meanings.mine.json 里（按词形做键）。
+改法有两种：
+
+1. 页面上点任意词 -> 「改释义」-> 写你的版本 -> 回车。改动只存在你自己的浏览器（localStorage）。
+2. 直接改 data/meanings.mine.json，然后重跑 node scripts/build-web.mjs，所有人都能看到。
+
+优先级：前端手改 > data/meanings.mine.json > 机器翻译（data/meanings.json）> 词对齐推断（meanings.auto.json）。
+后两个只是兜底，正常不该被用到。
+
 ## 已知限制
 
 - **读音还原不是词典级**。动词活用形 -> 辞书形的还原是自己写的规则（kuromoji 的 `base_form`

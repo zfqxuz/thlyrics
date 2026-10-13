@@ -62,6 +62,7 @@ async function main() {
   const ne = readJson(path.join(DATA, 'netease.json'), { matches: {} });
   const meanings = readJson(path.join(DATA, 'meanings.json'), {});          // 机器翻译/手工
   const autoMeanings = readJson(path.join(DATA, 'meanings.auto.json'), {});  // 词对齐推断
+  const mineMeanings = readJson(path.join(DATA, 'meanings.mine.json'), {});  // 人工精译（我自己翻的，最高优先）
 
 
   let merged = 0, withTrans = 0, withTiming = 0;
@@ -158,15 +159,16 @@ async function main() {
     if (ex) v.examples = ex;
     const auto = autoMeanings[v.word];
     const man = meanings[v.word];
-    const o = man || auto;
+    const mine = mineMeanings[v.word];
+    const o = (mine ? { meaning: mine } : null) || man || auto;
     if (!o) continue;
     v.meaning = typeof o === 'string' ? o : o.meaning || '';
     if (!v.meaning) { v.meaning = ''; continue; }
-    v.meaningSrc = man ? 'manual' : 'auto';
-    if (man) manual++; else machine++;
+    v.meaningSrc = mine ? 'mine' : man ? 'machine' : 'auto';
+    if (mine) manual++; else machine++;
     // 质量闸门：读起来不可信的标 check，前端会提示
-    const bad = v.meaning.length > Math.max(6, v.word.length * 3) || /^[a-zA-Z0-9]+$/.test(v.meaning) ||
-      (v.word.length === 1 && v.meaning.length > 4);
+    const bad = !mine && (v.meaning.length > Math.max(6, v.word.length * 3) || /^[a-zA-Z0-9]+$/.test(v.meaning) ||
+      (v.word.length === 1 && v.meaning.length > 4));
     if (bad) { v.meaningCheck = true; flagged++; }
     else v.hasMeaning = true;
   }
@@ -215,7 +217,7 @@ async function main() {
 
   const s = idx.stats;
   console.log(`曲目 ${s.tracks} · 并入网易云 ${s.withNetease} · 有时间轴 ${s.tracksWithTiming} · 行级译文 ${s.withTranslations} 行`);
-  console.log(`释义：共 ${s.withMeaning} 词有释义（手工 ${manual} / 机器 ${machine}），另有 ${flagged} 词机器译文可疑已标记`);
+  console.log(`释义：共 ${s.withMeaning} 词有释义（人工精译 ${manual} / 机器 ${machine}），另有 ${flagged} 词机器译文可疑已标记`);
   console.log('输出 docs/data/index.json');
 }
 

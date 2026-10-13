@@ -110,7 +110,27 @@ const KANA_ENDINGS = [
   [/り$/, (s) => s + 'る'],
 ];
 
+// 纯假名动词的不规则/易错词干 -> 辞书形（规则还原会把 なっ 算成 なう，这类必须查表）
+const KANA_VERB_FIX = {
+  なっ: 'なる', なり: 'なる', なら: 'なる', なれ: 'なる',
+  あり: 'ある', あっ: 'ある', あれ: 'ある',
+  いら: 'いる', いれ: 'いる', いよ: 'いる',
+  いえ: 'いう', いい: 'いう', いっ: 'いう', いわ: 'いう',
+  おっ: 'おる', おら: 'おる', おり: 'おる',
+  くれ: 'くれる', くれれ: 'くれる',
+  しまい: 'しまう', しまっ: 'しまう', しまえ: 'しまう', しまお: 'しまう',
+  でき: 'できる', すれ: 'する', しよ: 'する', しろ: 'する',
+  こい: 'くる', きま: 'くる',
+  わかっ: 'わかる', わから: 'わかる', わかり: 'わかる', わかん: 'わかる', わかれ: 'わかる',
+  のぼっ: 'のぼる', のぼり: 'のぼる', のぼれ: 'のぼる',
+  まわし: 'まわす', まわっ: 'まわす', かくし: 'かくす', つなご: 'つなぐ',
+  とっ: 'とる', とれ: 'とる', はらっ: 'はらう', へこん: 'へこむ',
+  やろ: 'やる', やり: 'やる', すい: 'すう', ひい: 'ひく', まどい: 'まどう',
+  かみ: 'かむ', どき: 'どく', うっ: 'うつ', おか: 'おく', こぼし: 'こぼす', つい: 'つく',
+};
+
 function hiraLemmaFromReading(readingHira) {
+  if (KANA_VERB_FIX[readingHira]) return KANA_VERB_FIX[readingHira];
   for (const [re, build] of KANA_ENDINGS) {
     const m = readingHira.match(re);
     if (!m) continue;
@@ -133,17 +153,28 @@ function resolveVerbLemma(surface, reading, info) {
   const readingHira = reading && reading !== '*' ? toHira(reading) : '';
   const hasKanji = /[一-龯]/.test(base);
 
-  if (ct.startsWith('一段')) return base.endsWith('る') ? base : base + 'る';   // 消え/見せ -> 消える/見せる
+  if (ct.startsWith('下二') || ct.startsWith('下ー')) {          // 下二段（捧げよ 这类文语残留）
+    return cf && cf.startsWith('命令') ? base.slice(0, -1) + 'る' : base;
+  }
+  if (ct.startsWith('一段')) {
+    // 一段动词的活用形：连用形是词干（消え/見せ），命令形是词干+ろ/よ（垂れろ/告げよ）
+    if (cf.startsWith('命令')) return base.slice(0, -1) + 'る';
+    if (base.endsWith('る')) return base;
+    return base + 'る';
+  }
   if (ct.startsWith('サ変')) return base.endsWith('する') ? base : base + 'する';
   if (ct.startsWith('カ変')) return base.endsWith('くる') ? base : base + 'くる';
 
   if (ct.startsWith('五段')) {
     if (cf === '基本形' || cf === '*') return base;                            // 本来就是辞书形
-    if (hasKanji && base.length >= 2) {
-      // 活用形词尾决定了行（五段・ワ行促音便 -> ワ行 -> う），把最后一拍换成该行的う段
-      const row = (ct.split('・')[1] || '').slice(0, 1);
-      const uEnd = ROW_U[row];
-      if (uEnd) return base.slice(0, -1) + uEnd;                               // 縫っ -> 縫う / 知ら -> 知る
+    const row = (ct.split('・')[1] || '').slice(0, 1);
+    const uEnd = ROW_U[row];
+    if (uEnd && base.length >= 2) {
+      // 活用形词尾合法才敢换：五段活用形只可能是 う段 / い段 / あ段 / え段 / お段 / っ
+      // （这样 告げよ 的 よ、垂れろ 的 ろ 就不会被当成活用尾，而是当成「词干里本来就有假名」）
+      const last = base.slice(-1);
+      const legit = (I_TO_U[last] || A2U[last] || O2U[last] || last === uEnd || last === 'っ');
+      if (legit && last !== uEnd) return base.slice(0, -1) + uEnd;             // 縫っ -> 縫う / 知ら -> 知る
     }
   }
 
@@ -496,6 +527,7 @@ async function main() {
 
         // 动词会出现两种形态：还原到辞书形（知る）和只还原到词干（知ら）。
         // 用「去掉最后一个假名」当合并键，把两者并成一张卡；带汉字的形态优先。
+        if (!seg.b) continue;                 // 被词表过滤掉的分词不参与合并
         const key = vocabKey(seg);
 
         let v = vocabMap.get(key);
@@ -524,14 +556,13 @@ async function main() {
     }
 
   // 词条主形与读音（最后一道工序）
-  // 同一动词在歌词里有多个活用形（縫っ / 縫う、知ら / 知る……），聚合后要挑一个「主形」，
-  // 再从所有候选读音里投票选出与主形最匹配的那个。
+  // 动词：同一词有多个活用形（縫っ/縫う、知ら/知る），挑汉字最多最长的当主形，读音用「段上算好的读音」投票；
+  // 非动词（名词/形容词/副词）：段上的读音本来就是对的，直接取出现最多的那个，不做任何「拧词尾」的加工。
   for (const v of vocabMap.values()) {
     const cands = v._cands || [];
     delete v._cands;
     if (!cands.length) continue;
 
-    // 主形：汉字最多 + 最长（縫う 优于 縫っ，知る 优于 知ら）
     let best = null;
     for (const c of cands) {
       const score = (/[一-龯]/.test(c.b) ? 10 : 0) + Math.min(c.b.length, 9);
@@ -541,7 +572,6 @@ async function main() {
     v.word = word;
     v.surface = best.s;
 
-    // 读音投票：分值 = 长度一致(3) + 词尾同假名(4) + 同行(2) + 出现次数
     const tally = new Map();
     for (const c of cands) {
       const r = toHira(c.l || '');
@@ -550,101 +580,61 @@ async function main() {
       t.n++;
       tally.set(r, t);
     }
-    let winner = null;
-    for (const t of tally.values()) {
-      const lenOk = t.r.length === word.length ? 3 : 0;
-      const tail = t.r.slice(-1), wEnd = word.slice(-1);
-      const tailOk = tail === wEnd ? 4 : 0;
-      const rowOk = !tailOk && I_TO_U[tail] === wEnd ? 2 : 0;
-      const score = lenOk + tailOk + rowOk + Math.min(t.n, 5) / 10;
-      if (!winner || score > winner.score) winner = { ...t, score };
-    }
-    let reading = toHira((winner && winner.r) || best.l || best.r || '');
-    // 最后一层保险：词条形以假名结尾时，读音至少要和这个假名同字（縫う/ぬう、知る/しる）
-    if (reading && !/[一-龯]/.test(word.slice(-1)) && reading.slice(-1) !== word.slice(-1)) {
-      const t = reading.slice(-1);
-      if (reading.length === word.length && I_TO_U[t] === word.slice(-1)) reading = reading.slice(0, -1) + word.slice(-1);
-      else if (reading.length + 1 === word.length && word.slice(-1) === 'る') reading = reading + 'る';
-      else reading = reading.slice(0, -1) + word.slice(-1);
-    }
-    // 兜底 0：读音短于 2 拍（经つ/縫う 只抓到促音前一拍）时，直接按「词条形最后一段假名」重推
-    if (reading.length < 2 && word.length >= 2) {
-      const lKana = (word.match(/[ぁ-ゖー]+$/) || [''])[0];
-      if (lKana) {
-        const base = cands.map((c) => c.l).filter(Boolean).sort((a, b) => b.length - a.length)[0] || '';
-        reading = base || lKana;
-        if (!reading.endsWith(lKana)) reading = reading.slice(0, -1) + lKana;
+    const list = [...tally.values()].sort((a, b) => b.n - a.n);
+
+    if (v.pos === '動詞') {
+      let winner = null;
+      for (const t of list) {
+        const tail = t.r.slice(-1), wEnd = word.slice(-1);
+        const score = (t.r.length === word.length ? 3 : 0) + (tail === wEnd ? 4 : 0) + (!(tail === wEnd) && I_TO_U[tail] === wEnd ? 2 : 0) + Math.min(t.n, 5) / 10;
+        if (!winner || score > winner.score) winner = { ...t, score };
       }
-    }
-    // 兜底：读音短于 2 拍（经つ / 縫う 这类只抓到促音前一拍的）时，按词条尾补全
-    if (reading.length < 2 && word.length >= 2) {
-      const wEnd = word.slice(-1);
-      if (!/[一-龯]/.test(wEnd)) {
-        const stem = reading.slice(0, -1);
-        const prevChar = stem.slice(-1);
-        const tbl = { う: A2U, く: I2U, す: I2U, つ: I2U, ぬ: I2U, む: I2U, ぶ: I2U, る: I2U }[wEnd] || A2U;
-        reading = stem + (tbl[prevChar] || wEnd);
+      let reading = toHira((winner && winner.r) || best.l || best.r || '');
+      // 只是最后一道保险：词尾读不出来时，至少和词形同字
+      if (reading && reading.slice(-1) !== word.slice(-1) && reading.length === word.length && I_TO_U[reading.slice(-1)] === word.slice(-1)) {
+        reading = reading.slice(0, -1) + word.slice(-1);
       }
+      if (reading.length < 2 && word.length >= 2 && !/[一-龯]/.test(word.slice(-1))) reading = reading.slice(0, -1) + word.slice(-1);
+      v.reading = reading;
+    } else {
+      let r = toHira((list[0] && list[0].r) || best.l || best.r || '');
+      // 形容词一定是 い 结尾（優しく -> やさしい），词尾不同就按 い 收尾
+      if (v.pos === '形容詞' && /い$/.test(word) && !/い$/.test(r) && /[一-龯]/.test(word)) r = r.slice(0, -1) + 'い';
+      v.reading = r;
     }
-    v.reading = reading;
-    v.romaji = reading ? kanaToRomaji(reading) : '';
+    v.romaji = v.reading ? kanaToRomaji(v.reading) : '';
   }
 
-  // 最后一道数据质量闸门：读音必须是平假名，且「段数」要合得上
-  // （经つ / 縫う 这类只抓到促音前一拍时，读音会短一截，这里按前 n 拍的元音补成同一段）
-  const segOf = { あ: 'あ', か: 'あ', が: 'あ', さ: 'あ', た: 'あ', な: 'あ', は: 'あ', ば: 'あ', ぱ: 'あ', ま: 'あ', や: 'あ', ら: 'あ', わ: 'あ',
-    い: 'い', き: 'い', ぎ: 'い', し: 'い', じ: 'い', ち: 'い', に: 'い', ひ: 'い', び: 'い', ぴ: 'い', み: 'い', り: 'い',
-    う: 'う', く: 'う', ぐ: 'う', す: 'う', ず: 'う', つ: 'う', づ: 'う', ぬ: 'う', ふ: 'う', ぶ: 'う', ぷ: 'う', む: 'う', ゆ: 'う', る: 'う',
-    え: 'え', け: 'え', げ: 'え', せ: 'え', ぜ: 'え', て: 'え', で: 'え', ね: 'え', へ: 'え', べ: 'え', ぺ: 'え', め: 'え', れ: 'え',
-    お: 'お', こ: 'お', ご: 'お', そ: 'お', ぞ: 'お', と: 'お', ど: 'お', の: 'お', ほ: 'お', ぼ: 'お', ぽ: 'お', も: 'お', よ: 'お', ろ: 'お', を: 'お',
-  };
-  const segToEnd = { あ: 'あ', い: 'い', う: 'う', え: 'え', お: 'お' };
-  for (const v of vocabMap.values()) {
-    const lKana = (v.word.match(/[ぁ-ゖー]+$/) || [''])[0] || '';
-    let r = v.reading || '';
-    if ((/[一-龯]/.test(r) || /[ァ-ヺ]/.test(r)) || /undefined/.test(r)) r = '';
-    // 只抓到一个音节的词干（縫う/ぬ、経つ/た）时，按词条尾补全；其余情况只做净化
-    if (lKana && (r.length < 2 || r.length < lKana.length)) {
-      const stem = r.slice(0, -1);
-      r = stem + lKana;
-    } else if (lKana && r.length < lKana.length + 1) {
-      const want = lKana.length;
-      const seg = segOf[r.slice(-1)] || 'う';
-      const stem = r.slice(0, -1);
-      let cand = stem + (segToEnd[seg] || 'う');
-      if (lKana.length === 1 && cand.length < want) {
-        // 促音前一拍的行由词条尾决定（縫う/ぬ + う段 -> ぬう、経つ/た + つ -> たつ）
-        const iOfU = { う: 'わ', く: 'か', す: 'さ', つ: 'た', ぬ: 'な', む: 'ま', ぶ: 'ば', る: 'ら' };
-        const iChar = iOfU[lKana] && segOf[iOfU[lKana]];
-        cand = stem + (iChar && segToEnd[seg] === segToEnd[iChar] ? iOfU[lKana] : (segToEnd[seg] || 'う'));
+  // 收尾清理：命令形残留（告げよ / くれよ 被当成词条）和明显读不通的碎片
+  for (const [k, v] of [...vocabMap.entries()]) {
+    if (v.pos === '動詞') {
+      // 命令形（告げよ/くれよ/捧げよ）被当成词条：把词形和形态表都改成辞书形
+      const fixYo = (x) => (/よ$/.test(x) && !/よう$/.test(x) ? x.slice(0, -1) + 'る' : x);
+      const nw = fixYo(v.word);
+      if (nw !== v.word) { v.word = nw; v.reading = fixYo(v.reading || ''); v.romaji = kanaToRomaji(v.reading); }
+      const nf = {};
+      for (const [k2, val] of Object.entries(v.forms || {})) nf[fixYo(k2)] = val;
+      v.forms = nf;
+      // 一段命令形残留（垂れろ -> 垂れる）
+      const fixRo = (x) => (/[\u3041-\u3096\u4e00-\u9faf]ろ$/.test(x) && !/いろ$|ころ$|しろ$/.test(x) ? x.slice(0, -1) + 'る' : x);
+      const nw2 = fixRo(v.word);
+      if (nw2 !== v.word) { v.word = nw2; v.reading = fixRo(v.reading || ''); v.romaji = kanaToRomaji(v.reading); }
+      const nf2 = {};
+      for (const [k2, val] of Object.entries(v.forms || {})) nf2[fixRo(k2)] = val;
+      v.forms = nf2;
+      // 读音也要一起清（垂れる / たれろ）
+      const fixRoR = (x) => (/[\u3041-\u3096]ろ$/.test(x) ? x.slice(0, -1) + 'る' : x);
+      const nr = fixRoR(v.reading || '');
+      if (nr !== v.reading) { v.reading = nr; v.romaji = kanaToRomaji(nr); }
+      const nf3 = {};
+      for (const [k2, val] of Object.entries(v.forms || {})) {
+        nf3[k2] = Object.assign({}, val, { readingHira: fixRoR(val.readingHira || ''), romaji: kanaToRomaji(fixRoR(val.readingHira || '')) });
       }
-      while (cand.length < want) cand += segToEnd[seg] || 'う';
-      r = cand;
+      v.forms = nf3;
+      if (/よる$/.test(v.word) && !/[一-龯]/.test(v.word)) { /* 纯假名残留，下面单独删 */ }
     }
-    v.reading = r;
-    v.romaji = r ? kanaToRomaji(r) : '';
-  }
-
-
-  // 极端兜底：读音只抓到促音前一拍、且读不出来（縫う/経つ/盛る），直接用词条尾拼
-  for (const v of vocabMap.values()) {
-    const lKana = (v.word.match(/[ぁ-ゖー]+$/) || [''])[0];
-    if (!lKana) continue;
-    const r = v.reading || '';
-    if (r.length < 2 || !r.length) {
-      const lastVowel = r.slice(-1);
-      v.reading = (lastVowel && 'あいうえお'.includes(lastVowel) && lKana.length === 1)
-        ? lastVowel + lKana
-        : lKana;
-      v.romaji = kanaToRomaji(v.reading);
-    }
-  }
-
-  // 人工覆盖表：自动还原搞不定的极少数词（发现错读就往这里加）
-  const READING_OVERRIDE = { 縫う: 'ぬう', 経つ: 'たつ', 盛る: 'もる' };
-  for (const v of vocabMap.values()) {
-    const o = READING_OVERRIDE[v.word];
-    if (o) { v.reading = o; v.romaji = kanaToRomaji(o); }
+    if (v.word === 'よる' && v.pos === '動詞') { vocabMap.delete(k); continue; }
+    if (v.word === 'げろ') { vocabMap.delete(k); continue; }
   }
 
   // 词表排序：出现曲数多的优先，其次总频次

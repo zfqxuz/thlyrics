@@ -238,9 +238,10 @@
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = w.romaji || '';
-    const mg = w.meaning
-      ? (w.meaningCheck ? `${w.meaning}（机器译文，可能不准）` : w.meaning)
-      : '（这个词还没有释义，欢迎在 data/meanings.json 里补）';
+    const myMean = (S.notes[w.id] && S.notes[w.id].meaning) || w.meaning;
+    const mg = myMean
+      ? (w.meaningCheck ? `${myMean}（机器译文，可能不准）` : myMean)
+      : '（这个词还没有释义，点「改释义」自己写一个）';
     $('p-meaning').textContent = mg;
     const ex = (w.examples || [])[0];
     $('p-ex').textContent = ex ? `例句（${ex.track}）：${ex.jp}${ex.zh ? '　→　' + ex.zh : ''}` : '';
@@ -300,6 +301,19 @@
     // 词条弹层
     $('p-speak').onclick = () => popWord && speak(popWord.word);
     $('p-close2').onclick = hidePop;
+    $('p-edit').onclick = () => {
+      if (!popWord) return;
+      const row = $('p-editrow');
+      row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+      $('p-editinput').value = (S.notes[popWord.id] && S.notes[popWord.id].meaning) || popWord.meaning || '';
+      $('p-editinput').focus();
+    };
+    $('p-editinput').onkeydown = (e) => {
+      if (e.key !== 'Enter' || !popWord) return;
+      const val = e.target.value.trim();
+      S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: val });
+      save(); showPop(popWord);
+    };
     $('p-known').onclick = () => {
       if (!popWord) return;
       if (S.known[popWord.id]) delete S.known[popWord.id]; else S.known[popWord.id] = 1;
