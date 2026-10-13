@@ -276,6 +276,17 @@ const ossState = await page.evaluate(() => { const a = document.querySelector('a
 check('OSS 曲目：audio.src 指向对象存储直链', /aliyuncs\.com/.test(ossState.src), ossState.src);
 check('OSS 曲目：不再调用第三方解析接口', audioReqs.length === reqBefore, '新增请求 ' + (audioReqs.length - reqBefore) + ' 次');
 check('OSS 曲目：进页面即预缓冲（readyState>0 或已开始拉流）', true, JSON.stringify(ossState));
+// 真请求一次（只取 1KB），防止"地址写错/签名过期"这类问题溜过去
+const ossHttp = await page.evaluate(async () => {
+  try {
+    const d = await (await fetch('data/index.json')).json();
+    const t = d.tracks.find((x) => x.id === 't1');
+    if (!t || !t.audioOss) return { why: '数据里没有 audioOss' };
+    const r = await fetch(t.audioOss, { headers: { Range: 'bytes=0-1023' } });
+    return { status: r.status, type: r.headers.get('content-type'), range: r.headers.get('content-range'), len: r.headers.get('content-length') };
+  } catch (e) { return { why: String(e).slice(0, 100) }; }
+});
+check('OSS 直链真请求可达（206 且 audio/mpeg）', ossHttp.status === 206 && /audio\/mpeg/.test(ossHttp.type || ''), JSON.stringify(ossHttp));
 
 // ============ 10 生词本 + 刷新恢复 ============
 await page.locator('#deck .word .kn').first().click().catch(() => {});
