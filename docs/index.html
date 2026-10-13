@@ -6,25 +6,33 @@
 <title>东方同人曲 学唱机</title>
 <style>
 :root{
-  --bg:#0f1115; --panel:#171a21; --panel2:#1d212a; --line:#2a2f3a; --ink:#e8e6e3; --muted:#9aa3b2;
-  --accent:#e0553f; --accent2:#5aa9e6; --hl:#3a2f24; --hl-line:#ffd48a; --ok:#63b97a;
+  --bg:#0b0d12; --panel:#141821; --panel2:#1a1f2a; --line:#242b38; --ink:#eceef2; --muted:#8d97a8;
+  --accent:#e0553f; --accent2:#5aa9e6; --hl:#2f2718; --hl-line:#ffd48a; --ok:#63b97a;
+  /* 词性颜色 */
+  --p-n:#7fc4ff; --p-v:#ff9d7a; --p-a:#ffd479; --p-na:#f0b96b; --p-adv:#b79cff;
+  --p-prt:#8f97a6; --p-aux:#7e8695; --p-oth:#9aa3b2;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.6}
 a{color:var(--accent2);text-decoration:none}
 .wrap{max-width:860px;margin:0 auto;padding:12px 12px 150px}
-header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:4px 2px 10px}
+header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:4px 2px 8px}
 header h1{font-size:17px;font-weight:700}
 header .meta{font-size:12px;color:var(--muted)}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:9px;font-size:13px;cursor:pointer}
 .btn:hover{border-color:#3d4453;background:var(--panel2)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.on{background:#2b3a4d;border-color:#3d5a7a;color:#cfe6ff}
 .btn.sm{padding:4px 9px;font-size:12px}
-input.q{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:14px;margin-bottom:10px}
+input.q{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:14px}
 input.q:focus{outline:2px solid #33405a}
+select.sel{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:6px 8px;font-size:12.5px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;align-items:center}
+.tabs{display:flex;gap:6px;margin:9px 0 4px}
+.tab{flex:1;text-align:center;padding:8px 0;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:10px;font-size:13.5px;cursor:pointer}
+.tab.on{background:#2b3a4d;border-color:#3d5a7a;color:#cfe6ff;font-weight:600}
+/* 曲目列表 */
 .track{display:flex;gap:10px;align-items:center;padding:9px 10px;margin-bottom:7px;cursor:pointer}
 .track:hover{border-color:#3d4453}
 .track img{width:48px;height:48px;border-radius:7px;object-fit:cover;background:#232833;flex:0 0 auto}
@@ -36,33 +44,75 @@ input.q:focus{outline:2px solid #33405a}
 .tag.t{border-color:#4a6b4e;color:#8fd39a}
 .tag.z{border-color:#6b5a3a;color:#e0c07a}
 .grouphead{font-size:12px;color:var(--muted);margin:14px 3px 6px;letter-spacing:.02em}
-/* 播放条 */
-#player{position:fixed;left:0;right:0;bottom:0;background:rgba(20,23,29,.97);border-top:1px solid var(--line);backdrop-filter:blur(8px);z-index:50;padding:8px 12px 10px;display:none}
+/* 学词（词汇入手） */
+.twscroll{max-height:46vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.word{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;margin-bottom:6px;cursor:pointer}
+.word:hover{border-color:#3d4453}
+.word .wl{min-width:0;flex:1}
+.word .ww{font-size:17px;font-weight:600;line-height:1.3}
+.word .ww .wr{font-size:12px;color:var(--accent2);font-weight:400;margin-left:6px}
+.word .ww .wy{font-size:11px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin-left:5px}
+.word .wm{font-size:13px;color:#f0e6d8;margin-top:1px}
+.word .wb{font-size:10.5px;color:var(--muted);margin-top:3px;display:flex;gap:5px;flex-wrap:wrap}
+.word .acts{display:flex;flex-direction:column;gap:5px}
+.badge{display:inline-block;font-size:10px;padding:0 5px;border-radius:5px;border:1px solid var(--line);color:var(--muted);line-height:1.7}
+.badge.br{border-color:#6b5a3a;color:#e0c07a}
+.badge.jl{border-color:#4a6b4e;color:#8fd39a}
+.badge.pn{border-color:#33506b;color:var(--p-n)}
+.badge.pv{border-color:#6b4335;color:var(--p-v)}
+.badge.pa{border-color:#6b5c33;color:var(--p-a)}
+.badge.padv{border-color:#4b3f6b;color:var(--p-adv)}
+.word.known{opacity:.5}
+/* 播放条：全站唯一的播放控件（页内不再放第二个播放键） */
+#player{position:fixed;left:0;right:0;bottom:0;background:rgba(15,18,24,.97);border-top:1px solid var(--line);backdrop-filter:blur(12px);z-index:50;display:none;padding:7px 14px calc(9px + env(safe-area-inset-bottom))}
 #player.on{display:block}
-#player .prow{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-#player .now{font-size:12px;color:var(--muted);flex:1;min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#player input[type=range]{flex:2;min-width:120px;accent-color:var(--accent)}
-#player .t{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-#player.loading #p-now{color:var(--accent2)}
-#player.loading #p-now::after{content:" ●";animation:blink 1s infinite}
+#player .pbar{max-width:860px;margin:0 auto}
+#player .ctr{display:flex;align-items:center;gap:8px}
+#player .prog{display:flex;align-items:center;gap:7px;margin-top:3px}
+#player input[type=range]{flex:1;min-width:0;height:16px;accent-color:var(--accent)}
+#player .t{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:32px;text-align:center}
+#player .pbig{width:44px;height:44px;border-radius:50%;border:0;background:linear-gradient(180deg,#e86a52,#cf4630);color:#fff;font-size:17px;line-height:1;cursor:pointer;box-shadow:0 5px 16px rgba(224,85,63,.32);flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+#player .pbig:active{transform:scale(.95)}
+#player .pmeta{flex:1;min-width:0;margin-left:2px}
+#player .now{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player .st{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player.loading .st{color:var(--accent2)}
+#player.loading .st::after{content:" ●";animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
-/* 歌词 */
-.lyrtop{display:flex;gap:11px;align-items:center;padding:10px;margin-bottom:8px}
-.lyrtop img{width:60px;height:60px;border-radius:9px;object-fit:cover;background:#232833}
-.lyrtop h2{font-size:15px}
+/* 歌词：一句 = 一个块（原文 / 罗马音 / 中文 锁在同一个块里，不会串行） */
+.lyrtop{display:flex;gap:11px;align-items:center;padding:12px;margin-bottom:9px}
+.lyrtop img{width:62px;height:62px;border-radius:10px;object-fit:cover;background:#232833}
+.lyrtop h2{font-size:15.5px;line-height:1.35}
 .lyrtop .m{font-size:11.5px;color:var(--muted)}
-#lyric{padding:12px 10px}
-.line{font-size:16.5px;line-height:1.6;padding:5px 7px;border-radius:7px;cursor:pointer;transition:background .15s}
-.line:hover{background:#1e2330}
-.line.playing{background:var(--hl);box-shadow:inset 3px 0 0 var(--hl-line)}
-.line .zh{font-size:.72em;color:var(--muted);line-height:1.45;padding-top:3px;font-weight:400}
-.line.en{color:#8f9bb0;font-size:14.5px}
-.romaji{font-size:11.5px;color:#7f8a9c;padding:0 7px 5px;font-family:ui-monospace,Menlo,monospace}
-.space{height:12px}
-.w{cursor:pointer;border-bottom:1px dashed transparent;padding:0 1px}
-.w:hover{background:#2a2130;border-bottom-color:var(--accent)}
-.w.learning{border-bottom-color:#7a6a4a}
-.w.known{color:var(--ok);border-bottom-color:transparent}
+#lyric{padding:8px 6px 10px}
+.lblock{padding:6px 8px 7px;border-radius:9px;margin-bottom:5px;cursor:pointer;transition:background .15s}
+.lblock:hover{background:#171c26}
+.lblock.playing{background:var(--hl);box-shadow:inset 3px 0 0 var(--hl-line)}
+.line{font-size:17.5px;line-height:1.7}
+.line.en{color:#8f9bb0;font-size:15px}
+.romaji{font-size:11.5px;color:#7e8ba0;font-family:ui-monospace,Menlo,monospace;margin-top:3px;padding-left:9px;border-left:2px solid #2b3444}
+.lblock .zh{font-size:13px;color:var(--muted);line-height:1.5;margin-top:3px;padding-left:9px;border-left:2px solid #3a3348}
+.space{height:14px}
+/* 词：按词性着色（助词/助动词刻意压暗，实词才跳出来） */
+.line .w{cursor:pointer;border-bottom:1px dashed transparent;padding:0 1px}
+.line .w:hover{background:#2a2130}
+.line .w.k-n{color:var(--p-n)}
+.line .w.k-v{color:var(--p-v)}
+.line .w.k-a{color:var(--p-a)}
+.line .w.k-na{color:var(--p-na)}
+.line .w.k-adv{color:var(--p-adv)}
+.line .w.k-prt,.line .w.k-aux{color:var(--p-prt)}
+.line .w.k-conj,.line .w.k-int,.line .w.k-rent,.line .w.k-pref,.line .w.k-oth{color:var(--p-oth)}
+.line .w.known{text-decoration:underline dotted var(--ok)}
+.line .w.hot{background:#3a2f24;border-radius:5px}
+/* 词级中文：挂在词下面的小字 */
+.line .g{display:none}
+body.gloss .line .w{display:inline-block;vertical-align:top;text-align:center;max-width:9.5em}
+body.gloss .line .g{display:block;font-size:10px;line-height:1.25;color:var(--muted);font-weight:400;white-space:normal;padding:0 2px}
+.legend{display:flex;gap:9px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:2px 3px 8px}
+.legend i{font-style:normal;margin-right:3px}
+.legend .k-n{color:var(--p-n)}.legend .k-v{color:var(--p-v)}.legend .k-a{color:var(--p-a)}
+.legend .k-na{color:var(--p-na)}.legend .k-adv{color:var(--p-adv)}.legend .k-prt{color:var(--p-prt)}
 /* 词条弹层 */
 #pop{pointer-events:none;position:fixed;left:50%;bottom:78px;transform:translateX(-50%);width:min(520px,calc(100% - 20px));background:#22262f;border:1px solid #39404e;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;z-index:60}
 #pop.on{display:block;pointer-events:auto}
@@ -76,21 +126,24 @@ input.q:focus{outline:2px solid #33405a}
 #pop .acts{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
 #pop .acts button{border:1px solid var(--line);background:#1b1f27;color:#e8e6e3;padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer}
 #pop .acts button.k{border-color:#4a6b4e;color:#a5dfae}
-/* 词表 */
-.vrow{display:flex;align-items:center;gap:9px;padding:7px 10px;margin-bottom:5px;font-size:13px;cursor:pointer}
-.vrow .vw{font-weight:600;min-width:88px}
-.vrow .vr{color:var(--accent2);font-size:12.5px}
-.vrow .vy{color:var(--muted);font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
-.vrow .vm{color:#cfc6b8;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.vrow .vc{color:var(--muted);font-size:11px;white-space:nowrap}
-.vrow.known{opacity:.6}
 .hint{font-size:11.5px;color:var(--muted);margin:6px 3px}
 .empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:13px}
 .foot{font-size:11px;color:var(--muted);text-align:center;margin-top:20px;line-height:1.8}
 details.src{font-size:12px;color:var(--muted);margin:8px 0}
 details.src summary{cursor:pointer;padding:6px 2px}
+details.brv{margin:8px 0}
+details.brv summary{cursor:pointer;padding:6px 2px;font-size:13px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
 .row label{font-size:12.5px;color:var(--muted)}
+.sec{font-size:12px;color:var(--muted);margin:12px 3px 6px}
+.chip{display:inline-block;font-size:11.5px;padding:2px 8px;margin:0 5px 5px 0;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--panel);cursor:pointer}
+.chip.on{background:#2b3a4d;border-color:#3d5a7a;color:#cfe6ff}
+.ex{padding:9px 10px;margin-bottom:6px;font-size:13.5px}
+.ex .ej{color:var(--ink)}
+.ex .ez{color:var(--p-a);font-size:12.5px;margin-top:2px}
+.ex .et{font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.wbig{font-size:30px;font-weight:700;line-height:1.25}
+.wmeta{font-size:12.5px;color:var(--muted);margin-top:4px}
 </style>
 </head>
 <body>
@@ -100,8 +153,53 @@ details.src summary{cursor:pointer;padding:6px 2px}
     <span class="meta" id="headstat">载入中…</span>
   </header>
 
-  <div id="view-list">
-    <input class="q" id="q" placeholder="搜索曲名 / 社团 / 专辑 / 原曲…">
+  <input class="q" id="q" placeholder="搜词 / 释义 / 曲名 / 社团 / 专辑 / 原曲…">
+  <div class="tabs">
+    <button class="tab on" id="tab-learn">学词</button>
+    <button class="tab" id="tab-songs">曲库</button>
+    <button class="tab" id="tab-mine">生词本</button>
+  </div>
+
+  <div id="view-learn" class="view" style="display:none">
+    <div class="row" style="justify-content:space-between">
+      <div style="min-width:0;flex:1">
+        <div><b id="deck-title">今天学哪些词</b></div>
+        <div id="deck-sub" style="font-size:11.5px;color:var(--muted);margin-top:1px"></div>
+      </div>
+      <select class="sel" id="d-sort">
+        <option value="easy">从易到难</option>
+        <option value="freq">曲库里最常见</option>
+        <option value="az">按五十音</option>
+      </select>
+    </div>
+    <div class="row">
+      <select class="sel" id="d-range">
+        <option value="all">全部范围</option>
+        <option value="c1">标日 初级上（第1-24课）</option>
+        <option value="c2">标日 初级下（第25-48课）</option>
+        <option value="c3">标日 中级</option>
+        <option value="out">标日未收录</option>
+        <option value="n45">JLPT N5-N4</option>
+        <option value="n123">JLPT N3-N1</option>
+      </select>
+      <select class="sel" id="d-pos">
+        <option value="all">全部词性</option>
+        <option value="名詞">名词</option>
+        <option value="動詞">动词</option>
+        <option value="形容詞">形容词</option>
+        <option value="副詞">副词</option>
+      </select>
+      <button class="btn sm on" id="d-hideknown">隐藏已掌握</button>
+      <button class="btn sm" id="d-reset">重置本页进度</button>
+    </div>
+    <div id="deck"></div>
+    <div class="row" style="justify-content:center">
+      <button class="btn" id="d-more">再看 30 个 →</button>
+    </div>
+    <div class="hint">练一句比背十个词有用：点词看释义 → 点「去这句」直接跳到歌里那句循环。</div>
+  </div>
+
+  <div id="view-songs" class="view" style="display:none">
     <div class="toolbar">
       <button class="btn on" id="f-all">全部</button>
       <button class="btn" id="f-audio">有音频</button>
@@ -111,7 +209,10 @@ details.src summary{cursor:pointer;padding:6px 2px}
     <div id="list"></div>
   </div>
 
-  <div id="view-track" style="display:none"></div>
+  <div id="view-mine" class="view" style="display:none"></div>
+  <div id="view-word" class="view" style="display:none"></div>
+  <div id="view-track" class="view" style="display:none"></div>
+  <div id="view-search" class="view" style="display:none"></div>
 
   <details class="src" id="srcbox">
     <summary>音频来源与设置</summary>
@@ -126,26 +227,32 @@ details.src summary{cursor:pointer;padding:6px 2px}
       <input type="file" id="audiofile" accept="audio/*">
       <button class="btn sm" id="audioclear">清除本地音频</button>
     </div>
-    <div class="hint">音频地址走公开中转接口按需取（永久地址会失效，所以每次播放前重新取）。绑定关系只存在你自己的浏览器里。</div>
+    <div class="hint">音频地址走公开中转接口按需取（地址会过期，所以取到后在有效期内复用，不再每点一次重取）。绑定关系只存在你自己的浏览器里。</div>
   </details>
 
   <div class="foot">
-    歌词/时间轴/译文：THBWiki 歌词服务 + 网易云 · 版权归各社团与原作者所有，仅供个人学习，请勿传播或商用<br>
+    歌词/时间轴/译文：THBWiki 歌词服务 + 网易云 · 难度参考《新版 标准日本语》单词表与 JLPT 词汇表 ·
+    版权归各社团与原作者所有，仅供个人学习，请勿传播或商用<br>
     <span id="genat"></span>
   </div>
 </div>
 
 <div id="player">
-  <div class="prow">
-    <button class="btn sm" id="p-play">▶</button>
-    <button class="btn sm" id="p-prev">⟨</button>
-    <button class="btn sm" id="p-loop">单句循环 关</button>
-    <span class="now" id="p-now">—</span>
-    <input type="range" id="p-seek" min="0" max="1000" value="0">
-    <span class="t" id="p-time">0:00</span>
-    <button class="btn sm" id="p-rate">1.0x</button>
-    <button class="btn sm" id="p-next">⟩</button>
-    <button class="btn sm" id="p-close">×</button>
+  <div class="pbar">
+    <div class="ctr">
+      <button class="pbig" id="p-play">▶</button>
+      <div class="pmeta"><div class="now" id="p-now">—</div><div class="st" id="p-state"></div></div>
+      <button class="btn sm" id="p-loop">循环 关</button>
+      <button class="btn sm" id="p-rate">1.0x</button>
+      <button class="btn sm" id="p-close" title="收起">×</button>
+    </div>
+    <div class="prog">
+      <button class="btn sm" id="p-prev" title="上一句">⟨</button>
+      <span class="t" id="p-time">0:00</span>
+      <input type="range" id="p-seek" min="0" max="1000" value="0">
+      <span class="t" id="p-dur">0:00</span>
+      <button class="btn sm" id="p-next" title="下一句">⟩</button>
+    </div>
   </div>
 </div>
 
@@ -162,7 +269,8 @@ details.src summary{cursor:pointer;padding:6px 2px}
   </div>
   <div class="mt" id="p-meta"></div>
   <div class="acts">
-    <button id="p-speak">🔊 读这个词</button>
+    <button id="p-speak">读这个词</button>
+    <button id="p-detail">词条详情</button>
     <button id="p-lines">看它出现在哪几句</button>
     <button id="p-edit">改释义</button>
     <button class="k" id="p-known">标为已掌握</button>

@@ -149,7 +149,7 @@ async function main() {
         if (!seg.w || !seg.b) continue;
         if (!linesByWord.has(seg.b)) linesByWord.set(seg.b, []);
         const arr = linesByWord.get(seg.b);
-        if (arr.length < 3) arr.push({ jp: line.text, zh: line.zh || '', track: tr.title, t: line.t });
+        if (arr.length < 3) arr.push({ jp: line.text, zh: line.zh || '', track: tr.title, tid: tr.id, li: tr.lines.indexOf(line), t: line.t });
       }
     }
   }

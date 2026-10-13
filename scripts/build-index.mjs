@@ -29,6 +29,11 @@ const WEB_DATA = path.join(ROOT, 'docs', 'data');
 const COVER_DIR = path.join(WEB_DATA, 'covers');
 const DICT = path.join(ROOT, 'node_modules', 'kuromoji', 'dict');
 
+/** 读一份可缺省的 JSON（额外词表：标日 / JLPT），坏文件不阻塞构建 */
+function RELAXED_JSON(p) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return {}; }
+}
+
 const argv = process.argv.slice(2);
 const WANT_COVERS = argv.includes('--covers');
 const WANT_STATS = argv.includes('--stats');
@@ -206,6 +211,24 @@ const DROP_WORDS = new Set([
   'です', 'ます', 'ない', 'たい', 'だ', 'の', 'ん', 'ほう', 'うち', 'とこ',
   'する', 'しする', 'みる', 'るる', 'どー', 'られる', 'させる', 'してる', 'して', 'した', 'すれ',
 ]);
+
+/** 词性分桶：前端按这个给歌词里的词上色（k 存在每个分词上，不只是词表里的词） */
+function posKind(t) {
+  switch (t.pos) {
+    case '名詞': return t.pos_detail_1 === '形容動詞語幹' ? 'na' : 'n';
+    case '動詞': return 'v';
+    case '形容詞': return 'a';
+    case '副詞': return 'adv';
+    case '助詞': return 'prt';
+    case '助動詞': return 'aux';
+    case '接続詞': return 'conj';
+    case '連体詞': return 'rent';
+    case '感動詞': return 'int';
+    case '接頭詞': return 'pref';
+    case '記号': return 'sym';
+    default: return 'oth';
+  }
+}
 
 /** 这个词要不要做进词表 */
 function isWorthLearning(t, lemma) {
@@ -487,6 +510,7 @@ async function main() {
         const learn = isWorthLearning(tk, lemma);
         segs.push({
           s: surf,
+          k: posKind(tk),
           w: learn,
           b: learn ? lemma : undefined,
           l: learn ? fixedReading || undefined : undefined,
@@ -602,6 +626,24 @@ async function main() {
       if (v.pos === '形容詞' && /い$/.test(word) && !/い$/.test(r) && /[一-龯]/.test(word)) r = r.slice(0, -1) + 'い';
       v.reading = r;
     }
+    // 读音一致性修复：动词/形容词的词尾读音必须和词形尾部假名对得上，
+    // 否则（老いる -> おう、分かる -> わから）用「同汉字前缀的形态」把词干读音抠出来拼回去。
+    if (v.pos === '動詞' || v.pos === '形容詞') {
+      const wm = /^([一-龯]+)([ぁ-ゖー]+)$/.exec(v.word);
+      if (wm && v.reading && !v.reading.endsWith(wm[2])) {
+        for (const c of cands) {
+          const sm = /^([一-龯]+)([ぁ-ゖー]*)$/.exec(c.s || '');
+          if (!sm || sm[1] !== wm[1]) continue;
+          const cr = toHira(c.r || c.l || '');
+          if (!cr) continue;
+          if (sm[2] && !cr.endsWith(sm[2])) continue;
+          const stemRead = sm[2] ? cr.slice(0, cr.length - sm[2].length) : cr;
+          if (!stemRead) continue;
+          v.reading = stemRead + wm[2];
+          break;
+        }
+      }
+    }
     v.romaji = v.reading ? kanaToRomaji(v.reading) : '';
   }
 
@@ -643,6 +685,43 @@ async function main() {
   );
   vocab.forEach((v, i) => (v.id = i + 1));
 
+  // ---- 难度标注：标日课次（最优先）→ JLPT 等级 → 曲库常见度 ----
+  const brTable = RELAXED_JSON(path.join(DATA_DIR, 'biaori.json'));
+  const jlptTable = RELAXED_JSON(path.join(DATA_DIR, 'jlpt.json'));
+  let withBr = 0, withJl = 0;
+  const HAS_KANJI = /[一-龯]/;
+  for (const v of vocab) {
+    // 只认「词形完全一致」，或用读音对齐且至少有一边是纯假名写法。
+    // 不加这个护栏会撞音误配：老いる(おう) 会撞上《标日》第一课的「王(おう)」。
+    const bw = brTable.words && brTable.words[v.word];
+    let b = bw || null;
+    if (!b && v.reading && !HAS_KANJI.test(v.word)) {
+      // 只用读音对齐、而且我们这边是纯假名写法（こそあど类）。
+      // 汉字词绝不用读音对齐：はやし(林) 会撞上同音的囃子，标成「第一课」就是误导。
+      b = brTable.words[v.reading] || null;
+    }
+    if (b) { v.br = { c: b.course, bk: b.book, l: b.lesson }; if (b.zh) v.brZh = b.zh; withBr++; }
+    const jw = jlptTable.words && jlptTable.words[v.word];
+    let j = jw || null;
+    if (!j && v.reading && !HAS_KANJI.test(v.word)) j = jlptTable.words[v.reading] || null;
+    if (j) { v.jl = j.level; withJl++; }
+  }
+  // diff 是「从易到难」的排序键：越小越简单。
+  //   1-80     标日课次（初级上 1-24 / 初级下 25-48 / 中级上 49-64 / 中级下 65-80）
+  //   81-130   标日没收的：按 JLPT 等级分层（N5 最前，N1 最后）
+  //   131+     既没进标日也没进 JLPT 的：按在曲库里的常见度排（越常见越靠前）
+  const tiers = new Map();
+  for (const v of vocab) {
+    const t = v.br ? v.br.c : v.jl ? 80 + (5 - v.jl) * 10 : 131;
+    if (!tiers.has(t)) tiers.set(t, []);
+    tiers.get(t).push(v);
+  }
+  for (const [t, list] of tiers) {
+    list.sort((a, b) => b.count - a.count || b.tracks.length - a.tracks.length || a.word.localeCompare(b.word, 'ja'));
+    list.forEach((v, i) => { v.diff = Math.round((t + i / Math.max(1, list.length)) * 1000) / 1000; });
+  }
+  console.log(`难度标注：标日 ${withBr} 词 · JLPT ${withJl} 词 · 共 ${vocab.length} 词`);
+
   // 曲目里带上这首歌的词表 id，方便歌词模式查词
   for (const tr of tracks) {
     const ids = new Set();
@@ -674,6 +753,8 @@ async function main() {
       withTiming: tracks.filter((t) => t.timing).length,
       lines: tracks.reduce((n, t) => n + t.lineCount, 0),
       vocab: vocab.length,
+      withBiaori: withBr,
+      withJlpt: withJl,
       originals: originals.length,
     },
     originals,
