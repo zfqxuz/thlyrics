@@ -6,7 +6,7 @@
  *       data/netease.json（fetch-netease.mjs 产物，可缺省）
  *       data/audio/<trackId>.<ext>（可选：本地音频，存在就优先用）
  *       data/meanings.json（可选：手工中文释义覆盖，按词条 word 覆盖）
- * 输出：web/data/index.json + web/data/covers/*
+ * 输出：docs/data/index.json + docs/data/covers/*
  *
  * 合并要点：
  *   1. 网易云有翻译的曲目，用网易云的时间轴 + 行级中文翻译（tlyric 按时间戳对齐）
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = path.join(ROOT, 'data');
-const WEB_DATA = path.join(ROOT, 'web', 'data');
+const WEB_DATA = path.join(ROOT, 'docs', 'data');
 const AUDIO_DIR = path.join(DATA, 'audio');
 
 const args = process.argv.slice(2);
@@ -217,7 +217,7 @@ async function main() {
   const s = idx.stats;
   console.log(`曲目 ${s.tracks} · 并入网易云 ${s.withNetease} · 有时间轴 ${s.tracksWithTiming} · 行级译文 ${s.withTranslations} 行`);
   console.log(`释义：共 ${s.withMeaning} 词有释义（手工 ${manual} / 机器 ${machine}），另有 ${flagged} 词机器译文可疑已标记`);
-  console.log('输出 web/data/index.json');
+  console.log('输出 docs/data/index.json');
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

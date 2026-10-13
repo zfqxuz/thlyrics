@@ -32,7 +32,7 @@ thlyrics/
 │   ├── build-index.mjs   # 解析 LRC + 分词 + 生成 JSON
 │   ├── kana-romaji.mjs   # 假名 -> 罗马音
 │   └── serve.mjs         # 本地静态服务
-└── web/                # 前端（无构建、无依赖）
+└── docs/                # 前端（GitHub Pages 从 /docs 发布，无构建无依赖）
     ├── index.html
     ├── app.js
     └── data/index.json + covers/
@@ -75,7 +75,7 @@ node scripts/serve.mjs 8848     # 然后访问 http://127.0.0.1:8848/
 
 进度存在浏览器 localStorage，换设备用「导出进度」带走。
 
-## 数据结构（web/data/index.json）
+## 数据结构（docs/data/index.json）
 
 ```
 stats      统计（曲目数/词表数/有时间轴的曲目数…）
