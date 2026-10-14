@@ -625,3 +625,46 @@ App 里页面 origin 是 **`https://localhost`**（iOS 是 `capacitor://localhos
    （App 端存沙盒 + `convertFileSrc`，网页端 IndexedDB/文件句柄）。注意 `.ncm/.uc!/.qmc*/mflac/mgg`
    这些网易云/QQ 的下载文件是加密容器，**不能直接用，也不要去解密**（规避技术措施是独立违法）。
 4. M2（core 抽纯逻辑）/ M3（ui 拆页面）还没做——不影响使用，属于可维护性投资。
+
+### 品牌资源 / 本机音源 / 进度回跳（2026-10-15，真机验证）
+
+#### 一、图标与品牌资源
+
+- 用户给了主图（1254×1254 像素画，**白底 + 内嵌圆角方块**）。处理要点：
+  - 先用「非白外接框」裁掉白边，再取**红像素的众数**当背景色 → `#A52628`（别在边中点采样，会取到白底）
+  - 四个圆角用 flood fill 填成背景色 → 得到满幅方图
+- 生成物（`PYTHONPATH=~/pylibs python3 …`，Pillow 是解包 wheel 装的，系统没有 pip）：
+  - 安卓 `mipmap-{mdpi..xxxhdpi}/{ic_launcher,ic_launcher_round,ic_launcher_foreground}.png`
+  - 启动页 `drawable{,-port-*,-land-*}/splash.png`（11 张，红底 + 居中图标）
+  - 自适应图标前景 = 满幅图缩到画布的 **66%** 居中、四周透明；底色写进 `values/ic_launcher_background.xml`
+  - 网站 `favicon.ico`(16/32/48/64) + `icon-192/512.png` + `apple-touch-icon.png` + `manifest.webmanifest`
+    （顺带修掉了之前 favicon 404 的控制台报错；登录闸门加了 `.glogo`）
+- **后续素材的提示词库在 `spec/ART-assets.md`**（固定风格块 + 负面词 + 6 张图规格）。用户额度用完后暂时没新图。
+
+#### 二、本机音源（用户自己带的文件）
+
+- 原生 `LocalAudioPlugin`：`ACTION_OPEN_DOCUMENT` 选音频 → 复制进 `filesDir/audio/<sha1>.<ext>`（**零权限**）→ 返回 `{key,path,name,size}`。
+- 前端 `docs/platform/media-store.js`：原生走插件 + `Capacitor.convertFileSrc(path)`；
+  网页端退化成 `<input type=file>` + IndexedDB(Blob) + `createObjectURL`。接口只有 `pick / url / remove`。
+- 绑定形态 `S.audio[trackId] = {type:'local', key, path, name}`；`urlFor()` 里 local 分支要**放在 nid 判断之前**，
+  `prepAudio()` 也要对本机音频短路（否则会走到「还没有音频」）。
+- 真机验证：选择器唤起 → 沙盒落盘字节一致 → `https://localhost/_capacitor_file_/…` 能播 →
+  **关掉 Wi-Fi + 数据后仍能播**（`paused:false`、进度推进）。
+- ⚠️ 网易云/QQ 客户端下载的 `.ncm/.uc!/.qmc*/.mflac` 是加密容器，**不做解密**，选了也放不了。
+- 待办：孤儿文件清理（解绑/删除曲目后沙盒里的副本没人删）。
+
+#### 三、两个真机才暴露的播放 bug（已修）
+
+1. **进度回跳**：地址失效自愈时把播放位置丢了 → 重解析后从头开始（真机后台恢复时 112s → 0s）。
+   现在自愈会带上原进度（`currentTime > 3` 用它，否则回落 `S.pos`）。
+2. **播完不清进度**：整首听完后再点开，「续播」会直接跳到结尾（看起来像坏了）。现在 `ended` 时清 `S.pos`。
+
+#### 四、测试基建的坑（很值钱）
+
+- **`page.route().fulfill()` 不支持 HTTP Range** → 媒体元素的 `seekable` 恒为 `[0,0]`，
+  测试里 `audio.currentTime = x` **静默失效**。自愈续播那条用例因此一直测不出来（假象：
+  "失效前 0.44s"）。给桩加 `accept-ranges` + 处理 `Range` 头返回 206 之后，seek 才真正生效。
+  但注意：**老用例（罗马音编辑器）依赖原来的无 Range 行为**，所以只有新加的 8 秒长音频桩开了 Range。
+- **门禁 `npm run check` 现在带语法检查**（`node --check` 每个前端文件）。真踩过：块注释里写了
+  `.qmc*/` 会把注释提前结束 → 整个前端白屏。这类错误以后必须在门禁就被拦下。
+- E2E 里新增 `.e2e/test-tone-long.wav`（8 秒）：自愈续播的主路径要求进度 > 3s，3 秒的老文件够不到。
