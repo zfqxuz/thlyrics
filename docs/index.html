@@ -193,7 +193,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .lblock:active{background:rgba(255,255,255,.03)}
 .lblock.playing{background:var(--accent-soft)}
 .lblock.playing::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--accent)}
-.line{font-size:17px;line-height:1.9;letter-spacing:.01em;min-height:2.35em;display:block}
+.line{font-size:16.5px;line-height:1.9;letter-spacing:.01em;min-height:2.35em;display:block}
 .line.en{color:var(--ink2);font-size:15px}
 .romaji{font-size:11px;color:var(--ink3);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px}
 .lblock .zh{font-size:13px;color:var(--ink2);margin-top:4px;padding-left:10px;border-left:2px solid rgba(212,80,60,.32)}
@@ -209,8 +209,8 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .line .r{display:none}
 /* 逐词罗马音（跟唱用）：罗马音在词上方，中文在词下方，日语居中 */
 body.ruby .line .w{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;
-  text-align:center;max-width:9.5em;margin:0 1px;line-height:1.35}
-body.ruby .line .r{display:block;min-height:1.3em;font-size:10.5px;line-height:1.3;color:var(--ink3);
+  text-align:center;max-width:12em;margin:0 1px;line-height:1.35}
+body.ruby .line .r{display:block;min-height:1.3em;font-size:10px;line-height:1.3;color:var(--ink3);
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:400;white-space:nowrap}
 body.gloss .line .w{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;text-align:center;max-width:9.5em}
 body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--ink3);font-weight:400;white-space:normal;padding:0 2px}
@@ -426,6 +426,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js?v=20261014p"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script src="app.js?v=20261014q"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
