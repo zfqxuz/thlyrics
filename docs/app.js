@@ -25,7 +25,7 @@
 
   // ────────────── 本地状态 ──────────────
   let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true };
-  let ACC = null;                                  // {token, name, uid}
+  let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { try { ACC = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch { ACC = null; } };
   const saveAcc = () => { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch {} };
   function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.autoSync = S.autoSync !== false; }
@@ -867,6 +867,43 @@
       </div></div>`;
   }
 
+  // ────────────── 管理员模式：看/删 OSS 上的文件 ──────────────
+  let adminFiles = null, adminPrefix = 'sync/';
+  const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(2) + 'MB' : (n / 1024).toFixed(1) + 'KB');
+  function adminHtml() {
+    if (!ACC || !ACC.admin) return '';
+    const total = adminFiles ? adminFiles.reduce((n, f) => n + f.size, 0) : null;
+    return `<div class="accbox on" id="adminbox">
+      <div class="col"><div class="l1">管理员模式</div>
+      <div class="l2">你能直接看和删 OSS 上存的文件。账号数据在 sync/users/…（一个人一个目录）；音频若有会放在 audio/（按歌曲 id 命名，同一首歌只会有一份）${total != null ? `。<br>当前 ${esc(adminPrefix)}：${adminFiles.length} 个文件 · ${fmtSize(total)}` : ''}</div></div>
+      <div class="row" style="margin-top:8px">
+        <button class="toolbtn" id="adm-list">${adminFiles ? '刷新列表' : '查看 OSS 文件'}</button>
+        <button class="toolbtn ${adminPrefix === 'sync/' ? 'on' : ''}" id="adm-sync">账号数据</button>
+        <button class="toolbtn ${adminPrefix === 'audio/' ? 'on' : ''}" id="adm-audio">音频</button>
+      </div>
+      ${adminFiles ? (adminFiles.length ? `<div class="list" style="margin-top:8px">${adminFiles.map((f) => `<div class="item"><div class="col"><div class="l1" style="font-size:12px;word-break:break-all;font-weight:400">${esc(f.key)}</div><div class="l2">${fmtSize(f.size)} · ${esc(String(f.at || '').slice(0, 16).replace('T', ' '))}</div></div><button class="toolbtn" data-admdel="${esc(f.key)}">删除</button></div>`).join('')}</div>` : '<div class="meta" style="margin-top:8px">这个前缀下没有文件</div>') : ''}
+      <div class="meta" style="margin-top:8px">⚠️ 删掉某个账号的 account.json，那个人下次登录会提示「用户名或密码不对」；删 data.json 只是清空他的记录。</div>
+    </div>`;
+  }
+  async function loadAdminFiles(prefix) {
+    if (prefix) adminPrefix = prefix;
+    try {
+      setLoad(true, '读取 OSS 文件…');
+      const r = await apiCall('/admin/files?prefix=' + encodeURIComponent(adminPrefix));
+      adminFiles = r.files || [];
+      setLoad(false);
+      renderMine();
+    } catch (e) { setLoad(false); toast('读取失败：' + e.message); }
+  }
+  async function adminDelete(key) {
+    if (!confirm('删除 ' + key + ' ？删了就找不回来了')) return;
+    try {
+      await apiCall('/admin/delete', { method: 'POST', body: { key } });
+      toast('已删除 ' + key);
+      await loadAdminFiles();
+    } catch (e) { toast('删除失败：' + e.message); }
+  }
+
   // ────────────── 登录闸门（没登录不让用） ──────────────
   function gateMsg(t) { const el = $('g-msg'); if (el) el.textContent = t || ''; }
   function afterLogin() {
@@ -903,7 +940,7 @@
       const body = { name, pass };
       if (kind === 'reg') body.data = userState(S);         // 注册时把本机已有记录一起带上去
       const res = await apiCall('/' + (kind === 'reg' ? 'register' : 'login'), { method: 'POST', body });
-      ACC = { token: res.token, name: res.user.name, uid: res.user.uid };
+      ACC = { token: res.token, name: res.user.name, uid: res.user.uid, admin: !!res.user.admin };
       saveAcc();
       setLoad(false);
       toast(kind === 'reg' ? `注册好了，欢迎 ${res.user.name}` : `已登录：${res.user.name}`);
@@ -951,6 +988,59 @@
     const d1 = Object.keys(S.imp || {}).length - impB, d2 = knownCount() - kB;
     toast(d1 || d2 ? `已拉回：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '云端和本机一样');
     renderMine();
+  }
+
+  // ── 歌单定期体检：一天查一次有没有新歌；也可以手动点 ──
+  const PL_CHECK_EVERY = 24 * 3600 * 1000;
+  let plChecking = false;
+  async function checkPlaylists(opts = {}) {
+    if (plChecking) { if (!opts.silent) toast('正在检查中…'); return; }
+    const pls = impPlaylists().filter((p) => /^\d+$/.test(String(p.id)));
+    if (!pls.length) { if (!opts.silent) toast('还没有导入过歌单'); return; }
+    plChecking = true;
+    const lines = [];
+    let added = 0, missingTotal = 0, bad = 0;
+    const stat = $('plstat');
+    if (stat && !opts.silent) stat.textContent = '检查歌单更新…';
+    if ($('plchk')) $('plchk').disabled = true;
+    try {
+      await ensureReadings().catch(() => {});
+      for (const pl of pls) {
+        let data = null;
+        try { data = await gdJson('?types=playlist&id=' + pl.id); } catch { bad++; lines.push(`《${pl.name}》：接口没读到，跳过`); continue; }
+        const tracks = (data && data.playlist && data.playlist.tracks) || [];
+        if (!tracks.length) { bad++; lines.push(`《${pl.name}》：读不到曲目，跳过`); continue; }
+        const haveNid = new Set(Object.values(S.imp || {}).map((r) => String(r.nid)));
+        const builtin = new Set(IDX.tracks.filter((t) => !t.imp && t.audio && t.audio.nid).map((t) => String(t.audio.nid)));
+        const mine = Object.values(S.imp || {}).filter((r) => String(r.plId) === String(pl.id));
+        const missing = tracks.filter((tr) => {
+          const nid = String(tr.id);
+          return !haveNid.has(nid) && !builtin.has(nid) && !S.del['i' + nid];
+        });
+        // 已经被原作者从歌单里拿掉的：只报数，不自动删（那是你的数据）
+        const upNid = new Set(tracks.map((tr) => String(tr.id)));
+        const gone = mine.filter((r) => !upNid.has(String(r.nid))).length;
+        lines.push(`《${pl.name}》：线上 ${tracks.length} 首 · 库里 ${mine.length} 首 · 新增 ${missing.length} 首${gone ? ` · 歌单已移除 ${gone} 首（库里保留）` : ''}`);
+        missingTotal += missing.length;
+        if (missing.length) {
+          const res = await importTracks(missing, pl.name, pl.id, null);
+          added += res.ok.length;
+          if (res.fail.length) lines.push(`　其中 ${res.fail.length} 首没进来（没歌词／取不到音频）`);
+        }
+      }
+      S.plCheckAt = Date.now();
+      save();
+      impState.msg = lines.join('\n');
+      const sum = `检查完：新增 ${added} 首${bad ? ` · ${bad} 个歌单读取失败` : ''}`;
+      if (!opts.silent) toast(sum);
+      else if (added) toast('歌单里有 ' + added + ' 首新歌，已经加进曲库');
+    } catch (e) {
+      if (!opts.silent) toast('检查失败：' + ((e && e.message) || e));
+    } finally {
+      plChecking = false;
+      if ($('plchk')) $('plchk').disabled = false;
+      if (location.hash.startsWith('#/songs')) renderSongs();
+    }
   }
 
   /** 只重试上次失败的那几首（比如当时接口抽风） */
@@ -1090,6 +1180,10 @@
         <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || '粘歌单链接或数字 ID')}</div>
         <div id="pllist">${impRowsHtml()}</div>
         ${impPlaylists().length ? `<div class="meta" style="margin-top:10px">已导入：${impPlaylists().map((p) => `${esc(p.name)}（${p.n} 首）`).join('、')}</div>` : ''}
+        <div class="row" style="margin-top:10px">
+          <button class="toolbtn" id="plchk" ${plChecking ? 'disabled' : ''}>检查歌单更新${plChecking ? '（进行中）' : ''}</button>
+          <span class="meta" style="align-self:center">上次检查：${S.plCheckAt ? new Date(S.plCheckAt).toLocaleString('zh-CN', { hour12: false }).slice(5) : '还没检查过'}（每 24 小时自动查一次）</span>
+        </div>
       </details>
       ${songView === 'list'
         ? `<div class="list" id="list">${list.map(trackRow).join('') || '<div class="empty">没有匹配的曲目</div>'}</div>`
@@ -1109,6 +1203,7 @@
     }));
     $('view-songs').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); }));
     if ($('plgo')) $('plgo').onclick = () => startImport();
+    if ($('plchk')) $('plchk').onclick = () => checkPlaylists({ manual: true });
     if ($('plretry')) $('plretry').onclick = () => retryFailed();
     if ($('plinput')) $('plinput').onkeydown = (e) => { if (e.key === 'Enter') startImport(); };
     if (importing) setTimeout(() => { if (!importing) renderSongs(); }, 800);
@@ -1121,6 +1216,7 @@
       <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词 · 导入的歌 ${Object.keys(S.imp || {}).length} 首</div></div></div>
       ${accHtml()}
       <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
+      ${adminHtml()}
       <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : '<span class="meta">还没标过词</span>'}</div>
       <div class="hair"></div>
       ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有自定义释义</div>'}
@@ -1138,6 +1234,10 @@
     if (accReg) accReg.onclick = () => doAuth('reg');
     if (accLogin) accLogin.onclick = () => doAuth('login');
     if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录（本机记录还在，再登回来即可）'); showGate('已退出登录。本机记录还在，登录即可继续。'); };
+    if ($('adm-list')) $('adm-list').onclick = () => loadAdminFiles();
+    if ($('adm-sync')) $('adm-sync').onclick = () => loadAdminFiles('sync/');
+    if ($('adm-audio')) $('adm-audio').onclick = () => loadAdminFiles('audio/');
+    $('view-mine').querySelectorAll('[data-admdel]').forEach((el) => (el.onclick = () => adminDelete(el.dataset.admdel)));
     const accPw = $('acc-pw'), accPwDo = $('acc-pwdo');
     if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
     if (accPwDo) accPwDo.onclick = () => changePass();
@@ -1628,6 +1728,11 @@
     route();
     // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
     if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
+    apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; saveAcc(); if (location.hash.startsWith('#/mine')) renderMine(); } }).catch(() => {});
+    // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
+    if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {
+      setTimeout(() => checkPlaylists({ silent: true }), 9000);
+    }
   }
   boot();
 })();

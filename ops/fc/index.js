@@ -22,6 +22,7 @@ const OSS_BUCKET = ENV.OSS_BUCKET || 'thlyrics-audio';
 const PREFIX = 'sync/users/';
 const TOKEN_DAYS = 180;
 const ALLOW = (ENV.ALLOW_ORIGINS || 'https://zfqxuz.github.io,http://127.0.0.1:8848,http://localhost:8848').split(',');
+const ADMINS = (ENV.ADMINS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);   // 管理员用户名（环境变量，可选）
 const MAX_BODY = 8 * 1024 * 1024;      // 单次请求体上限
 const MAX_STORE = 12 * 1024 * 1024;    // 每个账号记录的存储上限
 
@@ -59,6 +60,49 @@ async function ossGetJson(key) {
   if (r.status !== 200) throw new Error('oss get ' + r.status + ' ' + key);
   try { return JSON.parse(r.body); } catch { return null; }
 }
+/** 列对象（V1 签名，prefix 过滤，最多 1000 个） */
+function ossList(prefix) {
+  return new Promise((resolve, reject) => {
+    const date = new Date().toUTCString();
+    const q = { 'max-keys': '1000', prefix: prefix || '' };
+    // ⚠️ OSS V1 签名里「只有 sub-resource 才进 CanonicalizedResource」，prefix / max-keys 都不算
+    const canon = `/${OSS_BUCKET}/`;
+    const sts = ['GET', '', '', date, canon].join('\n');
+    const sig = crypto.createHmac('sha1', ENV.OSS_SK).update(sts).digest('base64');
+    const path = '/?' + Object.keys(q).sort().map((k) => `${k}=${encodeURIComponent(q[k]).replace(/%2F/gi, '/')}`).join('&');
+    const req = https.request({ host: OSS_HOST, method: 'GET', path, headers: { Date: date, Authorization: `OSS ${ENV.OSS_AK}:${sig}` }, timeout: 15000 }, (res) => {
+      const buf = [];
+      res.on('data', (d) => buf.push(d));
+      res.on('end', () => {
+        const xml = Buffer.concat(buf).toString('utf8');
+        if (res.statusCode !== 200) return resolve([]);
+        const files = [];
+        for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+          const c = m[1];
+          const g = (tag) => { const r = c.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`)); return r ? r[1] : ''; };
+          files.push({ key: g('Key'), size: Number(g('Size')) || 0, at: g('LastModified') });
+        }
+        resolve(files);
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('oss list timeout')));
+    req.end();
+  });
+}
+async function ossDelete(key) {
+  const r = await ossRequest('DELETE', key);
+  return r.status === 204 || r.status === 200;
+}
+async function requireAdmin(req) {
+  const me = userOf(req);
+  if (!me) return { err: reply(req, 401, { error: '请先登录' }) };
+  const acct = await ossGetJson(acctKey(me.sub));
+  const isAdmin = (acct && acct.admin) || ADMINS.indexOf(String(me.name || '').toLowerCase()) >= 0;
+  if (!isAdmin) return { err: reply(req, 403, { error: '需要管理员账号' }) };
+  return { me, acct };
+}
+
 async function ossPutJson(key, obj) {
   const r = await ossRequest('PUT', key, Buffer.from(JSON.stringify(obj), 'utf8'), 'application/json');
   if (r.status !== 200) throw new Error('oss put ' + r.status + ' ' + key);
@@ -171,12 +215,14 @@ exports.handler = async (event) => {
       if (index[key]) return reply(req, 409, { error: '这个用户名已经被用了' });
       const uid = rid(8);
       const salt = rid(16);
-      const acct = { uid, name, nameLower: key, salt, hash: hashPass(pass, salt), createdAt: new Date().toISOString() };
+      const first = Object.keys(index).length === 0;      // 第一个注册的就是管理员
+      const acct = { uid, name, nameLower: key, salt, hash: hashPass(pass, salt), createdAt: new Date().toISOString(),
+        admin: first || ADMINS.indexOf(key) >= 0 };
       await ossPutJson(acctKey(uid), acct);
       index[key] = uid;
       await ossPutJson(INDEX_KEY, index);
       if (body.data) await ossPutJson(dataKey(uid), { v: 1, at: new Date().toISOString(), data: body.data });
-      return reply(req, 200, { ok: true, token: tokenFor(uid, name), user: { uid, name } });
+      return reply(req, 200, { ok: true, token: tokenFor(uid, name), user: { uid, name, admin: !!acct.admin } });
     }
 
     if (action === '/login' && method === 'POST') {
@@ -186,14 +232,36 @@ exports.handler = async (event) => {
       if (!uid) return reply(req, 401, { error: '用户名或密码不对' });
       const acct = await ossGetJson(acctKey(uid));
       if (!acct || hashPass(pass, acct.salt) !== acct.hash) return reply(req, 401, { error: '用户名或密码不对' });
-      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name } });
+      const adm = !!acct.admin || ADMINS.indexOf(String(acct.nameLower || '').toLowerCase()) >= 0;
+      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name, admin: adm } });
     }
 
     // 余下的都要登录
     const me = userOf(req);
     if (!me) return reply(req, 401, { error: '请先登录' });
 
-    if (action === '/me') return reply(req, 200, { ok: true, user: { uid: me.sub, name: me.name } });
+    if (action === '/me') {
+      const acct0 = await ossGetJson(acctKey(me.sub));
+      const adm = !!((acct0 && acct0.admin) || ADMINS.indexOf(String(me.name || '').toLowerCase()) >= 0);
+      return reply(req, 200, { ok: true, user: { uid: me.sub, name: me.name, admin: adm } });
+    }
+
+    // ── 管理员：看 / 删 OSS 上的文件（只允许 sync/ 和 audio/ 前缀） ──
+    if (action === '/admin/files') {
+      const a = await requireAdmin(req);
+      if (a.err) return a.err;
+      const prefix = String(q.prefix || '').replace(/^\/+/, '');
+      const files = await ossList(prefix);
+      return reply(req, 200, { ok: true, prefix, files, total: files.reduce((n, f) => n + f.size, 0) });
+    }
+    if (action === '/admin/delete' && (method === 'POST' || method === 'DELETE')) {
+      const a = await requireAdmin(req);
+      if (a.err) return a.err;
+      const key = String(body.key || '');
+      if (!/^(sync|audio)\//.test(key)) return reply(req, 400, { error: '只允许删 sync/ 或 audio/ 下的对象' });
+      const done = await ossDelete(key);
+      return reply(req, done ? 200 : 500, { ok: done, key });
+    }
 
     if (action === '/password' && method === 'POST') {
       const acct = await ossGetJson(acctKey(me.sub));

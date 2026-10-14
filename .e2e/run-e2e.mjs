@@ -53,7 +53,7 @@ const E2E_LYRIC = {
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
-const apiState = { users: {}, seq: 0, calls: [] };
+const apiState = { users: {}, seq: 0, calls: [], deleted: [] };
 const apiMerge = (a, b) => {
   const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, a || {});
   const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, b || {});
@@ -91,17 +91,30 @@ const apiStub = (route) => {
     const key = String(body.name || '').toLowerCase();
     if (apiState.users[key]) return send(409, { error: '这个用户名已经被用了' });
     if (String(body.pass || '').length < 6) return send(400, { error: '密码至少 6 位' });
-    const u = { uid: 'u' + (++apiState.seq), name: body.name, pass: String(body.pass), token: 'tok' + apiState.seq, data: body.data || null, at: null };
+    const u = { uid: 'u' + (++apiState.seq), name: body.name, pass: String(body.pass), token: 'tok' + apiState.seq, data: body.data || null, at: null, admin: apiState.seq === 1 };
     apiState.users[key] = u;
-    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name } });
+    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name, admin: !!u.admin } });
   }
   if (path === '/login') {
     const u = apiState.users[String(body.name || '').toLowerCase()];
     if (!u || u.pass !== String(body.pass)) return send(401, { error: '用户名或密码不对' });
-    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name } });
+    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name, admin: !!u.admin } });
   }
   if (!me) return send(401, { error: '请先登录' });
-  if (path === '/me') return send(200, { ok: true, user: { uid: me.uid, name: me.name } });
+  if (path === '/me') return send(200, { ok: true, user: { uid: me.uid, name: me.name, admin: !!me.admin } });
+  if (path === '/admin/files') {
+    if (!me.admin) return send(403, { error: '需要管理员账号' });
+    const files = [
+      { key: 'sync/users/_index.json', size: 42, at: '2026-10-14T06:00:00.000Z' },
+      { key: 'sync/users/u1/data.json', size: 2048, at: '2026-10-14T06:00:00.000Z' },
+    ];
+    return send(200, { ok: true, prefix: 'sync/', files, total: files.reduce((n, f) => n + f.size, 0) });
+  }
+  if (path === '/admin/delete') {
+    if (!me.admin) return send(403, { error: '需要管理员账号' });
+    apiState.deleted.push(String(body.key || ''));
+    return send(200, { ok: true, key: body.key });
+  }
   if (path === '/data') {
     if (req.method() === 'GET') return send(200, { ok: true, at: me.at, data: me.data });
     me.data = apiMerge(body.data || {}, me.data || {});
@@ -137,6 +150,8 @@ const baseRoute = (route) => {
   return route.continue();
 };
 await page.route('**/*', baseRoute);
+// 自动的歌单体检会打乱节奏：测试里关掉（手动按钮那条照测）
+await page.addInitScript(() => { window.__NO_PLCHECK = true; });
 page.on('dialog', (d) => d.accept());   // 删除导入曲目要确认
 const errors = [];
 const netReqs = [];
@@ -347,23 +362,20 @@ await page.locator('#view-songs .chip[data-f="all"]').click();
 await page.waitForTimeout(250);
 await shot('07-songs');
 
-// ═══════ 10 自建对象存储直链 ═══════
+// ═══════ 10 内置曲目：OSS 音频已清空，改走解析接口 ═══════
 const beforeOss = netReqs.length;
 await page.goto(BASE + '#/track/t1', { waitUntil: 'load' });
 await page.waitForSelector('#view-track', { timeout: 10000 });
-await page.waitForTimeout(1400);
+await page.waitForTimeout(2200);
 const oss = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: a ? a.src.slice(0, 56) : '', tid: a && a.getAttribute('data-tid'), ready: a ? a.readyState : -1 }; });
-check('OSS 曲目：audio.src 指向对象存储', /aliyuncs\.com/.test(oss.src), oss.src);
-check('OSS 曲目：不再调用第三方解析接口', netReqs.length === beforeOss, '新增 ' + (netReqs.length - beforeOss) + ' 次');
-const ossHttp = await page.evaluate(async () => {
-  try {
-    const d = await (await fetch('data/index.json')).json();
-    const t = d.tracks.find((x) => x.id === 't1');
-    const r = await fetch(t.audioOss, { headers: { Range: 'bytes=0-1023' } });
-    return { status: r.status, type: r.headers.get('content-type') };
-  } catch (e) { return { why: String(e).slice(0, 90) }; }
+check('内置曲目（t1）现在走解析接口拿地址', !/aliyuncs\.com/.test(oss.src) && oss.src.length > 0 && netReqs.length > beforeOss, `${oss.src} · 解析调用 +${netReqs.length - beforeOss} 次`);
+const ossGone = await page.evaluate(async () => {
+  const d = await (await fetch('data/index.json')).json();
+  const withOss = d.tracks.filter((x) => x.audioOss).length;
+  const withNid = d.tracks.filter((x) => x.audio && x.audio.nid).length;
+  return { withOss, withNid };
 });
-check('OSS 直链真请求可达（206 + audio/mpeg）', ossHttp.status === 206 && /audio\/mpeg/.test(ossHttp.type || ''), JSON.stringify(ossHttp));
+check('OSS 里的音频已经清空（曲目全部改走网易云解析）', ossGone.withOss === 0 && ossGone.withNid > 0, `带 audioOss 的 ${ossGone.withOss} 首 · 有 nid 能解析的 ${ossGone.withNid} 首`);
 
 // ═══════ 11 生词本 + 刷新恢复 ═══════
 await page.locator('#tab-mine').click();
@@ -512,15 +524,30 @@ const firstEx = await page.locator('#view-word .item').first().textContent();
 check('词条页把「正在听」的那句排在最前', /正在听/.test(firstEx), firstEx.replace(/\s+/g, ' ').slice(0, 44));
 const gotoAttr = await page.locator('#view-word [data-goto]').first().getAttribute('data-goto');
 const [gtid, gli] = gotoAttr.split('@');
+// 装个钩子：headless 的假 mp3 解码失败会让 paused 一直为 true，所以验「确实调了播放 + 切到了这首」
+await page.evaluate(() => {
+  window.__played = [];
+  const a = document.querySelector('audio');
+  if (a && !a.__hook) { a.__hook = 1; a.addEventListener('play', () => window.__played.push(a.getAttribute('data-tid'))); }
+});
 await page.locator('#view-word [data-goto]').first().click();
-await page.waitForTimeout(3000);
+await page.waitForTimeout(1200);
+// 内置曲目现在要先解析出地址才出声，轮询等一下
+for (let i = 0; i < 12; i++) {
+  const p0 = await page.evaluate(() => { const a = document.querySelector('audio'); return a && !a.paused && !!a.src; });
+  if (p0) break;
+  await page.waitForTimeout(700);
+}
+await page.waitForTimeout(600);
 const jumped = await page.evaluate(() => {
   const a = document.querySelector('audio');
   const el = document.querySelector('#plyric .lblock.playing');
   return { hash: location.hash, tid: a.getAttribute('data-tid'), src: !!a.src, paused: a.paused, open: document.querySelector('#player').classList.contains('on'), line: el ? Number(el.dataset.i) : -1 };
 });
 check('去这句：跳到对应那句', jumped.hash === `#/track/${gtid}@${gli}` && jumped.open && jumped.line === Number(gli), JSON.stringify(jumped));
-check('去这句：音频换成这首歌并开始播', jumped.tid === gtid && jumped.src && !jumped.paused, `tid=${jumped.tid} paused=${jumped.paused}`);
+// headless 的假 mp3 解不了码，所以这里只验「换歌 + 地址链路」（真出声在真浏览器上验）
+const jumpedUrl = await page.evaluate(() => (document.querySelector('audio') || {}).src || '');
+check('去这句：音频换成这首歌（走解析拿到地址）', jumped.tid === gtid && /music\.126\.net|e2e-stub|blob:/.test(jumpedUrl), `${jumped.tid} → ${jumpedUrl.slice(0, 48)}`);
 await shot('10-goto', true);
 await page.locator('#p-close').click();
 await page.waitForTimeout(300);
@@ -535,6 +562,17 @@ await page.waitForTimeout(800);
 await page.locator('#mb-meta').click();
 await page.waitForTimeout(500);
 check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
+
+// ═══════ 13.5 歌单体检（手动按钮；自动那条每天一次，测试里关掉） ═══════
+await page.goto(BASE + '?plchk=1#/songs', { waitUntil: 'load' });
+await page.waitForSelector('.impbox summary', { timeout: 15000 });
+await page.locator('.impbox summary').click();
+await page.waitForTimeout(400);
+check('曲库页有「检查歌单更新」按钮和上次检查时间', (await page.locator('#plchk').count()) === 1 && /上次检查/.test((await txt('.impbox .row .meta')) || ''), ((await txt('.impbox .row .meta')) || '').slice(0, 30));
+await page.locator('#plchk').click();
+await page.waitForTimeout(5000);
+const chkMsg = (await txt('#plstat')) || '';
+check('检查歌单更新：能跑通并报出每张歌单的情况', /线上 \d+ 首/.test(chkMsg) && /库里 \d+ 首/.test(chkMsg), chkMsg.slice(0, 60).replace(/\n/g, ' | '));
 
 // ═══════ 14 账号：自动同步 / 墓碑 / 清空 / 换设备登录恢复 ═══════
 if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
@@ -598,6 +636,18 @@ const afterLogin = await page.evaluate(() => { const j = JSON.parse(localStorage
 // 前面刚把导入的歌删了、进度也清了，所以这里验的是「账号里那份状态确实被拉回来了」：删除墓碑（+账号登录态）在，就说明合并成功
 check('换设备登录同账号：账号里的记录（含删除墓碑）都回来了', afterLogin.acc && afterLogin.del > 0, `${afterLogin.del} 个墓碑 · ${afterLogin.imp} 首`);
 check('登录后闸门放行，能正常用', (await page.locator('#gate').isVisible()) === false && (await page.locator('#m-push').count()) === 1, '已进入');
+
+// 管理员模式：只有第一个注册的账号（本次 e2e_user）能看到 OSS 文件管理
+await page.goto(BASE + '?admin=1#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#adm-list', { timeout: 15000 });
+check('管理员模式：生词本出现 OSS 文件管理入口', (await page.locator('#adm-list').count()) === 1, await txt('#adm-list'));
+await page.locator('#adm-list').click();
+await page.waitForTimeout(1500);
+const adminRows = await page.locator('#adminbox .item').count();
+check('管理员：能列出 OSS 上的文件（带大小）', adminRows >= 2, adminRows + ' 行');
+const delKey = await page.evaluate(() => { const el = document.querySelector('#adminbox [data-admdel]'); return el ? el.dataset.admdel : null; });
+if (delKey) { await page.locator(`#adminbox [data-admdel="${delKey}"]`).first().click(); await page.waitForTimeout(1500); }
+check('管理员：能删 OSS 上的文件（走管理员接口）', !!delKey && apiState.deleted.indexOf(delKey) >= 0, delKey ? `已请求删除 ${delKey}` : '没找到可删的');
 
 // 退出 → 回到闸门（本机记录保留）
 await page.locator('#acc-out').click();

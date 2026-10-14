@@ -22,6 +22,11 @@
 | POST | `/api/password` | `{old, new}`，改完返回新 token |
 | GET | `/api/data` | 取记录 |
 | PUT | `/api/data` | `{data}`，**服务端按时间戳逐条合并**后返回全量（多设备不会互相覆盖） |
+| GET | `/api/admin/files?prefix=` | 管理员：列 OSS 对象（key/size/LastModified），prefix 一般是 `sync/` 或 `audio/` |
+| POST | `/api/admin/delete` | 管理员：`{key}` 删对象（只允许 `sync/` 或 `audio/` 前缀） |
+
+管理员判定：`_index.json` 为空时**第一个注册的账号**自动是管理员（写进 account.json 的 `admin` 字段）；
+也可以用函数环境变量 `ADMINS=名字1,名字2` 追加。普通用户看不到 `/api/admin/*`（403）。
 
 令牌是 HMAC-SHA256 签名的自包含 token（180 天），密钥在
 `~/.dsh/thlyrics-fc.secret`（600，不进仓库）。
@@ -48,6 +53,15 @@ python3 ops/deploy-fc.py        # 把 ops/fc/ 打包上传，并设置环境变�
 - 登录后 `syncNow()` 走账号模式（一次 PUT，服务端合并后返回全量），
   未登录则回落到「公开预签名对象」的老路子
 - 界面在「生词本」页顶部：注册并按登录 / 登录 / 退出 / 改密码
+
+## 音频：现在 OSS 里没有音频
+
+用户 2026-10-14 要求把 OSS 里的 mp3 全部删掉（来源不明的曲目不留副本），
+`audio/` 前缀现在是空的，44 首内置曲目里那 16 首有网易云 nid 的都改走解析接口
+（首次播放多等约 1.8s，之后 18 分钟复用）。`data/audio-oss.json` 的 `tracks` 已清空，
+将来要重新放固定直链，把 trackId→url 填回去再 `node scripts/build-web.mjs` 即可。
+**同一首歌只留一份**：真要放音频就用 `audio/<歌曲id>.mp3` 命名（不按用户分目录），
+管理员面板会直接列出 audio/ 下的文件。
 
 ## 没做 / 可做
 

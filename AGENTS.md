@@ -327,3 +327,22 @@
 - E2E 96/96（第 0 节：未登录只有闸门、注册后放行；第 14 节整节改成账号制：
   改释义/标词自动同步、删除墓碑、清空进度不被顶回来、清浏览器数据后登录恢复、退出回闸门）。
 - 真机验证脚本 `.e2e/acc-real.mjs <url> <用户名>`（线上真 API，跑完记得删账号对象 + 重置 _index.json）。
+
+### 歌单体检 / 管理员模式 / 清空 OSS 音频（2026-10-14 深夜第二批，已上线）
+
+- **OSS 音频全删了**（用户要求「不知道哪来的曲都删掉，确保是干净的」）：
+  `audio/` 前缀现在为空，`data/audio-oss.json` 的 tracks 已清空并重建 →
+  `docs/data/index.json` 里 `audioOss` 为 0 条；内置那 16 首有 `audio.nid` 的改走解析接口
+  （实测解析后 Range 请求 206 · audio/mpeg · TTFB 58ms）。要放回来：往 `data/audio-oss.json.tracks`
+  填 trackId→url 再 `node scripts/build-web.mjs`。**同歌只留一份，key 用 `audio/<歌曲id>.mp3`**。
+- **歌单体检**：`checkPlaylists()` —— 对每张导入的歌单拉一次线上曲目表，报「线上 N 首 · 库里 M 首 · 新增 X 首」，
+  缺的自动补进来；被原作者移出歌单的只报数、不自动删（那是用户的数据）。
+  入口在曲库页的导入面板里（`#plchk`）；另外**每 24 小时静默跑一次**（`S.plCheckAt`）。
+  测试里用 `window.__NO_PLCHECK = true` 关掉自动那次。
+- **管理员模式**：第一个注册的账号自动是管理员（account.json 的 `admin`），可用 `ADMINS` 环境变量追加。
+  生词本页给管理员加了一块「管理员模式」卡片：列 OSS 文件（sync/ 账号数据、audio/ 音频）、显示大小、可单个删。
+  API：`GET /api/admin/files?prefix=`、`POST /api/admin/delete {key}`（非管理员 403）。
+  ⚠️ 实现坑：OSS V1 签名里**只有 sub-resource 才进 CanonicalizedResource**，
+  `prefix`/`max-keys` 不算 —— 列表请求的 canonical resource 就是 `/<bucket>/`（写错过一次，会 403）。
+- E2E 100/100（新增：内置曲目改走解析、歌单体检手动按钮、管理员列/删文件；去这句那条改成验地址链路，
+  因为 headless shell 解不了假 mp3）。
