@@ -6,3 +6,4 @@ node_modules/
 data/netease-lyrics/
 .DS_Store
 *.log
+__pycache__/
