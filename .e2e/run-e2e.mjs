@@ -44,6 +44,7 @@ const E2E_PLAYLIST = {
     { id: 737955, name: 'Thank you for dears.', ar: [{ name: 'GET IN THE RING' }], al: { name: 'E2E', picUrl: E2E_COVER } },
     { id: 22645196, name: 'Bad Apple!!', ar: [{ name: 'のみこ' }], al: { name: 'E2E', picUrl: E2E_COVER } },
     { id: 888888888, name: '这首取不到音频', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
+    { id: 777777777, name: '这首取不到歌词', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
     { id: 999999999, name: '这首是纯音乐', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
   ] },
 };
@@ -131,6 +132,7 @@ const apiStub = (route) => {
   if (path === '/lyric') {
     const u = new URL(req.url());
     const id = u.searchParams.get('id') || '', src = u.searchParams.get('source') || 'netease';
+    if (id === '777777777') return send(502, { error: 'stub 上游挂了' });     // 两个源都挂 = 真失败
     if (src === 'tencent') return send(200, { ok: true, lyric: E2E_LYRIC.lyric, tlyric: E2E_LYRIC.tlyric });
     return send(200, { ok: true, lyric: id === '999999999' ? '纯音乐，请欣赏\n' : E2E_LYRIC.lyric, tlyric: E2E_LYRIC.tlyric });
   }
@@ -198,6 +200,7 @@ const baseRoute = (route) => {
   }
   if (/gdstudio/.test(u) && /types=lyric/.test(u)) {
     const id = (u.match(/[?&]id=(\d+)/) || [])[1];
+    if (id === '777777777') return route.fulfill({ status: 502, contentType: 'text/plain', body: 'stub 上游挂了' });
     return route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify(id === '999999999' ? { lyric: '纯音乐，请欣赏\n' } : E2E_LYRIC),
@@ -508,7 +511,7 @@ await shot('08-restored');
 // ═══════ 12 网易云歌单导入（失败逐首报原因） ═══════
 await page.locator('#tab-songs').click();
 await page.waitForTimeout(400);
-check('曲库页有「导入网易云」入口', (await page.locator('.impbox summary').count()) === 1 && /导入网易云/.test(await txt('.impbox summary')), await txt('.impbox summary'));
+check('曲库页有「导入歌单」入口', (await page.locator('.impbox summary').count()) === 1 && /导入歌单/.test(await txt('.impbox summary')), await txt('.impbox summary'));
 await page.locator('.impbox summary').click();
 await page.waitForTimeout(250);
 expect400 = true;
@@ -528,17 +531,20 @@ await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
 await page.waitForTimeout(500);
 const impStat = await txt('#plstat');
-check('163cn.tv 手机短链能解析（歌单）', /入库 2 首/.test(impStat), impStat.slice(0, 40));
-check('整张歌单一次导完：入库 2 · 跳过 1 · 失败 1', /入库 2 首/.test(impStat) && /跳过 1 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 80));
+check('163cn.tv 手机短链能解析（歌单）', /入库 3 首/.test(impStat), impStat.slice(0, 50));
+check('整张歌单一次导完：入库 3（含 1 首暂无音源）· 跳过 1 · 失败 1',
+  /入库 3 首/.test(impStat) && /暂无音源/.test(impStat) && /跳过 1 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 92));
 const impLog0 = await page.locator('#pllist').textContent();
 check('纯音乐/无歌词只算跳过，不算失败', /纯音乐/.test(impLog0), impLog0.replace(/\s+/g, ' ').slice(0, 60));
 const impLog = await page.locator('#pllist').textContent();
-check('跳过与失败分开列（跳过的不算失败）', /·/.test(impLog) && /✗/.test(impLog) && /取不到音频/.test(impLog), impLog.replace(/\s+/g, ' ').slice(0, 70));
+check('跳过与失败分开列（跳过的不算失败）', /·/.test(impLog) && /✗/.test(impLog) && /取不到歌词/.test(impLog), impLog.replace(/\s+/g, ' ').slice(0, 70));
 expect404 = false;
-check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 2);
+check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 3);
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(300);
-check('「我导入的」能筛出 2 首', (await page.locator('#list .track').count()) === 2);
+check('「我导入的」能筛出 3 首', (await page.locator('#list .track').count()) === 3);
+const noAudioTag = await page.evaluate(() => { const el = [...document.querySelectorAll('#list .track')].find((x) => /无音源/.test(x.textContent)); return el ? el.textContent.replace(/\s+/g, ' ').slice(0, 40) : ''; });
+check('没音源的那首照样入库，列表标「无音源」', !!noAudioTag, noAudioTag);
 // 曲库内的搜索框 + 按社团/专辑分组
 await page.locator('#view-songs .chip[data-f="all"]').click();
 await page.waitForTimeout(250);
@@ -622,10 +628,10 @@ await page.goto(BASE + '#/songs');
 await page.waitForTimeout(500);
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(300);
-check('刷新后导入的歌还在', (await page.locator('#list .track').count()) === 2);
+check('刷新后导入的歌还在', (await page.locator('#list .track').count()) === 3);
 await page.locator('#list .track [data-del]').first().click();
 await page.waitForTimeout(500);
-check('导入的歌可以删掉', (await page.locator('#list .track').count()) === 1, (await page.locator('#list .track').count()) + ' 首');
+check('导入的歌可以删掉', (await page.locator('#list .track').count()) === 2, (await page.locator('#list .track').count()) + ' 首');
 
 // 专辑导入：一条链接进来整张
 if (!(await page.locator('.impbox').evaluate((el) => el.open))) { await page.locator('.impbox summary').click(); await page.waitForTimeout(300); }
@@ -640,7 +646,7 @@ await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 60000 });
 await page.waitForTimeout(500);
 check('单曲导入：分享文案里也能认出来', /入库 1 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 50));
-check('专辑/单曲进来的歌也在「我导入的」里', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 4);
+check('专辑/单曲进来的歌也在「我导入的」里', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 5);
 
 // QQ 音乐：单曲（分享文案）+ 专辑
 await page.locator('#plinput').fill('分享单曲：QQ 单曲 https://y.qq.com/n/ryqq/songDetail/E2EQQ0000001');
@@ -659,7 +665,7 @@ const qqTag = await page.evaluate(() => {
   return { tencent: recs.filter((r) => r.src === 'tencent').length, netease: recs.filter((r) => (r.src || 'netease') === 'netease').length,
     plId: (recs.find((r) => r.src === 'tencent') || {}).plId || '' };
 });
-check('QQ 曲目记了平台（src=tencent，plId 带 tx 前缀）', qqTag.tencent === 3 && qqTag.netease === 4 && /^tx/.test(qqTag.plId), JSON.stringify(qqTag));
+check('QQ 曲目记了平台（src=tencent，plId 带 tx 前缀）', qqTag.tencent === 3 && qqTag.netease === 5 && /^tx/.test(qqTag.plId), JSON.stringify(qqTag));
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(400);
 const tagTxt = await page.evaluate(() => [...document.querySelectorAll('#list .track .l3')].map((e) => e.textContent).join(' | '));
@@ -778,7 +784,7 @@ await page.waitForTimeout(400);
 const code = await page.evaluate(() => (document.getElementById('sh-code') || {}).value || '');
 check('能生成分享码（TL1. 开头的短码）', /^TL1\./.test(code) && code.length < 400, `${code.length} 字符`);
 await page.locator('#sh-imp').click();
-await page.waitForTimeout(1500);
+await page.waitForFunction(() => /导入完成|先把分享码|读不出来/.test((document.getElementById('sh-stat') || {}).textContent || ''), null, { timeout: 90000 }).catch(() => {});
 const shStat = (await txt('#sh-stat')) || '';
 check('导入别人的分享码：跑通并逐条报数', /导入完成：入库 \d+ 首/.test(shStat), shStat.slice(0, 40));
 
