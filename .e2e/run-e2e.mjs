@@ -912,6 +912,9 @@ const rw = await page.evaluate(() => {          // 挑一个能推出多种写�
 });
 await page.locator('#plyric .w[data-w]').nth(rw ? rw.i : 0).click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });
+await page.waitForTimeout(300);
+const popOpenPaused = await page.evaluate(() => document.querySelector('audio').paused);
+check('抽屉一弹出就暂停（不是进编辑器才暂停）', popOpenPaused === true, `paused=${popOpenPaused}`);
 await page.locator('#p-roma').click();
 await page.waitForTimeout(500);
 const romaOpen = await page.evaluate(() => ({
@@ -953,12 +956,18 @@ const romaAfter = await page.evaluate((k) => {
     sameN: sameWord.length, othersChanged: others.filter((x) => rOf(x) === chosen).length,
     paused: document.querySelector('audio').paused, bottom: document.getElementById('pop').style.bottom };
 }, rw);
-check('保存后立刻生效 + 继续播放', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.paused === false,
+check('保存后立刻生效（抽屉还开着 → 保持暂停，不自己续播）', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.paused === true,
   `存 ${romaAfter.saved} 条 · 显示「${romaAfter.shown}」· paused=${romaAfter.paused}`);
 check('只改这一处：同曲同词的其它位置不动', romaAfter.fixedN === 1 && romaAfter.othersChanged === 0,
   `本曲同词 ${romaAfter.sameN} 处 · 改动 ${romaAfter.fixedN} 处 · 其它被误改 ${romaAfter.othersChanged} 处`);
 check('纠正键带曲目和位置（不会跨曲）', /^t1\|\d+\|\d+$/.test(romaAfter.key), romaAfter.key || '(空)');
 check('键盘收起后抽屉复位', romaAfter.bottom === '', `bottom="${romaAfter.bottom}"`);
+// 收起抽屉 → 续播（新契约：暂停/续播绑抽屉生命周期）
+await page.locator('#p-close2').click();
+await page.waitForTimeout(900);
+const afterPopClose = await page.evaluate(() => ({ on: document.getElementById('pop').classList.contains('on'), paused: document.querySelector('audio').paused }));
+check('收起抽屉 → 继续播放', afterPopClose.on === false && afterPopClose.paused === false,
+  `抽屉=${afterPopClose.on ? '还开' : '已关'} · paused=${afterPopClose.paused}`);
 // 自定义输入
 await page.locator('#plyric .w[data-fixed="1"]').first().click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });

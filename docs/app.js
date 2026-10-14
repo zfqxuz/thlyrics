@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015n';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015p';
 
 (() => {
   'use strict';
@@ -2320,8 +2320,10 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   }
 
   // ────────────── 词条弹层 ──────────────
-  let popWord = null, popFallback = null, popSeg = null, popPos = null, romaCtx = null, romaWasPlaying = false;
+  let popWord = null, popFallback = null, popSeg = null, popPos = null, romaCtx = null, popWasPlaying = false;
   function showPop(w, fallback, seg) {
+    // 抽屉一弹出就暂停；续播交给"收起抽屉"（用户要求：暂停/续播绑抽屉，不绑编辑器）
+    if (!popWasPlaying && !audio.paused && audio.src) { popWasPlaying = true; try { audio.pause(); } catch {} }
     popFallback = fallback || null;
     popSeg = seg || null;
     popPos = (seg && seg.li != null && seg.ti != null && curTrack) ? { tid: curTrack.id, li: seg.li, ti: seg.ti } : null;
@@ -2355,16 +2357,19 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('p-editrow').style.display = 'none';
     $('pop').classList.add('on');
   }
-  /** 关弹层：顺手把罗马音编辑器收起来，编辑时停掉的播放继续 */
-  const hidePop = () => {
+  /** 关弹层：顺手收起罗马音编辑器；抽屉弹出时暂停的播放，在这里续上 */
+  const hidePop = (keepPaused) => {
+    const skip = keepPaused === true;               // ⚠️ 会被当 onclick 用，参数可能是 MouseEvent，必须判 === true
     const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; }
     closeRomaEditor();
     $('pop').classList.remove('on');
+    // 抽屉弹出时暂停的播放，收起时续上；整首已经播完就不用再起播了
+    if (!skip && popWasPlaying && !audio.ended && curTrack) playTrack(curTrack);
+    popWasPlaying = false;
   };
   function closeRomaEditor() {
     const box = $('p-romabox'); if (box) box.hidden = true;
     romaCtx = null;
-    if (romaWasPlaying) { romaWasPlaying = false; if (curTrack) playTrack(curTrack); }
   }
   const romaboxHint = () => $('p-romahint');
   function refreshLyricsNow() {
@@ -2505,9 +2510,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('p-roma').onclick = () => {
       const t = romaTarget(); if (!t) return;
       romaCtx = t;
-      romaWasPlaying = !audio.paused && !!audio.src;
-      try { audio.pause(); } catch {}                 // 无条件暂停（没在播也无害）：改读音时别吵
-      if (romaboxHint()) romaboxHint().textContent = romaWasPlaying ? '已暂停播放，改完自动继续' : '播放本来就是停着的，改完不会自己响';
+      if (romaboxHint()) romaboxHint().textContent = popWasPlaying ? '播放已暂停，收起抽屉后继续' : '播放本来就是停着的';
       const box = $('p-romabox'); if (box) box.hidden = false;
       $('p-romainput').value = romaOf(t.tid, t.li, t.ti) || (t.seg && t.seg.y) || (t.w && t.w.romaji) || '';
       $('p-romacands').dataset.hint = (t.seg && t.seg.s) || t.surface;
@@ -2520,14 +2523,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const saveRoma = (drop) => {
       if (!romaCtx) return;
       setRoma(romaCtx.tid, romaCtx.li, romaCtx.ti, drop ? '' : $('p-romainput').value, drop);
-      const keepPlaying = romaWasPlaying;
-      romaWasPlaying = false;
       const box = $('p-romabox'); if (box) box.hidden = true;
       romaCtx = null;
       refreshLyricsNow();
       if (popWord || popSeg) showPop(popWord, popFallback, popSeg);
       else hidePop();
-      if (keepPlaying && curTrack) playTrack(curTrack);
       toast(drop ? '已还原' : '这一处的罗马音已更新');
     };
     $('p-romasave').onclick = () => saveRoma(false);
@@ -2537,7 +2537,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       if (!popWord) return;
       const ex = examplesFor(popWord, 1)[0];
       if (!ex || !ex.tid) { toast('曲库里还没有这个词的例句'); return; }
-      $('pop').classList.remove('on');
+      hidePop(true);                                  // 马上要跳去别的歌，这里不用续播
       go('#/track/' + ex.tid + '@' + ex.li);
     };
     $('p-lines').onclick = () => {
