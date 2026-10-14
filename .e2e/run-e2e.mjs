@@ -230,7 +230,9 @@ let expect401 = false;   // 故意用错密码那一步会打一条 401 控制�
 let expect400 = false;   // 故意喂非法输入那两步：解析接口会回 400，也不算 bug
 let expect404 = false;   // 故意放一首取不到音频的歌：后端会回 404，也不算 bug
 page.on('console', (m) => { if (m.type() !== 'error') return; const t = m.text(); const u = ((m.location() || {}).url) || ''; if (expect401 && /status of 401/.test(t)) return; if (expect400 && /status of 400/.test(t)) return; if (/status of 404/.test(t) && /\/api\/audio/.test(u)) return;   // 「这首取不到音频」是预期分支（404 → 回落第三方）
-    if (expect404 && /status of 404/.test(t)) return; errors.push('console: ' + t.slice(0, 120) + ' @ ' + u.slice(0, 80)); });
+    if (expect404 && /status of 404/.test(t)) return;
+    if (/status of 502/.test(t) && /lyric/.test(u)) return;   // 桩里故意做了首"取不到歌词"：两个源都会 502，属预期
+    errors.push('console: ' + t.slice(0, 120) + ' @ ' + u.slice(0, 80)); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message.slice(0, 140)));
 page.on('crash', () => errors.push('渲染进程崩溃'));
 
