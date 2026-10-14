@@ -215,6 +215,7 @@ const baseRoute = (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
   if (/aqqmusic\.tc\.qq\.com/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mp4', body: 'ID3' });
+  if (/_test-tone\.wav/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/wav', body: fs.readFileSync(path.join(HERE, 'test-tone.wav')) });
   if (/music\.126\.net\/e2e-cover/.test(u)) return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
   return route.continue();
@@ -876,23 +877,15 @@ await page.goto(BASE + '?heal=1#/track/t1', { waitUntil: 'load' });
   await page.waitForTimeout(300);
 }
 
-// ═══════ 13.2 罗马音纠正（听不准就改：备选 + 自由输入；编辑时暂停，改完继续） ═══════
+// ═══════ 13.2 罗马音纠正（备选 + 自由输入；编辑时暂停、改完继续；键盘不遮抽屉） ═══════
 await page.goto(BASE + '?roma=1#/track/t1', { waitUntil: 'load' });
 await page.waitForTimeout(1200);
-await page.evaluate(() => {                 // headless 的假 mp3 播不起来：装作"正在播"，钩住 play/pause 调用
-  const a = document.querySelector('audio');
-  window.__calls = [];
-  if (!a.__romahook) {
-    a.__romahook = 1;
-    a.__origPlay = a.play.bind(a); a.__origPause = a.pause.bind(a);
-    a.play = () => { window.__calls.push('play'); return a.__origPlay(); };
-    a.pause = () => { window.__calls.push('pause'); return a.__origPause(); };
-    Object.defineProperty(a, 'paused', { get: () => false, configurable: true });
-  }
-  window.__calls.length = 0;
-});
 await page.locator('#t-sing').click();
-await page.waitForTimeout(1200);
+await page.waitForTimeout(1000);
+// headless 解不了 mp3 → 换成真能解码的 wav，让"暂停/继续"是真的
+await page.evaluate(async () => { const a = document.querySelector('audio'); a.src = '/_test-tone.wav'; await a.play().catch(() => {}); });
+await page.waitForTimeout(700);
+check('测试音源真的在播（后续暂停才有意义）', await page.evaluate(() => !document.querySelector('audio').paused), 'paused=false');
 const rw = await page.evaluate(() => {          // 挑一个能推出多种写法的词（含 し/ち/つ/ふ/じ）
   const els = [...document.querySelectorAll('#plyric .w[data-w]')];
   const i = els.findIndex((x) => /[しちつふじシチツフジ]/.test(x.dataset.r || ''));
@@ -902,16 +895,30 @@ const rw = await page.evaluate(() => {          // 挑一个能推出多种写�
 await page.locator('#plyric .w[data-w]').nth(rw ? rw.i : 0).click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.locator('#p-roma').click();
-await page.waitForTimeout(400);
+await page.waitForTimeout(500);
 const romaOpen = await page.evaluate(() => ({
   box: !document.getElementById('p-romabox').hidden,
-  calls: (window.__calls || []).slice(),
+  paused: document.querySelector('audio').paused,
+  hint: (document.getElementById('p-romahint') || {}).textContent || '',
   cands: document.querySelectorAll('#p-romacands button').length,
   val: (document.getElementById('p-romainput') || {}).value || '',
 }));
-check('改罗马音：编辑器打开并暂停播放', romaOpen.box && romaOpen.calls.includes('pause'), `调用 ${romaOpen.calls.join('/')}`);
+check('打开罗马音编辑器：真的暂停了', romaOpen.box && romaOpen.paused === true, `paused=${romaOpen.paused} · ${romaOpen.hint.slice(0, 14)}`);
 const hasVarKana = /[しちつふじシチツフジ]/.test(rw ? rw.r : '');
 check('给出备选（能推出多种写法时给多个）', romaOpen.cands >= 1 && (!hasVarKana || romaOpen.cands >= 2), `${romaOpen.cands} 个备选 · 当前「${romaOpen.val}」`);
+// 手机键盘：抽屉要跟着抬起来，输入与保存不能被键盘盖住
+const kb = await page.evaluate(() => {
+  document.getElementById('p-romainput').focus();
+  window.__kb(320);                       // 模拟 320px 高的键盘
+  const pop = document.getElementById('pop');
+  const inp = document.getElementById('p-romainput').getBoundingClientRect();
+  const save = document.getElementById('p-romasave').getBoundingClientRect();
+  return { bottom: pop.style.bottom, inputBottom: Math.round(inp.bottom), saveBottom: Math.round(save.bottom), visibleH: window.innerHeight - 320 };
+});
+check('手机键盘弹起：抽屉上移，输入与保存都在可视区内',
+  kb.bottom === '320px' && kb.inputBottom <= kb.visibleH && kb.saveBottom <= kb.visibleH,
+  `bottom=${kb.bottom} · 输入底 ${kb.inputBottom} / 保存底 ${kb.saveBottom} · 可视高 ${kb.visibleH}`);
+await page.evaluate(() => window.__kb(0));
 await page.locator('#p-romacands button').nth(1).click();
 await page.waitForTimeout(200);
 const chosen = await page.locator('#p-romainput').inputValue();
@@ -926,14 +933,15 @@ const romaAfter = await page.evaluate((k) => {
   const rOf = (el) => { const r = el && el.querySelector('.r'); return r ? r.textContent.trim() : ''; };
   return { saved: keys.length, key: keys[0] || '', shown: rOf(fixed[0]), fixedN: fixed.length,
     sameN: sameWord.length, othersChanged: others.filter((x) => rOf(x) === chosen).length,
-    calls: (window.__calls || []).slice() };
+    paused: document.querySelector('audio').paused, bottom: document.getElementById('pop').style.bottom };
 }, rw);
-check('保存后立刻生效 + 继续播放', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.calls.includes('play'),
-  `存 ${romaAfter.saved} 条 · 显示「${romaAfter.shown}」`);
+check('保存后立刻生效 + 继续播放', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.paused === false,
+  `存 ${romaAfter.saved} 条 · 显示「${romaAfter.shown}」· paused=${romaAfter.paused}`);
 check('只改这一处：同曲同词的其它位置不动', romaAfter.fixedN === 1 && romaAfter.othersChanged === 0,
   `本曲同词 ${romaAfter.sameN} 处 · 改动 ${romaAfter.fixedN} 处 · 其它被误改 ${romaAfter.othersChanged} 处`);
 check('纠正键带曲目和位置（不会跨曲）', /^t1\|\d+\|\d+$/.test(romaAfter.key), romaAfter.key || '(空)');
-// 自定义输入（还是刚才那一处）
+check('键盘收起后抽屉复位', romaAfter.bottom === '', `bottom="${romaAfter.bottom}"`);
+// 自定义输入
 await page.locator('#plyric .w[data-fixed="1"]').first().click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.locator('#p-roma').click();
@@ -943,12 +951,10 @@ await page.locator('#p-romasave').click();
 await page.waitForTimeout(800);
 const custom = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return Object.values(j.roma || {}).map((x) => x.y); });
 check('也能自己输入罗马音', custom.includes('my-own-romaji'), JSON.stringify(custom).slice(0, 40));
-// 还原 + 刷新后仍在
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(1500);
 const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').roma || {});
 check('刷新后纠正还在（并跟着账号同步）', Object.keys(persisted).length === 1 && Object.values(persisted)[0].y === 'my-own-romaji', JSON.stringify(persisted).slice(0, 60));
-await page.evaluate(() => { const a = document.querySelector('audio'); if (a && a.__romahook) { delete a.paused; a.play = a.__origPlay; a.pause = a.__origPause; delete a.__romahook; } });
 
 // ═══════ 13.5 歌单体检（手动按钮；自动那条每天一次，测试里关掉） ═══════
 await page.goto(BASE + '?plchk=1#/songs', { waitUntil: 'load' });

@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261015b';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261015c';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -1338,6 +1338,32 @@
     } catch (e) { toast('删除失败：' + e.message); }
   }
 
+  // ────────────── 手机键盘：把底部抽屉顶上去 ──────────────
+  // 手机弹键盘时 visualViewport 会变小，但 position:fixed 的元素仍贴着"物理底部"，
+  // 于是输入框和保存按钮被键盘盖住。这里按差值把抽屉 bottom 抬起来，并把聚焦的输入滚进可视区。
+  function setupKeyboardAwareSheet() {
+    const vv = window.visualViewport;
+    const pop = $('pop');
+    if (!pop) return;
+    const apply = (gapOverride) => {
+      const gap = gapOverride != null ? Number(gapOverride)
+        : (vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0);
+      const on = gap > 60 && pop.classList.contains('on');
+      pop.style.bottom = on ? Math.round(gap) + 'px' : '';
+      pop.style.maxHeight = on ? Math.max(220, Math.round(((vv ? vv.height : window.innerHeight) - 24))) + 'px' : '';
+      if (on) {
+        const el = document.activeElement;
+        if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) {
+          setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {} }, 80);
+        }
+      }
+    };
+    if (vv) { vv.addEventListener('resize', () => apply()); vv.addEventListener('scroll', () => apply()); }
+    window.addEventListener('resize', () => apply());
+    window.__kb = apply;               // 测试钩子：window.__kb(320) 模拟 320px 高的键盘
+    apply();
+  }
+
   // ────────────── 登录闸门（没登录不让用） ──────────────
   function gateMsg(t) { const el = $('g-msg'); if (el) el.textContent = t || ''; }
   let gateAvatar = '';                                    // 注册时选的头像
@@ -2265,6 +2291,7 @@
     romaCtx = null;
     if (romaWasPlaying) { romaWasPlaying = false; if (curTrack) playTrack(curTrack); }
   }
+  const romaboxHint = () => $('p-romahint');
   function refreshLyricsNow() {
     if (!curTrack) return;
     renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true);
@@ -2357,6 +2384,7 @@
     $('q-clear').onclick = () => { $('q').value = ''; if (location.hash.startsWith('#/search')) go(lastNonSearch); };
 
     bindAudio();
+    setupKeyboardAwareSheet();
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();
     $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('整首播放'); };
@@ -2403,7 +2431,8 @@
       const t = romaTarget(); if (!t) return;
       romaCtx = t;
       romaWasPlaying = !audio.paused && !!audio.src;
-      if (romaWasPlaying) audio.pause();
+      try { audio.pause(); } catch {}                 // 无条件暂停（没在播也无害）：改读音时别吵
+      if (romaboxHint()) romaboxHint().textContent = romaWasPlaying ? '已暂停播放，改完自动继续' : '播放本来就是停着的，改完不会自己响';
       const box = $('p-romabox'); if (box) box.hidden = false;
       $('p-romainput').value = romaOf(t.tid, t.li, t.ti) || (t.seg && t.seg.y) || (t.w && t.w.romaji) || '';
       $('p-romacands').dataset.hint = (t.seg && t.seg.s) || t.surface;
