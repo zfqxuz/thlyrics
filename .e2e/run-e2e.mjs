@@ -60,6 +60,10 @@ const baseRoute = (route) => {
       body: JSON.stringify(id === '999999999' ? {} : E2E_LYRIC),
     });
   }
+  if (/r\.jina\.ai/.test(u)) {   // 短链解析中转的桩：带 no-id 的返回一个没有歌单 ID 的页面
+    const body = /no-id/.test(u) ? 'Title: 网易云音乐\n\nMarkdown Content:\n# 网易云音乐\n首页' : 'Title: 网易云音乐\n\nMarkdown Content:\n[歌单](https://music.163.com/playlist?id=999000123)\n';
+    return route.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body });
+  }
   if (/gdstudio/.test(u) && /types=url/.test(u)) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
@@ -307,11 +311,17 @@ await page.locator('#plinput').fill('随便写点什么');
 await page.locator('#plgo').click();
 await page.waitForTimeout(400);
 check('非法输入 → 直接报「没识别出歌单 ID」', /没识别出歌单\s*ID/.test(await txt('#plstat')), (await txt('#plstat')).slice(0, 40));
-await page.locator('#plinput').fill('https://music.163.com/playlist?id=999000123');
+await page.locator('#plinput').fill('https://163cn.tv/no-id-xxxx');
+await page.locator('#plgo').click();
+await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
+const shortFail = await txt('#plstat');
+check('解析不了的短链：说清怎么办（不空转）', /短链里没有歌单\s*ID/.test(shortFail) && /地址栏/.test(shortFail), shortFail.slice(0, 56));
+await page.locator('#plinput').fill('https://163cn.tv/abc123');   // 短链 → 中转解析出 ID
 await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
 await page.waitForTimeout(500);
 const impStat = await txt('#plstat');
+check('163cn.tv 短链能自动解析出歌单 ID', /成功 2 首/.test(impStat), impStat.slice(0, 40));
 check('导入汇总：成功 2 首、失败 1 首', /成功 2 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 70));
 check('失败逐首给原因（不阻塞其它）', /没有带时间轴的歌词/.test(await page.locator('#pllist').textContent()));
 check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 2);

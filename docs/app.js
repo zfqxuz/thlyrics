@@ -561,10 +561,31 @@
     const m = s.match(/[?&#]id=(\d{3,})/) || s.match(/playlist\/?[^\d]{0,8}(\d{3,})/) || s.match(/^(\d{3,})$/);
     return m ? m[1] : '';
   }
+  /** 把用户粘的东西（数字 / 链接 / 短链 / 整段分享文案）解析成歌单 ID */
+  async function resolvePlaylistId(input) {
+    const s = String(input || '').trim();
+    const direct = plIdOf(s);
+    if (direct) return { id: direct };
+    const url = (s.match(/https?:\/\/[^\s，,、）)]+/) || [])[0];
+    if (!url) return { error: '没识别出歌单 ID：粘「歌单链接」或直接填数字 ID' };
+    // 浏览器直连短链/网易云一定会被跨域挡（还会在控制台留红字），所以直接走公共中转
+    // （r.jina.ai）把重定向跟到底，再从页面内容里捞 id
+    try {
+      const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 30000);
+      const r = await fetch('https://r.jina.ai/' + url, { signal: ac.signal });
+      clearTimeout(timer);
+      const t = (await r.text()).slice(0, 200000);
+      const m = t.match(/playlist\?id=(\d{5,})/) || t.match(/"playlistId"\s*:\s*"(\d{5,})"/) || t.match(/playlist\/(\d{5,})/);
+      if (m) return { id: m[1], short: url };
+    } catch {}
+    return { error: `这条短链里没有歌单 ID（${url.slice(0, 46)}…），自动解析也没成功。两个办法：① 点开它，在浏览器地址栏里找 id= 后面那串数字，直接填数字；② 把链接发我，我解析给你` };
+  }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
   async function importPlaylist(input, limit, onStep) {
-    const pid = plIdOf(input);
-    if (!pid) return { error: '没识别出歌单 ID：请用 playlist?id=… 的完整链接，或直接填数字 ID' };
+    const rid = await resolvePlaylistId(input);
+    if (rid.error) return { error: rid.error };
+    const pid = rid.id;
+    if (rid.short && onStep) onStep(0, 0, '短链已解析', '歌单 ID ' + pid);
     let pl = null;
     try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
     catch (e) { return { error: '拉取歌单失败：' + (e.name === 'AbortError' ? '超时' : e.message) }; }
@@ -647,12 +668,6 @@
     const input = box ? box.value : '';
     const stat = $('plstat');
     impState.log = []; impState.total = 0; impState.done = false;
-    if (!plIdOf(input)) {
-      impState.msg = '没识别出歌单 ID：请用 playlist?id=… 的完整链接，或直接填数字 ID';
-      if (stat) stat.textContent = impState.msg;
-      if ($('pllist')) $('pllist').innerHTML = '';
-      return;
-    }
     importing = true;
     if (stat) stat.textContent = '正在拉取歌单…';
     if ($('plgo')) $('plgo').disabled = true;
@@ -701,10 +716,10 @@
       <details class="impbox" ${impState.log.length || impState.msg ? 'open' : ''}>
         <summary>导入网易云歌单</summary>
         <div class="row" style="margin-top:10px">
-          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单链接（含 id=…）或数字 ID">
+          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单链接 / 数字 ID / 分享文案">
           <button class="toolbtn on" id="plgo">${importing ? '导入中…' : '导入'}</button>
         </div>
-        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || `把歌单里的歌收进来：有带时间轴的歌词 + 能取到音频的才收，取不到的逐首报原因。一次最多 ${IMP_LIMIT} 首，词性/罗马音/释义会用现有词表自动对齐。`)}</div>
+        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || `把歌单里的歌收进来：有带时间轴的歌词 + 能取到音频的才收，取不到的逐首报原因。一次最多 ${IMP_LIMIT} 首，词性/罗马音/释义会用现有词表自动对齐。短链（163cn.tv/…）会自动尝试解析。`)}</div>
         <div id="pllist">${impRowsHtml()}</div>
         ${impPlaylists().length ? `<div class="meta" style="margin-top:10px">已导入：${impPlaylists().map((p) => `${esc(p.name)}（${p.n} 首）`).join('、')}</div>` : ''}
       </details>
