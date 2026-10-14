@@ -73,8 +73,8 @@ const E2E_SEG = {
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
 const apiState = { users: {}, seq: 0, calls: [], deleted: [] };
 const apiMerge = (a, b) => {
-  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, a || {});
-  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, b || {});
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, b || {});
   const n = (v) => Number(v) || 0;
   const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del), fav: {}, sing: {} };
   for (const kind of ['fav', 'sing']) {
@@ -82,6 +82,11 @@ const apiMerge = (a, b) => {
       const x = n(A[kind][k]), y = n(B[kind][k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
       if (v) out[kind][k] = v;
     }
+  }
+  for (const k of new Set([...Object.keys(A.roma || {}), ...Object.keys(B.roma || {})])) {
+    const x = (A.roma || {})[k] || {}, y = (B.roma || {})[k] || {};
+    const v = n(y.u) > n(x.u) ? y : x;
+    if (v && v.y) out.roma[k] = v;
   }
   for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
     const x = n(A.known[k]), y = n(B.known[k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
@@ -822,6 +827,66 @@ await page.goto(BASE + '?heal=1#/track/t1', { waitUntil: 'load' });
   await page.locator('#p-close').click().catch(() => {});
   await page.waitForTimeout(300);
 }
+
+// ═══════ 13.2 罗马音纠正（听不准就改：备选 + 自由输入；编辑时暂停，改完继续） ═══════
+await page.goto(BASE + '?roma=1#/track/t1', { waitUntil: 'load' });
+await page.waitForTimeout(1200);
+await page.evaluate(() => {                 // headless 的假 mp3 播不起来：装作"正在播"，钩住 play/pause 调用
+  const a = document.querySelector('audio');
+  window.__calls = [];
+  if (!a.__romahook) {
+    a.__romahook = 1;
+    a.__origPlay = a.play.bind(a); a.__origPause = a.pause.bind(a);
+    a.play = () => { window.__calls.push('play'); return a.__origPlay(); };
+    a.pause = () => { window.__calls.push('pause'); return a.__origPause(); };
+    Object.defineProperty(a, 'paused', { get: () => false, configurable: true });
+  }
+  window.__calls.length = 0;
+});
+await page.locator('#t-sing').click();
+await page.waitForTimeout(1200);
+const rw = await page.evaluate(() => { const el = document.querySelector('#plyric .w[data-w]'); return el ? { s: el.dataset.s, r: el.dataset.r || '' } : null; });
+await page.locator('#plyric .w[data-w]').first().click();
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+await page.locator('#p-roma').click();
+await page.waitForTimeout(400);
+const romaOpen = await page.evaluate(() => ({
+  box: !document.getElementById('p-romabox').hidden,
+  calls: (window.__calls || []).slice(),
+  cands: document.querySelectorAll('#p-romacands button').length,
+  val: (document.getElementById('p-romainput') || {}).value || '',
+}));
+check('改罗马音：编辑器打开并暂停播放', romaOpen.box && romaOpen.calls.includes('pause'), `调用 ${romaOpen.calls.join('/')}`);
+check('给出备选（含训令式等写法）', romaOpen.cands >= 2, `${romaOpen.cands} 个备选 · 当前「${romaOpen.val}」`);
+await page.locator('#p-romacands button').nth(1).click();
+await page.waitForTimeout(200);
+const chosen = await page.locator('#p-romainput').inputValue();
+await page.locator('#p-romasave').click();
+await page.waitForTimeout(900);
+const romaAfter = await page.evaluate((k) => {
+  const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}');
+  const el = [...document.querySelectorAll('#plyric .w')].find((x) => x.dataset.s === k.s);
+  const rEl = el && el.querySelector('.r');
+  return { saved: Object.keys(j.roma || {}).length, shown: rEl ? rEl.textContent.trim() : '', calls: (window.__calls || []).slice() };
+}, rw);
+check('保存后歌词里立刻生效 + 继续播放', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.calls.includes('play'),
+  `存 ${romaAfter.saved} 条 · 显示「${romaAfter.shown}」`);
+// 自定义输入
+await page.locator('#plyric .w[data-w]').first().click();
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+await page.locator('#p-roma').click();
+await page.waitForTimeout(300);
+await page.locator('#p-romainput').fill('my-own-romaji');
+await page.locator('#p-romasave').click();
+await page.waitForTimeout(800);
+const custom = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return Object.values(j.roma || {}).map((x) => x.y); });
+check('也能自己输入罗马音', custom.includes('my-own-romaji'), JSON.stringify(custom).slice(0, 40));
+// 还原 + 刷新后仍在
+await page.reload({ waitUntil: 'load' });
+await page.waitForTimeout(1500);
+const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').roma || {});
+check('刷新后纠正还在（并跟着账号同步）', Object.keys(persisted).length === 1 && Object.values(persisted)[0].y === 'my-own-romaji', JSON.stringify(persisted).slice(0, 60));
+await page.evaluate(() => { const a = document.querySelector('audio'); if (a && a.__romahook) { delete a.paused; a.play = a.__origPlay; a.pause = a.__origPause; delete a.__romahook; } });
 
 // ═══════ 13.5 歌单体检（手动按钮；自动那条每天一次，测试里关掉） ═══════
 await page.goto(BASE + '?plchk=1#/songs', { waitUntil: 'load' });

@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014w';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014x';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -37,12 +37,12 @@
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, rate: 1, ruby: true, gloss: false, zh: true,
+  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, rate: 1, ruby: true, gloss: false, zh: true,
     mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { try { ACC = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch { ACC = null; } };
   const saveAcc = () => { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch {} };
-  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {};
+  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {};
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new'; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} queueSync(); };
@@ -68,6 +68,40 @@
     if (by === 'azd') return arr.sort((a, b) => byTitle(b, a));
     return arr.sort((a, b) => trackTime(b) - trackTime(a) || byTitle(a, b));
   }
+  // ── 罗马音纠正：键 = 表面形|读音，值 {y: 用户写的罗马音, u: 时间戳}（跟着账号同步）──
+  const romaKey = (s, r) => String(s || '') + '|' + String(r || '');
+  const romaOf = (s, r) => {
+    const o = S.roma && S.roma[romaKey(s, r)];
+    return (o && (typeof o === 'object' ? o.y : o)) || '';
+  };
+  function setRoma(s, r, y, drop) {
+    const k = romaKey(s, r);
+    S.roma = S.roma || {};
+    if (drop || !String(y || '').trim()) delete S.roma[k];
+    else S.roma[k] = { y: String(y).trim(), u: Date.now() };
+    save();
+  }
+  /** 备选：赫本（当前）/ 训令式 / 长音不标 等，外加用户已经改过的值 */
+  function romaVariants(surface, reading) {
+    const base = String(kanaRomaji(reading || '') || '').trim();
+    const kana = String(reading || '');
+    const out = [];
+    const push = (v) => { const t = String(v || '').trim(); if (t && !out.includes(t)) out.push(t); };
+    const cur = romaOf(surface, reading);
+    if (cur) push(cur);
+    push(base);
+    push(base.replace(/shi/g, 'si').replace(/chi/g, 'ti').replace(/tsu/g, 'tu').replace(/fu/g, 'hu')
+      .replace(/ji/g, 'zi').replace(/sha/g, 'sya').replace(/shu/g, 'syu').replace(/sho/g, 'syo')
+      .replace(/cha/g, 'tya').replace(/chu/g, 'tyu').replace(/cho/g, 'tyo')
+      .replace(/ja/g, 'zya').replace(/ju/g, 'zyu').replace(/jo/g, 'zyo'));
+    push(base.replace(/ou/g, 'o').replace(/uu/g, 'u'));
+    // 促音（っ）不双写、长音分写等手写习惯
+    push(base.replace(/([bcdfghjklmpqrstvwxyz])\1/g, '$1'));
+    const kanaRoma = { 'し': 'shi', 'ち': 'chi', 'つ': 'tsu', 'ふ': 'fu', 'じ': 'ji' };
+    if (kana && kanaRoma[kana]) push(kanaRoma[kana]);
+    return out.filter(Boolean).slice(0, 6);
+  }
+
   // ── 头像：只存 128×128 的小图（data URL），注册时可传，之后可换 ──
   const avatarHtml = (who, cls) => {
     const a = (who && who.avatar) || '';
@@ -584,7 +618,7 @@
       <div class="revbar"><i style="width:${Math.round(((revI) / revDeck.length) * 100)}%"></i></div>
       <div class="revcard">
         <div class="rw">${esc(v.word)}</div>
-        ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(v.romaji || '')}</div>
+        ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(romaOf(v.word, v.reading) || v.romaji || '')}</div>
           <div class="rm">${esc(meaningOf(v) || '（没有释义）')}</div>
           ${ex ? `<div class="rx">${esc(ex.track || '')}<br>${esc(ex.jp)}${ex.zh ? '<br>' + esc(ex.zh) : ''}</div>` : ''}`
         : '<div class="rr">？</div>'}
@@ -1124,8 +1158,8 @@
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
-    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, a);
-    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, b);
+    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, a);
+    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, b);
     const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
     out.known = {};
     for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
@@ -1147,6 +1181,12 @@
       const v = n0(y.u) > n0(x.u) ? y : x;
       if (v && v.meaning && (n0(v.u) > out.clearedAt || !out.clearedAt)) out.notes[k] = v;
     }
+    out.roma = {};                                     // 罗马音纠正：取时间戳更新的一条
+    for (const k of new Set([...Object.keys(A.roma), ...Object.keys(B.roma)])) {
+      const x = A.roma[k] || {}, y = B.roma[k] || {};
+      const v = n0(y.u) > n0(x.u) ? y : x;
+      if (v && v.y) out.roma[k] = v;
+    }
     out.audio = Object.assign({}, B.audio, A.audio);             // 手册绑定的音频地址：本机优先
     out.del = Object.assign({}, B.del);
     for (const [k, v] of Object.entries(A.del)) out.del[k] = Math.max(n0(out.del[k]), n0(v));
@@ -1160,7 +1200,7 @@
     return out;
   }
   const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {},
-    fav: o.fav || {}, sing: o.sing || {}, clearedAt: n0(o.clearedAt) });
+    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, clearedAt: n0(o.clearedAt) });
 
   /** 合并后多出来的导入曲目，挂进内存里的曲库 */
   function registerImpTracks() {
@@ -1198,7 +1238,7 @@
         await ensureReadings().catch(() => {});
         applying = true;
         S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
-        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing;
+        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing; S.roma = mergedAcc.roma;
         S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();
@@ -1830,7 +1870,7 @@
         ${next ? `<button class="toolbtn" data-go-word="${next.id}">${esc(next.word)} →</button>` : ''}
       </div>
       <div class="sec-title" style="font-size:30px">${esc(v.word)}</div>
-      <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
+      <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(romaOf(v.word, v.reading) || v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
       <div class="bar" style="margin:14px 0 0"><i style="width:${level(v) * 20}%"></i></div>
       <div style="font-size:17px;margin-top:14px;color:#ffe9df" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
       <div class="row" style="margin-top:14px">
@@ -1981,7 +2021,7 @@
           const w = sym ? null : ((sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null);
           const span = document.createElement('span');
           span.className = 'w k-' + sg.k + (w && isKnown(w) ? ' known' : '');
-          const y = sg.y || '';
+          const y = romaOf(sg.s, sg.r) || sg.y || '';
           span.dataset.s = sg.s;
           if (sg.r) span.dataset.r = sg.r;
           if (y) span.dataset.y = y;
@@ -2130,15 +2170,16 @@
   }
 
   // ────────────── 词条弹层 ──────────────
-  let popWord = null, popFallback = null;
+  let popWord = null, popFallback = null, popSeg = null, romaCtx = null, romaWasPlaying = false;
   function showPop(w, fallback, seg) {
     popFallback = fallback || null;
+    popSeg = seg || null;
     const on = (id) => { const el = $(id); if (el) el.style.display = ''; };
     if (!w) {
       const rd = (seg && seg.r) ? norm(seg.r) : '';
       $('p-word').textContent = fallback || '';
       $('p-reading').textContent = rd ? '（' + rd + '）' : '';
-      $('p-romaji').textContent = (seg && seg.y) || '';
+      $('p-romaji').textContent = romaOf(seg && seg.s, seg && seg.r) || (seg && seg.y) || '';
       $('p-meaning').textContent = rd ? '词表未收录' : '词表未收录，也没查到读音';
       $('p-ex').textContent = ''; $('p-meta').textContent = '';
       $('p-known').style.display = 'none'; $('p-goto').style.display = 'none';
@@ -2153,7 +2194,7 @@
     if ($('p-goto')) $('p-goto').style.display = exG && exG.tid ? '' : 'none';
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
-    $('p-romaji').textContent = w.romaji || '';
+    $('p-romaji').textContent = romaOf((seg && seg.s) || w.word, (seg && seg.r) || w.reading) || w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
     const ex = exG;
     $('p-ex').textContent = ex ? `例句（${ex.track}）：${ex.jp}${ex.zh ? ' → ' + ex.zh : ''}` : '';
@@ -2163,7 +2204,21 @@
     $('p-editrow').style.display = 'none';
     $('pop').classList.add('on');
   }
-  const hidePop = () => { const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; } $('pop').classList.remove('on'); };
+  /** 关弹层：顺手把罗马音编辑器收起来，编辑时停掉的播放继续 */
+  const hidePop = () => {
+    const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; }
+    closeRomaEditor();
+    $('pop').classList.remove('on');
+  };
+  function closeRomaEditor() {
+    const box = $('p-romabox'); if (box) box.hidden = true;
+    romaCtx = null;
+    if (romaWasPlaying) { romaWasPlaying = false; if (curTrack) playTrack(curTrack); }
+  }
+  function refreshLyricsNow() {
+    if (!curTrack) return;
+    renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true);
+  }
 
   // ────────────── 路由 ──────────────
   const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-me', 'view-admin', 'view-word', 'view-track', 'view-search', 'view-review'];
@@ -2286,6 +2341,42 @@
     $('p-editinput').onkeydown = (e) => { if (e.key !== 'Enter' || !popWord) return; S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: e.target.value.trim(), u: Date.now() }); save(); showPop(popWord); };
     $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) renderLyrics($('plyric'), curTrack); };
     $('p-more').onclick = () => { const b = $('p-morebox'); if (b) b.hidden = !b.hidden; };
+    // ── 罗马音纠正：打开时暂停播放，保存/关闭后继续 ──
+    const romaTarget = () => {
+      const seg = popSeg, w = popWord;
+      const surface = (seg && seg.s) || (w && w.word) || '';
+      const reading = (seg && seg.r) || (w && w.reading) || '';
+      return surface ? { surface, reading, seg, w } : null;
+    };
+    $('p-roma').onclick = () => {
+      const t = romaTarget(); if (!t) return;
+      romaCtx = t;
+      romaWasPlaying = !audio.paused && !!audio.src;
+      if (romaWasPlaying) audio.pause();
+      const box = $('p-romabox'); if (box) box.hidden = false;
+      $('p-romainput').value = romaOf(t.surface, t.reading) || (t.seg && t.seg.y) || (t.w && t.w.romaji) || '';
+      const cands = romaVariants(t.surface, t.reading);
+      $('p-romacands').innerHTML = cands.map((v) => `<button class="chip" data-r="${esc(v)}">${esc(v)}</button>`).join('')
+        + (cands.length ? '' : '<span class="meta">这个词没有读音可推，直接手写吧</span>');
+      $('p-romacands').querySelectorAll('[data-r]').forEach((el) => (el.onclick = () => { $('p-romainput').value = el.dataset.r; }));
+      $('p-romainput').focus();
+    };
+    const saveRoma = (drop) => {
+      if (!romaCtx) return;
+      setRoma(romaCtx.surface, romaCtx.reading, drop ? '' : $('p-romainput').value, drop);
+      const keepPlaying = romaWasPlaying;
+      romaWasPlaying = false;
+      const box = $('p-romabox'); if (box) box.hidden = true;
+      romaCtx = null;
+      refreshLyricsNow();
+      if (popWord || popSeg) showPop(popWord, popFallback, popSeg);
+      else hidePop();
+      if (keepPlaying && curTrack) playTrack(curTrack);
+      toast(drop ? '已还原' : '罗马音已更新');
+    };
+    $('p-romasave').onclick = () => saveRoma(false);
+    $('p-romareset').onclick = () => saveRoma(true);
+    $('p-romainput').onkeydown = (e) => { if (e.key === 'Enter') saveRoma(false); };
     $('p-goto').onclick = () => {
       if (!popWord) return;
       const ex = examplesFor(popWord, 1)[0];

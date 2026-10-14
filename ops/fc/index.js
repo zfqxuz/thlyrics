@@ -152,8 +152,8 @@ const INDEX_KEY = `${PREFIX}_index.json`;
 // ─────────── 记录合并（和时间戳规则同前端：谁改得晚听谁的） ───────────
 const n0 = (v) => (Number(v) || 0);
 function mergeStates(a, b) {
-  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, a || {});
-  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, b || {});
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, b || {});
   const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
   out.known = {};
   for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
@@ -174,6 +174,12 @@ function mergeStates(a, b) {
     const x = A.notes[k] || {}, y = B.notes[k] || {};
     const v = n0(y.u) > n0(x.u) ? y : x;
     if (v && v.meaning && (n0(v.u) > out.clearedAt || !out.clearedAt)) out.notes[k] = v;
+  }
+  out.roma = {};                                    // 罗马音纠正
+  for (const k of new Set([...Object.keys(A.roma), ...Object.keys(B.roma)])) {
+    const x = A.roma[k] || {}, y = B.roma[k] || {};
+    const v = n0(y.u) > n0(x.u) ? y : x;
+    if (v && v.y) out.roma[k] = v;
   }
   out.audio = Object.assign({}, B.audio, A.audio);
   out.del = Object.assign({}, B.del);

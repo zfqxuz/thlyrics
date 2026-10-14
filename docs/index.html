@@ -467,8 +467,18 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   <div class="acts">
     <button class="k" id="p-known">标为已掌握</button>
     <button id="p-goto">去这句</button>
+    <button id="p-roma">罗马音</button>
     <button id="p-more">更多</button>
     <button id="p-close2">关闭</button>
+  </div>
+  <div id="p-romabox" hidden>
+    <div class="meta" style="margin-top:10px">听不准就改：下面几个是备选，也可以自己写（改完立刻生效）</div>
+    <div class="row" id="p-romacands" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:8px">
+      <input class="sel" id="p-romainput" style="flex:1;min-width:140px;height:36px" placeholder="罗马音" autocomplete="off">
+      <button class="toolbtn on" id="p-romasave">保存</button>
+      <button class="toolbtn" id="p-romareset">还原</button>
+    </div>
   </div>
   <div id="p-morebox" hidden>
     <div class="mt" id="p-ex"></div>
@@ -485,6 +495,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js?v=20261014w"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script src="app.js?v=20261014x"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
