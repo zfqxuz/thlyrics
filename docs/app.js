@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015p';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015q';
 
 (() => {
   'use strict';
@@ -175,6 +175,53 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // 已掌握记的是时间戳：正数=标了，负数=明确取消（云端合并时按时间戳取胜，不会被旧数据顶回来）
   const isKnown = (w) => !!(w && Number(S.known[w.id]) > 0);
   const meaningOf = (w) => (w && ((S.notes[w.id] && S.notes[w.id].meaning) || w.meaning)) || '';
+
+  // ── 逐词中文（词级对照）──
+  // 踩过的坑：助词/助动词不能用词表兜底。词表里为「汉字词」都建了假名活用形索引，
+  // 纯假名的「は/から/た/し/な」于是被认成「歯/空/田/詩/名」——用户看到的逐词中文全错。
+  // 现在：实词查词表（只认含汉字的活用形 + 词典形），助词/助动词改查下面这张人工语法小表。
+  const GRAM = {
+    'の': '的；所属', 'に': '朝向・时间・对象', 'を': '提示宾语', 'て': '连接（并列/继续）',
+    'は': '提示主题', 'た': '过去・完成', 'が': '提示主语', 'も': '也', 'で': '地点・手段',
+    'ない': '否定', 'なく': '不…（否定连用）', 'な': '啊（感叹/禁止）', 'と': '和；引用',
+    'よ': '提示对方', 'だ': '是（断定）', 'う': '意志・推量', 'か': '疑问',
+    'から': '从…；因为', 'まで': '到…为止', 'さ': '语气（随意）', 'や': '和（列举）',
+    'だけ': '只，仅', 'へ': '朝向', 'ね': '吧（求认同）', 'ば': '如果…就', 'ぬ': '不（＝ない）',
+    'なら': '如果是…', 'じゃ': '那么；不是', 'ず': '不…（书面）', 'でも': '可是；连…也',
+    'たい': '想…', 'さえ': '连…都', 'すら': '连…都', 'として': '作为…', 'だろ': '大概…吧',
+    'だろう': '大概…吧', 'でしょ': '大概…吧', 'でしょう': '大概…吧', 'より': '比…；从…',
+    'だって': '因为；就连…', 'なんて': '之类的', 'など': '等等', 'こそ': '正是',
+    'ます': '礼貌体', 'わ': '语气（柔和）', 'たら': '如果…就', 'れば': '如果…就',
+    'だっ': '是（过去）', 'のに': '明明…却', 'けど': '虽然…但', 'って': '引用；主题',
+    'しか': '只（接否定）', 'ましょ': '礼貌意志', 'たり': '又…又…', 'かしら': '…吧',
+    'という': '叫做…', 'べき': '应该…', 'ほど': '程度；越…越…', 'ちゃ': '…了（口语）',
+    'なきゃ': '必须…', 'なくちゃ': '必须…', 'ん': '说明语气', 'ても': '即使…也',
+    'ながら': '一边…一边', 'ので': '因为', 'みたい': '像…一样', 'らしい': '好像…',
+    'よう': '意志・推量', 'そう': '好像；那样', 'てる': '正在…', 'ている': '正在…',
+    'れる': '被动・可能', 'られる': '被动・可能', 'せる': '使役', 'させる': '使役',
+  };
+  const CONTENT_KIND = { n: 1, v: 1, a: 1, na: 1, adv: 1, int: 1, conj: 1, rent: 1, pref: 1 };
+  /** 这个词位配哪个词条：先按词典形查（最准），查不到再按表面形兜底（只认实词） */
+  function wordForSeg(sg) {
+    if (!sg || !sg.s || sg.k === 'sym') return null;
+    if (sg.w && sg.b) { const v = VBY.get(sg.b); if (v) return v; }
+    if (!CONTENT_KIND[sg.k]) return null;          // 助词/助动词不查词表：假名撞车全在这
+    const v = SURF.get(sg.s) || null;
+    if (!v) return null;
+    // 表面形兜底还要「读得通」：同形不同词的（一个「名」可能是 な/めい）宁可少显示也不张冠李戴
+    const r = norm(sg.r || '');
+    const f = (v.forms || {})[sg.s];
+    const want = norm((f && (f.readingHira || f.reading)) || v.reading || '');
+    if (r && want && want !== r && !want.startsWith(r) && !r.startsWith(want)) return null;
+    return v;
+  }
+  /** 词下那一行中文：实词=词表释义（人工改过的优先），助词/助动词=语法小表；都没有就不占位 */
+  const glossOf = (sg, w) => {
+    const g = (w && meaningOf(w)) || '';
+    if (g && g.length <= 14 && !(w && w.meaningCheck)) return g;
+    const gram = (sg && (sg.k === 'prt' || sg.k === 'aux')) ? GRAM[sg.s] : '';
+    return (gram && gram.length <= 12) ? gram : '';
+  };
   const toggleKnown = (w) => { if (!w) return; if (isKnown(w)) S.known[w.id] = -Date.now(); else S.known[w.id] = Date.now(); save(); };
 
   // 旧版本往 IndexedDB 绑过本机音频文件，功能已下线：开机清一次，别留垃圾
@@ -226,7 +273,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
 
   let stationNid = null, seekTime = null, prepToken = 0, posSavedAt = 0, healing = false;
   const setNow = (t) => { const el = $('p-now'); if (el) el.textContent = t; };
-  const setState = (t) => { const el = $('p-state'); if (el) el.textContent = t || ''; };
+  const setState = (t) => {
+    const el = $('p-state'); if (el) el.textContent = t || '';
+    const p2 = $('p-state2');                  // 迷你条那条状态在跟唱页看不见，这里再显示一份（占位固定，不顶歌词）
+    if (p2) p2.textContent = t || '';
+  };
   function setLoad(on, text) {
     document.body.classList.toggle('loading', !!on);
     const b = $('playbtn');
@@ -279,16 +330,29 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     return url;
   }
 
-  /** 媒体键的「上一首/下一首」：按曲库当前排序走（跟曲库页顺序一致，跟界面筛选无关） */
-  function stepTrack(dir) {
-    const list = sortTracks(IDX.tracks.slice());
-    if (!list.length) return;
+  /** 有没有可播的音源（自动切歌时跳过「无音源」的曲目，别停在一首放不响的歌上） */
+  const hasAudio = (t) => !!(t && (t.audioOss || t.audio || (S.audio || {})[t.id]));
+
+  /** 上一首/下一首：按「播放顺序」走 —— 顺序=不回头（到头停）、循环=绕圈、随机=乱跳
+   *  顺序与筛选无关，跟曲库当前排序一致（用户要的是"整张列表顺序播放"） */
+  function stepTrack(dir, opts = {}) {
+    let list = sortTracks(IDX.tracks.slice());
+    if (opts.skipUnplayable) list = list.filter(hasAudio);
+    if (!list.length) return null;
     const i = curTrack ? list.findIndex((t) => t.id === curTrack.id) : -1;
-    const n = i < 0 ? (dir > 0 ? 0 : list.length - 1) : (i + dir + list.length) % list.length;
-    const t = list[n];
-    if (!t || (curTrack && t.id === curTrack.id)) return;
+    let t = null;
+    if (playOrder === 'shuffle' && list.length > 1) {
+      for (let k = 0; k < 24 && !t; k++) { const n = Math.floor(Math.random() * list.length); if (n !== i) t = list[n]; }
+    } else {
+      let n = i < 0 ? (dir > 0 ? 0 : list.length - 1) : i + dir;
+      const wrap = opts.wrap !== false;                   // 手动切歌永远绕圈；自动播完由调用方决定
+      if (n < 0 || n >= list.length) { if (!wrap) return null; n = (n + list.length) % list.length; }
+      t = list[n];
+    }
+    if (!t || (curTrack && t.id === curTrack.id)) return null;
     go('#/track/' + t.id);                       // 进去就自动起播（showTrack 里已经这么做）
-    toast((dir > 0 ? '下一首：' : '上一首：') + t.title);
+    if (!opts.silent) toast((dir > 0 ? '下一首：' : '上一首：') + t.title);
+    return t;
   }
 
   /** 沙盒里没人认领的本机音频：解绑/删曲目后留下的副本，开机清一次 */
@@ -429,6 +493,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     // （踩过：不清的话「续播」会把 20 秒的曲子直接跳到结尾，看起来像坏了）
     audio.addEventListener('ended', () => {
       if (curTrack && S.pos && S.pos[curTrack.id] != null) { delete S.pos[curTrack.id]; save(); }
+      if (mode === 'loop') return;              // 单句循环：frame() 会自己回卷，不会走到这
+      advanceTrack();                           // 全曲：按「顺序/循环/随机」接着放
     });
     // 记住听到哪：每 3 秒落一次，下次进这首歌从这儿继续
     audio.addEventListener('timeupdate', () => {
@@ -445,14 +511,42 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // ────────────── 单句循环 / 播放帧 ──────────────
   let curTrack = null, curLines = [], loopLine = null, raf = null;
   let activeLine = -1;                               // 由播放进度推出的"当前句"
-  let mode = (S.mode === 'loop') ? 'loop' : 'all';   // 整首 / 单句循环
+  let mode = (S.mode === 'loop') ? 'loop' : 'all';   // 全曲 / 单句循环
   const lineEnd = (i) => (curLines[i + 1] && curLines[i + 1].t != null) ? curLines[i + 1].t : null;
+
+  // ── 播放顺序：顺序 / 循环 / 随机（用户要求补的三档；跟「单句/全曲」是两个维度）──
+  const ORDERS = ['seq', 'loop', 'shuffle'];
+  const ORDER_NAME = { seq: '顺序', loop: '循环', shuffle: '随机' };
+  const ORDER_ICON = { seq: '→', loop: '↻', shuffle: '⤨' };
+  let playOrder = ORDERS.includes(S.order) ? S.order : 'seq';
+  function applyOrder(quiet) {
+    if (S.order !== playOrder) { S.order = playOrder; save(); }
+    const t = $('p-order-t'); if (t) t.textContent = ORDER_NAME[playOrder];
+    const ic = $('p-order-ic'); if (ic) ic.textContent = ORDER_ICON[playOrder];
+    const b = $('p-order'); if (b) { b.classList.toggle('on', playOrder !== 'seq'); b.title = '播放顺序：' + ORDER_NAME[playOrder] + '（点一下换下一档）'; }
+    if (!quiet) setState('播放顺序：' + ORDER_NAME[playOrder]);
+  }
+  function setOrder(o, quiet) { playOrder = ORDERS.includes(o) ? o : 'seq'; applyOrder(quiet); }
+  const cycleOrder = () => { setOrder(ORDERS[(ORDERS.indexOf(playOrder) + 1) % ORDERS.length]); };
+
+  /** 一首放完 → 按播放顺序接着放（顺序：到头就停；循环：回到第一首；随机：随便挑一首） */
+  function advanceTrack() {
+    const t = stepTrack(1, { wrap: playOrder === 'loop', skipUnplayable: true, silent: true });
+    if (!t) setState('播放完了 · 点下一首或换一首继续');
+  }
+
+  function applyControls() {
+    const a = $('m-all'), l = $('m-loop'), sc = $('p-scope');
+    if (a) a.classList.toggle('on', mode !== 'loop');
+    if (l) l.classList.toggle('on', mode === 'loop');
+    if (sc) sc.setAttribute('aria-checked', mode === 'loop' ? 'true' : 'false');
+    applyOrder(true);
+  }
 
   function setMode(m) {
     mode = m === 'loop' ? 'loop' : 'all';
     S.mode = mode; save();
-    $('m-all').classList.toggle('on', mode === 'all');
-    $('m-loop').classList.toggle('on', mode === 'loop');
+    applyControls();
     const mb = $('mb-loop'); if (mb) mb.hidden = mode !== 'loop';
     if (mode === 'loop') {
       if (loopLine == null || !curLines[loopLine]) {
@@ -486,8 +580,10 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     }
     return idx;
   };
+  /** 当前句：单句模式下是循环那句，否则是播放进度推出来的那句（和 highlight 同一口径） */
+  const curLineIdx = () => (mode === 'loop' && loopLine != null) ? loopLine : activeLine;
   function highlight(scroll) {
-    const on = (mode === 'loop' && loopLine != null) ? loopLine : activeLine;
+    const on = curLineIdx();
     document.querySelectorAll('.lblock[data-i]').forEach((el) => el.classList.toggle('playing', Number(el.dataset.i) === on));
     const pl = $('plyric'); if (pl) pl.classList.toggle('has-active', on >= 0);
     if (!scroll) return;
@@ -2162,7 +2258,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
             continue;
           }
           const sym = sg.k === 'sym';
-          const w = sym ? null : ((sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null);
+          const w = sym ? null : wordForSeg(sg);
           const span = document.createElement('span');
           span.className = 'w k-' + sg.k + (w && isKnown(w) ? ' known' : '');
           const y = romaOf(t.id, i, ti) || sg.y || '';
@@ -2177,8 +2273,13 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
           // 有读音的词会被顶下去、没读音的浮在上面 —— 看起来就是「歌词一上一下」
           if (ruby) { const ri = document.createElement('i'); ri.className = 'r'; ri.textContent = y; span.appendChild(ri); }
           span.appendChild(document.createTextNode(sg.s));
-          const g = meaningOf(w);
-          if (g && g.length <= 14) { const gi = document.createElement('i'); gi.className = 'g'; gi.textContent = g; span.appendChild(gi); }
+          const g = glossOf(sg, w);
+          if (g) {
+            const gi = document.createElement('i');
+            gi.className = 'g' + (w ? '' : ' g-gram');        // 语法小表来的单独标一下（视觉上能区分）
+            gi.textContent = g;
+            span.appendChild(gi);
+          }
           line.appendChild(span);
           flat.push(y || sg.s);
         }
@@ -2201,11 +2302,20 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     host.addEventListener('click', (e) => {
       const wEl = e.target.closest('.w');
       if (wEl && !wEl.dataset.plain) {
-        // 点别的词 = 直接切过去看那个词（查词顺手）；要关就点抽屉外、下拉、或 ✕
-        const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
         const blk = e.target.closest('.lblock[data-i]');
-        showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '',
-          li: blk ? Number(blk.dataset.i) : null, ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
+        const li = blk ? Number(blk.dataset.i) : null;
+        const cur = curLineIdx();
+        // 词只认「当前这一句」：点别的句里的词 = 先切到那一句，不弹词条（用户要求：
+        // 想查别的句的词，先把那句切过来）
+        if (li != null && cur >= 0 && li !== Number(cur)) {
+          playFrom(li);
+          toast('已切到这一句 · 再点词看释义');
+          return;
+        }
+        // 同一句里点别的词 = 直接切过去看那个词（查词顺手）；要关就点抽屉外、下拉、或 ✕
+        const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
+        showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '', li,
+          ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
         return;
       }
       const b = e.target.closest('.lblock[data-i]');
@@ -2271,6 +2381,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
     $('b-back').onclick = () => history.length > 1 ? history.back() : go('#/songs');
     $('p-title').textContent = t.title; $('p-artist').textContent = t.artist + ' · ' + t.album;
+    const pc = $('p-cover');                       // 全屏页头部也给一张封面，别只有一行字
+    if (pc) {
+      const psrc = t.coverFile ? 'data/' + t.coverFile : httpsImg(t.coverUrl);
+      if (psrc) { pc.src = psrc; pc.hidden = false; } else { pc.removeAttribute('src'); pc.hidden = true; }
+    }
     const mbCover = $('mb-cover');
     if (mbCover) {
       const src = t.coverFile ? 'data/' + t.coverFile : httpsImg(t.coverUrl);
@@ -2283,8 +2398,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
     if ($('p-nosrc')) $('p-nosrc').hidden = !!(t.audioOss || t.audio || S.audio[t.id]);
     activeLine = -1; loopLine = null;
-    $('m-all').classList.toggle('on', mode === 'all');
-    $('m-loop').classList.toggle('on', mode === 'loop');
+    applyControls();
     if (!raf) raf = requestAnimationFrame(frame);
     renderLyrics($('plyric'), t); bindLyrics($('plyric'));   // 先进跟唱页时就绪，不白屏
     prepAudio(t);
@@ -2432,7 +2546,13 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (Object.keys(S.imp || {}).length) await ensureReadings();
     VBY = new Map(VOCAB.map((w) => [w.word, w]));
     VBYID = new Map(VOCAB.map((w) => [w.id, w]));
-    for (const w of VOCAB) { SURF.set(w.word, w); for (const f of Object.keys(w.forms || {})) if (!SURF.has(f)) SURF.set(f, w); }
+    for (const w of VOCAB) {
+      SURF.set(w.word, w);
+      // 只收「含汉字」的活用形：forms 里还塞着纯假名的读音（歯→は、田→た、空→から、詩→し），
+      // 以前一并当表面形建索引 → 助词「は／から／た」被认成「牙齿／天空／田地」，
+      // 逐词中文全是错的（用户反馈「中文逐字对照翻译准确性很差」的根因就是这个）
+      for (const f of Object.keys(w.forms || {})) if (/[\u4e00-\u9fff]/.test(f) && !SURF.has(f)) SURF.set(f, w);
+    }
     TRACK = new Map(data.tracks.map((t) => [t.id, t]));
     buildDict();
     for (const rec of Object.values(S.imp || {})) {
@@ -2467,13 +2587,14 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     setupKeyboardAwareSheet();
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();
-    $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('整首播放'); };
+    $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('已退出单句循环'); };
     $('p-close').onclick = () => $('player').classList.remove('on');
     $('p-play').onclick = () => togglePlay();
     $('p-prev').onclick = () => step(-1);
     $('p-next').onclick = () => step(1);
-    $('m-all').onclick = () => setMode('all');
-    $('m-loop').onclick = () => setMode('loop');
+    // 单句 / 全曲：合成一个开关，点一下换边（两个半区都看得见当前是哪一档）
+    $('p-scope').onclick = () => { const to = mode === 'loop' ? 'all' : 'loop'; setMode(to); toast(to === 'loop' ? '单句循环' : '全曲播放'); };
+    $('p-order').onclick = () => cycleOrder();
     $('b-display').onclick = (e) => { e.stopPropagation(); const b = $('displaybox'); b.classList.toggle('on'); };
     $('b-gloss').onclick = () => { S.gloss = S.gloss === false; save(); applyDisplay(); };
     $('b-zh').onclick = () => { S.zh = S.zh === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
@@ -2487,6 +2608,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       toast('语速 ' + r.toFixed(1) + 'x');
     };
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
+    applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
     $('p-speak').onclick = () => speak(popWord ? popWord.word : popFallback);
     $('p-close2').onclick = hidePop;
@@ -2567,7 +2689,14 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const pop = $('pop');
       if (!pop || !pop.classList.contains('on')) return;
       if (e.target.closest('#pop')) return;
-      if (e.target.closest('.w')) return;
+      const wEl = e.target.closest('.w');
+      if (wEl && !wEl.dataset.plain) {
+        // 只有「当前这一句里的词」才允许换成它（同句查词顺手）；别的句的词一律先关抽屉
+        const blk = wEl.closest('.lblock[data-i]');
+        const li = blk ? Number(blk.dataset.i) : null;
+        const cur = curLineIdx();
+        if (li != null && cur >= 0 && li === Number(cur)) return;
+      }
       hidePop();
       e.stopPropagation();
       e.preventDefault();
@@ -2603,6 +2732,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       if (e.key === 'ArrowDown') step(1);
       if (e.key === 'ArrowUp') step(-1);
       if (e.key === 'l' || e.key === 'L') setMode(mode === 'loop' ? 'all' : 'loop');
+      if (e.key === 'o' || e.key === 'O') cycleOrder();
       if (e.key === 'Escape') { $('player').classList.remove('on'); hidePop(); }
     });
     $('p-nosrc').onclick = () => {

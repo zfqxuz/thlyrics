@@ -258,6 +258,23 @@ page.on('crash', () => errors.push('渲染进程崩溃'));
 const txt = (sel) => page.locator(sel).textContent();
 const shot = async (n, keep) => { if (!keep) { await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(420); } else await page.waitForTimeout(450); await page.screenshot({ path: path.join(SHOTS, n + '.png') }); };
 const idxOf = () => page.evaluate(() => { const el = document.querySelector('#plyric .lblock.playing, #plyric .lblock.playing'); return el ? Number(el.dataset.i) : -1; });
+// 把某一"句"变成当前句：双击 = 单句循环，loopLine 是稳定的，不受音频长度影响
+const focusLine = async (i) => {
+  const loc = page.locator(`#plyric .lblock[data-i="${i}"]`);
+  await loc.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(200);
+  await loc.dblclick({ position: { x: 6, y: 6 }, timeout: 8000 });
+  await page.waitForTimeout(350);
+};
+// 点「当前这一句」里的第 n 个词（新契约：词只认当前句；别的句要先切过去）
+const tapCurWord = async (n = 0) => {
+  const loc = page.locator('#plyric .lblock.playing .w:not([data-plain])');
+  const cnt = await loc.count();
+  if (!cnt) return false;
+  await loc.nth(Math.min(n, cnt - 1)).click({ timeout: 8000 });
+  await page.waitForTimeout(350);
+  return true;
+};
 const tapLine = async (host, i, opts = {}) => {
   const loc = page.locator(`${host} .lblock[data-i="${i}"]`);
   await loc.evaluate((el) => el.scrollIntoView({ block: 'center' }));
@@ -342,7 +359,7 @@ await goBtn.click();
 await page.waitForSelector('#view-track', { timeout: 8000 });
 await page.waitForTimeout(700);
 check('「去这句」进入单曲并开始单句循环', (await idxOf()) >= 0, '高亮第 ' + (await idxOf()) + ' 句');
-check('循环时模式芯片显示「单句循环」', (await page.locator('#m-loop.on').count() > 0), (await txt('#p-mode')) || '');
+check('循环时模式开关切到「单句」', (await page.locator('#m-loop.on').count() > 0), (await txt('#p-scope')) || '');
 check('「去这句」直接把全屏跟唱页拉起来', await page.locator('#player.on').count() > 0);
 await page.locator('#p-close').click();          // 收起全屏页，继续测单曲页本体
 await page.waitForTimeout(450);
@@ -403,7 +420,7 @@ const ha = await page.evaluate(() => [...document.querySelectorAll('#plyric .lbl
 check('切当前句时所有歌词块高度不变（不再上下跳）', hb.length === ha.length && hb.every((h, i) => h === ha[i]), `块数 ${hb.length}→${ha.length} · 切句前 ${[...new Set(hb)].join('/')} → 切句后 ${[...new Set(ha)].join('/')}`);
 
 // ═══════ 6 播放交互：点句=继续播、双击=单句循环 ═══════
-await page.locator('#m-all').click();          // 先切回「整首」，再验点句子的行为
+if (await page.locator('#m-loop.on').count()) await page.locator('#p-scope').click();   // 先切回「全曲」，再验点句子的行为
 await page.waitForTimeout(300);
 const lines = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock[data-i]')].map((e) => Number(e.dataset.i)));
 const pick = lines[4];
@@ -426,6 +443,66 @@ check('循环开着时迷你条给出「一键退出」', await page.locator('#m
 await page.locator('#mb-loop').click();     // 一键退出循环
 await page.waitForTimeout(300);
 check('循环可一键关掉', (await page.locator('#m-all.on').count() > 0) && (await page.locator('#mb-loop').isHidden()), '整首点亮=' + (await page.locator('#m-all.on').count()));
+
+// ═══════ 6.5 播放顺序：顺序 / 循环 / 随机（放完一首自动接下一首） ═══════
+const orderLabel = () => txt('#p-order-t');
+const tapOrder = async () => { await page.locator('#p-order').click(); await page.waitForTimeout(250); };
+const setOrderTo = async (name) => { for (let i = 0; i < 4; i++) { if (((await orderLabel()) || '').trim() === name) return; await tapOrder(); } };
+const fireEnded = async () => { await page.evaluate(() => document.querySelector('audio').dispatchEvent(new Event('ended'))); await page.waitForTimeout(1300); };
+const curTid = () => page.evaluate(() => String(location.hash).replace('#/track/', '').split('@')[0]);
+const ensurePlayer = async () => { if (!(await page.locator('#player.on').count())) { await page.locator('#mb-meta').click(); await page.waitForTimeout(450); } };
+
+await page.locator('#mb-meta').click();           // 顺序控件在全屏跟唱页里
+await page.waitForTimeout(500);
+await ensurePlayer(); await setOrderTo('顺序');
+const labels = [(await orderLabel() || '').trim()];
+await tapOrder(); labels.push(((await orderLabel()) || '').trim());
+await tapOrder(); labels.push(((await orderLabel()) || '').trim());
+check('播放顺序一个键换三档：顺序 → 循环 → 随机', labels.join(' → ') === '顺序 → 循环 → 随机', labels.join(' → '));
+
+// 曲库顺序（DOM 顺序 = sortTracks 顺序）+ 哪些真有音源（stepTrack 会自动跳过无音源的）
+await page.locator('#p-close').click();
+await page.waitForTimeout(300);
+await page.evaluate(() => { location.hash = '#/songs'; });
+await page.waitForTimeout(900);
+const libOrder = await page.evaluate(() => [...document.querySelectorAll('#list .track')].map((e) => ({ id: e.dataset.id, audio: /有声/.test(e.textContent) })));
+const playableOrder = libOrder.filter((x) => x.audio).map((x) => x.id);
+check('曲库里有可播曲目（顺序测试的前提）', playableOrder.length >= 2, playableOrder.length + ' 首有声');
+
+// 顺序：放完接下一首（不回头）
+await page.evaluate((id) => { location.hash = '#/track/' + id; }, playableOrder[0]);
+await page.waitForTimeout(1500);
+await ensurePlayer(); await setOrderTo('顺序');
+const seqBefore = await curTid();
+await fireEnded();
+const seqAfter = await curTid();
+check('顺序档：放完自动接下一首', !!seqAfter && seqAfter !== seqBefore, `${seqBefore} → ${seqAfter}`);
+
+// 随机：放完换到别的曲目（不是原地重播）
+await ensurePlayer(); await setOrderTo('随机');
+let shBefore = await curTid(), shAfter = shBefore;
+for (let i = 0; i < 4 && shAfter === shBefore; i++) { await fireEnded(); shAfter = await curTid(); }
+check('随机档：放完换到别的曲目', !!shAfter && shAfter !== shBefore, `${shBefore} → ${shAfter}`);
+
+// 循环：最后一首放完绕回曲库
+const lastId = playableOrder[playableOrder.length - 1];
+await page.evaluate((id) => { location.hash = '#/track/' + id; }, lastId);
+await page.waitForTimeout(1500);
+await ensurePlayer(); await setOrderTo('循环');
+await fireEnded();
+const loopAfter = await curTid();
+check('循环档：最后一首放完绕回曲库（不回头）', loopAfter !== lastId, `${lastId} → ${loopAfter}`);
+
+// 顺序档在最后一首就该停住（不绕圈）
+await page.evaluate((id) => { location.hash = '#/track/' + id; }, lastId);
+await page.waitForTimeout(1500);
+await ensurePlayer(); await setOrderTo('顺序');
+await fireEnded();
+check('顺序档：最后一首放完就停（不绕圈）', (await curTid()) === lastId, `停在 ${await curTid()}`);
+
+check('测试后回到「顺序」，不影响后续用例', ((await orderLabel()) || '').trim() === '顺序', await orderLabel());
+await page.locator('#p-close').click();               // 收好全屏页，后面的用例要用迷你条
+await page.waitForTimeout(400);
 
 // ═══════ 7 迷你播放条 + 全屏跟唱页 ═══════
 check('迷你播放条已出现', await page.locator('#minibar.on').count() > 0);
@@ -455,7 +532,7 @@ const r1 = await page.evaluate(() => document.querySelector('audio').playbackRat
 check('倍速切换生效', r0 !== r1, r0 + 'x → ' + r1 + 'x');
 await page.locator('#b-display').click();      // 收起抽屉
 await page.waitForTimeout(200);
-await page.locator('#m-loop').click();          // 单句循环现在只有播放条上那一个分段控件
+await page.locator('#p-scope').click();         // 单句/全曲是同一个开关：点一下换到「单句」
 await page.waitForTimeout(200);
 const i0 = await idxOf();
 await page.locator('#p-next').click(); await page.waitForTimeout(350);
@@ -904,13 +981,26 @@ await page.waitForTimeout(1000);
 await page.evaluate(async () => { const a = document.querySelector('audio'); a.src = '/_test-tone.wav'; await a.play().catch(() => {}); });
 await page.waitForTimeout(700);
 check('测试音源真的在播（后续暂停才有意义）', await page.evaluate(() => !document.querySelector('audio').paused), 'paused=false');
-const rw = await page.evaluate(() => {          // 挑一个能推出多种写法的词（含 し/ち/つ/ふ/じ）
-  const els = [...document.querySelectorAll('#plyric .w[data-w]')];
-  const i = els.findIndex((x) => /[しちつふじシチツフジ]/.test(x.dataset.r || ''));
-  const el = els[i >= 0 ? i : 0];
-  return el ? { i: i >= 0 ? i : 0, s: el.dataset.s, r: el.dataset.r || '' } : null;
+const linePick = await page.evaluate(() => {    // 找一句里有「能推出多种写法」的词（含 し/ち/つ/ふ/じ）
+  const blocks = [...document.querySelectorAll('#plyric .lblock[data-i]')];
+  for (const b of blocks) {
+    const ws = [...b.querySelectorAll('.w[data-w]')];
+    const i = ws.findIndex((x) => /[しちつふじシチツフジ]/.test(x.dataset.r || ''));
+    if (i >= 0) return { li: Number(b.dataset.i), i, s: ws[i].dataset.s, r: ws[i].dataset.r || '' };
+  }
+  const first = blocks.find((b) => b.querySelector('.w[data-w]'));
+  const w = first && first.querySelector('.w[data-w]');
+  return first ? { li: Number(first.dataset.i), i: 0, s: w.dataset.s, r: w.dataset.r || '' } : null;
 });
-await page.locator('#plyric .w[data-w]').nth(rw ? rw.i : 0).click();
+if (linePick) await focusLine(linePick.li);    // 双击那一句 = 切到它（也顺带开了单句循环，当前句就稳定了）
+const rw = await page.evaluate(() => {          // 以「当前句」里的词为准重新挑一次（挑到 = 等下点到）
+  const els = [...document.querySelectorAll('#plyric .lblock.playing .w[data-w]')];
+  if (!els.length) return null;
+  const k = els.findIndex((x) => /[しちつふじシチツフジ]/.test(x.dataset.r || ''));
+  const i = k >= 0 ? k : 0;
+  return { i, s: els[i].dataset.s, r: els[i].dataset.r || '' };
+});
+await page.locator('#plyric .lblock.playing .w[data-w]').nth(rw ? rw.i : 0).click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.waitForTimeout(300);
 const popOpenPaused = await page.evaluate(() => document.querySelector('audio').paused);
@@ -1219,15 +1309,35 @@ await page.evaluate(() => { const el = document.querySelector('.item.track'); if
 await page.waitForTimeout(1600);
 await page.evaluate(() => { const b = document.getElementById('t-sing'); if (b) b.click(); });   // 进跟唱页，歌词在 #plyric 里
 await page.waitForSelector('#plyric .w', { timeout: 8000 });
-await page.locator('#plyric .w').first().click();
+const firstLineWithWord = await page.evaluate(() => {
+  const b = [...document.querySelectorAll('#plyric .lblock[data-i]')].find((x) => x.querySelector('.w:not([data-plain])'));
+  return b ? Number(b.dataset.i) : null;
+});
+if (firstLineWithWord != null) await focusLine(firstLineWithWord);
+await tapCurWord(0);
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 const openA = await page.evaluate(() => document.getElementById('pop').classList.contains('on'));
 const wordA = await page.evaluate(() => document.getElementById('p-word').textContent);
-await page.locator('#plyric .w').nth(1).click();          // 点另一个词 → 直接切过去
-await page.waitForTimeout(400);
+await tapCurWord(1);                                      // 同一句里点另一个词 → 直接切过去
 const switched = await page.evaluate(() => ({ on: document.getElementById('pop').classList.contains('on'), word: document.getElementById('p-word').textContent }));
-check('抽屉开着时点另一个词 → 直接切到那个词', openA === true && switched.on === true && switched.word !== wordA, `${wordA} → ${switched.word}`);
-await page.locator('#plyric .w').first().click();
+check('抽屉开着时点同一句的另一个词 → 直接切到那个词', openA === true && switched.on === true && switched.word !== wordA, `${wordA} → ${switched.word}`);
+
+// 词只认当前句：点别的句里的词 = 只把那句切过来（不弹词条），想查词先切句
+await page.evaluate(() => document.getElementById('pop') && document.getElementById('pop').classList.remove('on'));
+const otherWord = await page.evaluate(async () => {
+  const blocks = [...document.querySelectorAll('#plyric .lblock[data-i]')];
+  const cur = document.querySelector('#plyric .lblock.playing');
+  if (!cur) return { none: '没有当前句' };
+  const other = blocks.find((b) => b !== cur && b.querySelector('.w:not([data-plain])'));
+  if (!other) return null;
+  const before = cur ? cur.dataset.i : null;
+  other.querySelector('.w:not([data-plain])').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 500));
+  return { before, target: other.dataset.i, pop: document.getElementById('pop').classList.contains('on') };
+});
+check('点别的句里的词 → 不弹词条（词只认当前句）', !!otherWord && otherWord.pop === false, otherWord ? `第 ${otherWord.target} 句的词 · 抽屉=${otherWord.pop}` : '没找到别的句');
+
+await tapCurWord(0);
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.evaluate(() => document.querySelector('.phead').click());   // 点抽屉外的区域
 await page.waitForTimeout(400);
@@ -1235,18 +1345,24 @@ const afterOutside = await page.evaluate(() => document.getElementById('pop').cl
 check('点抽屉外的区域 → 收起', afterOutside === false, afterOutside ? '仍开着' : '已收起');
 
 // 抽屉开着时点歌词行：只关抽屉，绝不能"顺手跳句"（用户真机反馈）
-await page.locator('#plyric .w').first().click();
+await tapCurWord(0);
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.evaluate(() => { document.getElementById('minibar').classList.remove('on'); });
+// ⚠️ 别拿「迷你条有没有亮」当判据：收起抽屉本来就会续播（这是另一条契约）。
+// 这里只验「这一下有没有把当前句切走」——点的是**别的句**，切走了才算穿透。
 const lineTap = await page.evaluate(async () => {
-  const b = document.querySelector('#plyric .lblock[data-i]');
+  const blocks = [...document.querySelectorAll('#plyric .lblock[data-i]')];
+  const cur = document.querySelector('#plyric .lblock.playing');
+  const b = blocks.find((x) => x !== cur) || blocks[0];
   if (!b) return { none: true };
+  const before = cur ? String(cur.dataset.i) : null;
   b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-  await new Promise((r) => setTimeout(r, 400));
-  return { on: document.getElementById('pop').classList.contains('on'), minibar: document.getElementById('minibar').classList.contains('on') };
+  await new Promise((r) => setTimeout(r, 500));
+  const after = document.querySelector('#plyric .lblock.playing');
+  return { before, tapped: String(b.dataset.i), after: after ? String(after.dataset.i) : null, on: document.getElementById('pop').classList.contains('on') };
 });
-check('抽屉开着时点歌词行 → 只关抽屉，不跳句（不触发播放）', lineTap.on === false && lineTap.minibar === false,
-  `抽屉开=${lineTap.on} · 播放被触发=${lineTap.minibar}`);
+check('抽屉开着时点别的歌词行 → 只关抽屉，不跳句（不穿透）', lineTap.on === false && lineTap.before === lineTap.after,
+  `抽屉开=${lineTap.on} · 当前句 ${lineTap.before} → ${lineTap.after}（点的是第 ${lineTap.tapped} 句）`);
 
 // 退出 → 回到闸门（本机记录保留）
 await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });
