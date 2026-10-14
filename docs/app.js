@@ -713,6 +713,49 @@
   window.__tlImport = (input, limit) => importInto(input, limit);
   window.__tlSegs = (t) => segsFor(t);   // 测试用
   window.__tlVid = (w) => (VBY.get(w) || {}).id;   // 测试用：词 → 词条 id
+  // ────────────── 导入歌单的云端同步（预签名 URL，无后端） ──────────────
+  let syncCfg = null;
+  async function syncUrls() {
+    if (!syncCfg) syncCfg = await (await fetch('data/oss-sync.json', { cache: 'no-store' })).json();
+    return syncCfg;
+  }
+  async function pushCloud() {
+    if (importing) return;
+    const n = Object.keys(S.imp || {}).length;
+    if (!n) { toast('本机还没导入过歌'); return; }
+    try {
+      const cfg = await syncUrls();
+      const payload = JSON.stringify({ v: 1, at: new Date().toISOString(), count: n, imp: S.imp });
+      setLoad(true, '同步到云端…');
+      const r = await fetch(cfg.put, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: payload });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      S.syncAt = new Date().toISOString();
+      save();
+      setLoad(false);
+      toast(`已同步 ${n} 首（${Math.round(payload.length / 1024)}KB）`);
+    } catch (e) { setLoad(false); toast('同步失败：' + e.message); }
+  }
+  async function pullCloud() {
+    if (importing) return;
+    try {
+      const cfg = await syncUrls();
+      setLoad(true, '从云端拉取…');
+      const r = await fetch(cfg.get, { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status === 404 ? '云端还没有数据' : 'HTTP ' + r.status);
+      const j = await r.json();
+      const cloud = j.imp || {};
+      let added = 0;
+      for (const [id, rec] of Object.entries(cloud)) if (!S.imp[id]) { S.imp[id] = rec; added++; }
+      if (added) {
+        save();
+        for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+        if (location.hash.startsWith('#/songs')) renderSongs();
+      }
+      setLoad(false);
+      toast(added ? `云端拉回 ${added} 首（本机共 ${Object.keys(S.imp).length} 首）` : '云端和本机一样');
+    } catch (e) { setLoad(false); toast('拉取失败：' + e.message); }
+  }
+
   /** 只重试上次失败的那几首（比如当时接口抽风） */
   async function retryFailed() {
     const ctx = impState.ctx;
@@ -878,16 +921,20 @@
     const knownList = VOCAB.filter(isKnown);
     const noted = VOCAB.filter((v) => S.notes[v.id] && S.notes[v.id].meaning);
     $('view-mine').innerHTML = `
-      <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 自己改过释义 ${noted.length} 词（都存在本机）</div></div></div>
+      <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词 · 导入的歌 ${Object.keys(S.imp || {}).length} 首${S.syncAt ? ' · 上次同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) : ''}</div></div></div>
       <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : '<span class="meta">还没标过词</span>'}</div>
       <div class="hair"></div>
       ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有自定义释义</div>'}
       <div class="row" style="margin-top:18px">
-        <button class="toolbtn" id="m-export">导出进度</button>
-        <button class="toolbtn" id="m-import">导入进度</button>
+        <button class="toolbtn" id="m-export">导出到文件</button>
+        <button class="toolbtn" id="m-import">从文件导入</button>
+        <button class="toolbtn" id="m-push">同步到云端</button>
+        <button class="toolbtn" id="m-pull">从云端拉回</button>
         <button class="toolbtn" id="m-clear">清空进度</button>
       </div>`;
     $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
+    $('m-push').onclick = () => pushCloud();
+    $('m-pull').onclick = () => pullCloud();
     $('m-export').onclick = () => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }));
@@ -895,7 +942,7 @@
     };
     $('m-import').onclick = () => {
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json';
-      inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, local: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); renderMine(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
+      inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, local: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
     $('m-clear').onclick = () => { if (!confirm('清空本机进度？')) return; S.known = {}; S.notes = {}; save(); renderMine(); };

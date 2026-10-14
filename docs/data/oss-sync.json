@@ -1,0 +1,9 @@
+{
+ "_note": "导入歌单的云端同步：这两个预签名地址让静态页面直接读写 sync/imports.json。由 scripts/gen-sync-urls.mjs 生成，10 年有效。",
+ "key": "sync/imports.json",
+ "region": "oss-cn-hangzhou",
+ "bucket": "thlyrics-audio",
+ "expiresAt": "2036-10-11",
+ "get": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/sync/imports.json?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107317355&Signature=maQqitKE671BhPlSTuLK2ew54R8%3D",
+ "put": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/sync/imports.json?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107317355&Signature=yDGqdp9TXnFKK3hkP%2F3Yuca%2B7Mo%3D"
+}

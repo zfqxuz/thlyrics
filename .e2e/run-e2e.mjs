@@ -51,8 +51,28 @@ const E2E_LYRIC = {
     + '[00:04.00] 続\n[00:04.60] け\n[00:05.20] て\n[00:05.80] く\n[00:06.50] 踊る憂鬱と\n',
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
+// 云端同步的桩：页面会去读 data/oss-sync.json，再对 get/put 地址读写；这里全用假的，别碰真 OSS
+let cloudBlob = null;
 const baseRoute = (route) => {
   const u = route.request().url();
+  if (/data\/oss-sync\.json/.test(u)) {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ get: 'https://sync.e2e/get', put: 'https://sync.e2e/put' }) });
+  }
+  if (u === 'https://sync.e2e/put') {
+    cloudBlob = route.request().postData() || '';
+    return route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
+  }
+  if (u === 'https://sync.e2e/get') {
+    if (!cloudBlob) return route.fulfill({ status: 404, contentType: 'text/plain', body: 'no such key' });
+    const j = JSON.parse(cloudBlob);
+    // 模拟"另一台设备"也导入了 1 首：云端这份比本机多一条
+    j.imp['i888800001'] = j.imp['i888800001'] || {
+      id: 'i888800001', nid: '888800001', title: '别的设备导入的歌', artist: '測試', album: '東方', cover: '',
+      lines: [{ t: 1, text: '流れてく　時の中ででも', zh: '就算在流逝的时间中' }, { t: 3, text: '気だるさが', zh: '仍能发现' }, { t: 5, text: 'ほらグルグル廻って', zh: '只在原地打转不停' }],
+      plId: '1', plName: '另一台设备的歌单', at: Date.now(),
+    };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
+  }
   if (/gdstudio/.test(u) && /types=playlist/.test(u)) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(E2E_PLAYLIST) });
   }
@@ -465,6 +485,25 @@ await page.waitForTimeout(800);
 await page.locator('#mb-meta').click();
 await page.waitForTimeout(500);
 check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
+
+// ═══════ 14 导入的歌能不能换设备（云端同步 / 文件导出） ═══════
+if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
+await page.locator('#tab-mine').click();
+await page.waitForTimeout(400);
+check('生词本给出云端同步入口', (await page.locator('#m-push').count()) === 1 && (await page.locator('#m-pull').count()) === 1, await txt('#m-push'));
+const impBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {}).length);
+await page.locator('#m-push').click();
+await page.waitForTimeout(1200);
+const pushed = cloudBlob ? JSON.parse(cloudBlob) : null;
+check('同步到云端：把本机导入的歌传上去', !!pushed && Object.keys(pushed.imp || {}).length === impBefore, `云端收到 ${pushed ? Object.keys(pushed.imp || {}).length : '—'} 首 / 本机 ${impBefore} 首`);
+await page.locator('#m-pull').click();
+await page.waitForTimeout(1500);
+const impAfter = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {}).length);
+check('从云端拉回：另一台设备导入的歌并进来了', impAfter === impBefore + 1, `本机 ${impBefore} → ${impAfter} 首`);
+await page.goto(BASE + '#/songs');
+await page.waitForTimeout(600);
+const pulledN = await page.evaluate(() => document.querySelectorAll('#list .track').length);
+check('拉回的歌能在曲库看到', pulledN > 0, pulledN + ' 首');
 
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 

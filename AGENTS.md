@@ -274,3 +274,19 @@
 - `prepAudio`/`playTrack` 竞态：attach 改成幂等（同一首已挂就不重复 load），
   playTrack 进场时 `prepToken++` 让在飞的 prepAudio 作废。
 - E2E 82/82（新增：正在听的那句排最前、去这句真的切歌并开始播、没音频时给出绑定入口）。
+
+### 导入的歌换设备（云端同步 + 文件导出）（2026-10-14 晚）
+
+- 现状：导入的歌存在 localStorage，**只在这台设备这个浏览器**；内置 44 首是站内的，任何设备都有。
+- **云端同步**（新增）：`docs/data/oss-sync.json` 里放两个 10 年有效的**预签名**地址
+  （GET / PUT `sync/imports.json`），生词本页「同步到云端 / 从云端拉回」直接读写自己的 OSS，
+  不需要后端。生成脚本 `scripts/gen-sync-urls.mjs`（用 ali-oss，注意 **PUT 必须把
+  `Content-Type: application/json` 一起签进去**，前端上传要带同样的头，否则 SignatureDoesNotMatch）。
+  桶 CORS 需要放通 `PUT`（已加：https://zfqxuz.github.io + http://127.0.0.1:8848）。
+  合并策略：**拉回只补本地没有的**（按 trackId），不覆盖本机；推送写全量。
+  ⚠️ 这两个地址写在公开页面里，等于任何拿到页面的人都能读写那一个对象（内容只是歌单元数据）。
+  在意的话可以改成「同步码」：key 里加一段随机串，只有知道码的设备能同步（需要重做签名方案）。
+- **文件导出/导入**：导出的是完整 S（含 `S.imp`），换设备导入即可；导入后现在会自动 `location.reload()`
+  （以前导入完要手动刷新才认那些导入的歌）。
+- 真机验证：`.e2e/sync-probe.mjs`（不带桩，真读写 OSS）→ GET 200 / PUT 200；
+  E2E 里用桩，86/86。
