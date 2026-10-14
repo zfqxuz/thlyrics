@@ -311,7 +311,8 @@
 - E2E 102/102（第 15 节新增 8 条：账号入口、注册登录、注册时带本机数据、登录后标词进账号、
   退出、密码错提示、清浏览器数据后登录同账号恢复）。账号那节在 `.e2e/run-e2e.mjs` 里是**打桩**的
   （拦 `thlyrics-auth-*.cn-hangzhou.fcapp.run`），别让它打真 API。
-- 真机验证脚本：`.e2e/sync-real.mjs <url>`（真 OSS；跑完记得把云端对象恢复成空）。
+- 真机验证脚本：`.e2e/acc-real.mjs <url> [用户名]`（真 API；跑完记得删账号对象 + 重置 _index.json）。
+  （旧的 `.e2e/sync-real.mjs` / `sync-probe.mjs` 随公开对象一起删了。）
 
 ### 必须登录 + 账号制（2026-10-14 深夜，已上线）
 
