@@ -51,7 +51,7 @@ page.on('crash', () => errors.push('渲染进程崩溃'));
 
 const txt = (sel) => page.locator(sel).textContent();
 const shot = async (n, keep) => { if (!keep) { await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(420); } else await page.waitForTimeout(450); await page.screenshot({ path: path.join(SHOTS, n + '.png') }); };
-const idxOf = () => page.evaluate(() => { const el = document.querySelector('#lyric .lblock.playing, #plyric .lblock.playing'); return el ? Number(el.dataset.i) : -1; });
+const idxOf = () => page.evaluate(() => { const el = document.querySelector('#plyric .lblock.playing, #plyric .lblock.playing'); return el ? Number(el.dataset.i) : -1; });
 const tapLine = async (host, i, opts = {}) => {
   const loc = page.locator(`${host} .lblock[data-i="${i}"]`);
   await loc.evaluate((el) => el.scrollIntoView({ block: 'center' }));
@@ -121,7 +121,7 @@ await goBtn.click();
 await page.waitForSelector('#view-track', { timeout: 8000 });
 await page.waitForTimeout(700);
 check('「去这句」进入单曲并开始单句循环', (await idxOf()) >= 0, '高亮第 ' + (await idxOf()) + ' 句');
-check('循环时模式芯片显示「单句循环」', ((await txt('#p-mode')) || '').includes('单句循环'), (await txt('#p-mode')) || '');
+check('循环时模式芯片显示「单句循环」', (await page.locator('#m-loop.on').count() > 0), (await txt('#p-mode')) || '');
 check('「去这句」直接把全屏跟唱页拉起来', await page.locator('#player.on').count() > 0);
 await page.locator('#p-close').click();          // 收起全屏页，继续测单曲页本体
 await page.waitForTimeout(450);
@@ -137,26 +137,28 @@ await page.locator('#twchips .chip[data-f="all"]').click();
 await page.waitForTimeout(200);
 await shot('04-track-vocab');
 
-// 切到歌词
-await page.locator('#t-lyric').click();
-await page.waitForTimeout(400);
-check('可切到「歌词」页签', await page.locator('#lyric .lblock').count() > 5, (await page.locator('#lyric .lblock').count()) + ' 块');
+// 进入跟唱（全站只有播放器里这一套歌词）
+await page.locator('#t-sing').click();
+await page.waitForTimeout(800);
+check('单曲页点「进入跟唱」打开播放器歌词', await page.locator('#player.on').count() > 0 && await page.locator('#plyric .lblock').count() > 5,
+  (await page.locator('#plyric .lblock').count()) + ' 块');
+check('单曲页里不再有第二套歌词 DOM', await page.locator('#lyric .lblock, #view-track .lblock').count() === 0);
 
 // ═══════ 5 歌词排版：分块 / 词性分色 / 词级中文 ═══════
 const pos = await page.evaluate(() => {
-  const g = (c) => document.querySelectorAll('#lyric .w.' + c).length;
+  const g = (c) => document.querySelectorAll('#plyric .w.' + c).length;
   return { n: g('k-n'), v: g('k-v'), a: g('k-a'), prt: g('k-prt') };
 });
 check('词性分色齐全', pos.n > 3 && pos.v > 3 && pos.prt > 3, JSON.stringify(pos));
 const rom = await page.evaluate(() => {
-  const bs = [...document.querySelectorAll('#lyric .lblock')];
-  const withRom = bs.filter((b) => b.querySelector('.romaji')).length;
-  const b = bs.find((x) => x.querySelector('.romaji'));
-  const r = b.querySelector('.romaji').getBoundingClientRect(), l = b.querySelector('.line').getBoundingClientRect();
-  return { withRom, gap: Math.round(r.top - l.bottom) };
+  const words = [...document.querySelectorAll('#plyric .lblock .w:not([data-plain])')];
+  const withR = words.filter((w) => { const r = w.querySelector('.r'); return r && r.textContent.trim(); }).length;
+  const sample = words.slice(0, 5).map((w) => { const r = w.querySelector('.r'); return r && r.textContent.trim() ? r.textContent + '=' + w.textContent.trim() : ''; }).filter(Boolean);
+  const spaced = words.map((w) => { const r = w.querySelector('.r'); return r ? r.textContent.trim() : ''; }).filter(Boolean).join(' ');
+  return { withR, total: words.length, ratio: Math.round(withR / Math.max(1, words.length) * 100), sample, spaced: spaced.includes(' ') };
 });
-check('罗马音锁在本句块内且紧贴', rom.withRom > 3 && rom.gap < 30, JSON.stringify(rom));
-check('词级中文（实词下挂释义）', await page.locator('#lyric .g').count() > 5, (await page.locator('#lyric .g').count()) + ' 个');
+check('罗马音改成逐词对齐（不再整行一串）', rom.ratio > 60 && rom.spaced, rom.ratio + '% 词带罗马音 · ' + rom.sample.slice(0, 3).join(' '));
+check('词级中文（实词下挂释义）', await page.locator('#plyric .g').count() > 5, (await page.locator('#plyric .g').count()) + ' 个');
 await page.locator('#b-gloss').click();
 await page.waitForTimeout(250);
 check('词义可一键收起', await page.evaluate(() => !document.body.classList.contains('gloss')));
@@ -165,23 +167,29 @@ await page.waitForTimeout(250);
 await shot('05-lyric', true);
 
 // ═══════ 6 播放交互：点句=继续播、双击=单句循环 ═══════
-const lines = await page.evaluate(() => [...document.querySelectorAll('#lyric .lblock[data-i]')].map((e) => Number(e.dataset.i)));
-const pick = lines[4];
-await tapLine('#lyric', pick);
+await page.locator('#m-all').click();          // 先切回「整首」，再验点句子的行为
 await page.waitForTimeout(300);
-check('点句子 = 从这句继续播（不自动循环）', (await idxOf()) === -1 && ((await txt('#p-mode')) || '') === '整首', '模式=' + (await txt('#p-mode')));
+const lines = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock[data-i]')].map((e) => Number(e.dataset.i)));
+const pick = lines[4];
+await tapLine('#plyric', pick);
+await page.waitForTimeout(300);
+check('点句子 = 从这句继续播（不是循环）',
+  (await page.locator('#m-all.on').count() > 0) && (await page.locator('#mb-loop').isHidden()) && (await idxOf()) === pick,
+  '整首模式=' + (await page.locator('#m-all.on').count() > 0) + ' 循环提示隐藏=' + (await page.locator('#mb-loop').isHidden()) + ' 高亮=' + (await idxOf()));
 check('点句子后播放条有反馈', ((await txt('#p-state')) || '').length > 0, ((await txt('#p-state')) || '').slice(0, 24));
 const before = await page.evaluate(() => document.querySelector('audio').currentTime);
-await page.locator(`#lyric .lblock[data-i="${pick}"]`).dblclick({ position: { x: 6, y: 6 }, timeout: 8000 });
+await page.locator(`#plyric .lblock[data-i="${pick}"]`).dblclick({ position: { x: 6, y: 6 }, timeout: 8000 });
 await page.waitForTimeout(450);
-check('双击 = 单句循环', (await idxOf()) === pick && ((await txt('#p-mode')) || '').includes('单句循环'), '高亮 ' + (await idxOf()));
+check('双击 = 单句循环', (await idxOf()) === pick && (await page.locator('#m-loop.on').count() > 0), '高亮 ' + (await idxOf()));
 const t1 = Date.now();
-for (const n of [lines[7], lines[2], lines[6]]) { await tapLine('#lyric', n); }
+for (const n of [lines[7], lines[2], lines[6]]) { await tapLine('#plyric', n); }
 check('连点三句响应快', Date.now() - t1 < 2400, (Date.now() - t1) + 'ms');
+await page.locator('#p-close').click();      // 全屏页盖着迷你条，先收起
+await page.waitForTimeout(450);
 check('循环开着时迷你条给出「一键退出」', await page.locator('#mb-loop').isVisible());
-await page.locator('#mb-loop').click();     // 关掉循环
+await page.locator('#mb-loop').click();     // 一键退出循环
 await page.waitForTimeout(300);
-check('循环可一键关掉', ((await txt('#p-mode')) || '') === '整首');
+check('循环可一键关掉', (await page.locator('#m-all.on').count() > 0) && (await page.locator('#mb-loop').isHidden()), '整首点亮=' + (await page.locator('#m-all.on').count()));
 
 // ═══════ 7 迷你播放条 + 全屏跟唱页 ═══════
 check('迷你播放条已出现', await page.locator('#minibar.on').count() > 0);

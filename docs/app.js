@@ -22,7 +22,7 @@
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1 };
+  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: true, zh: true, mode: 'all' };
   function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; }
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
   const isKnown = (w) => !!(w && S.known[w.id]);
@@ -136,7 +136,7 @@
     audio.addEventListener('waiting', () => setLoad(true, '缓冲中…'));
     audio.addEventListener('stalled', () => setLoad(true, '缓冲中…'));
     audio.addEventListener('canplay', () => { applySeek(); setLoad(false); });
-    audio.addEventListener('loadedmetadata', applySeek);
+    audio.addEventListener('loadedmetadata', () => { applySeek(); if (audio.duration) { $('p-dur').textContent = fmt(audio.duration); $('p-seek').value = String(Math.round((audio.currentTime / audio.duration) * 1000)); } });
     audio.addEventListener('loadeddata', applySeek);
     audio.addEventListener('playing', () => { setLoad(false); $('minibar').classList.add('on'); });
     audio.addEventListener('play', () => { $('playbtn').textContent = '❚❚'; $('p-play').textContent = '❚❚'; });
@@ -146,14 +146,34 @@
 
   // ────────────── 单句循环 / 播放帧 ──────────────
   let curTrack = null, curLines = [], loopLine = null, raf = null;
+  let activeLine = -1;                               // 由播放进度推出的"当前句"
+  let mode = (S.mode === 'loop') ? 'loop' : 'all';   // 整首 / 单句循环
   const lineEnd = (i) => (curLines[i + 1] && curLines[i + 1].t != null) ? curLines[i + 1].t : null;
+
+  function setMode(m) {
+    mode = m === 'loop' ? 'loop' : 'all';
+    S.mode = mode; save();
+    $('m-all').classList.toggle('on', mode === 'all');
+    $('m-loop').classList.toggle('on', mode === 'loop');
+    const mb = $('mb-loop'); if (mb) mb.hidden = mode !== 'loop';
+    if (mode === 'loop') {
+      if (loopLine == null || !curLines[loopLine]) {
+        const i = activeLine >= 0 ? activeLine : curLines.findIndex((l) => l.text && l.t != null);
+        loopLine = i >= 0 ? i : 0;
+        const t = curLines[loopLine] && curLines[loopLine].t;
+        if (t != null) { jump(t); if (audio.paused) audio.play().catch(() => {}); }
+      }
+    } else loopLine = null;
+    $('p-loop').classList.toggle('on', mode === 'loop');
+    highlight(true);
+  }
 
   function setLoop(i, silent) {
     loopLine = i;
-    const chip = $('p-mode'), btn = $('p-loop'), mb = $('mb-loop');
-    if (chip) { chip.textContent = i == null ? '整首' : '单句循环'; chip.classList.toggle('on', i != null); }
+    if (i != null && mode !== 'loop') setMode('loop');
+    const btn = $('p-loop'), mb = $('mb-loop');
     if (btn) btn.classList.toggle('on', i != null);
-    if (mb) mb.hidden = i == null;               // 循环开着时，迷你条上给一个一键退出
+    if (mb) mb.hidden = i == null || mode !== 'loop';
     highlight(true);
     if (i == null || !curLines[i]) return;
     const t = curLines[i].t;
@@ -161,11 +181,21 @@
     jump(t);
     if (audio.paused) audio.play().catch(() => {});
   }
+  const lineAtTime = (t) => {
+    let idx = -1;
+    for (let i = 0; i < curLines.length; i++) {
+      const st = curLines[i].t;
+      if (st == null || !curLines[i].text.trim()) continue;
+      if (st <= t + 0.08) idx = i; else break;
+    }
+    return idx;
+  };
   function highlight(scroll) {
-    document.querySelectorAll('.lblock[data-i]').forEach((el) => el.classList.toggle('playing', Number(el.dataset.i) === loopLine));
-    const pl = $('plyric'); if (pl) pl.classList.toggle('has-active', loopLine != null);
+    const on = (mode === 'loop' && loopLine != null) ? loopLine : activeLine;
+    document.querySelectorAll('.lblock[data-i]').forEach((el) => el.classList.toggle('playing', Number(el.dataset.i) === on));
+    const pl = $('plyric'); if (pl) pl.classList.toggle('has-active', on >= 0);
     if (!scroll) return;
-    const el = document.querySelector('#plyric .lblock.playing') || document.querySelector('#lyric .lblock.playing');
+    const el = document.querySelector('#plyric .lblock.playing');
     if (!el) return;
     const box = el.parentElement;
     if (!box) return;
@@ -182,8 +212,10 @@
       if (audio.paused) setLoad(false);
       else if (bufferedAhead(t) < .25 && !audio.seeking) setLoad(true, '缓冲中…');
       else setLoad(false);
+      const at = lineAtTime(t);
+      if (at !== activeLine) { activeLine = at; highlight(at >= 0); }
     }
-    if (loopLine == null || !curLines[loopLine]) return;
+    if (mode !== 'loop' || loopLine == null || !curLines[loopLine]) return;
     const start = curLines[loopLine].t;
     if (start == null) return;
     const end = lineEnd(loopLine), now = audio.currentTime;
@@ -199,18 +231,23 @@
     if (n < 0) n = lines.length - 1;
     if (n >= lines.length) n = 0;
     // 循环开着时，上一句/下一句是「换到那句继续循环」，不能悄悄退出循环
-    if (loopLine != null) setLoop(lines[n].i);
-    else playFrom(lines[n].i);
+    playFrom(lines[n].i);
   }
   /** 点句子：从这句继续往下播（不循环）——只有双击/长按/循环键才开单句循环 */
   function playFrom(i) {
     if (!curLines[i]) return;
-    setLoop(null);
     const t = curLines[i].t;
+    if (mode === 'loop') {                       // 循环模式：换到这句继续循环
+      loopLine = i; activeLine = i;
+      if (t != null) jump(t);
+      if (audio.paused) audio.play().catch(() => {});
+      highlight(true); return;
+    }
+    activeLine = i;
     if (t != null) jump(t);
-    if (curTrack) { if (audio.paused) playTrack(curTrack, { at: t }); }
     highlight(true);
-    toast('从这句继续播 · 双击或长按 = 单句循环');
+    if (curTrack) playTrack(curTrack, { at: t });   // 整首模式：从这句继续往下播
+    toast('从这句继续播 · 双击 = 单句循环');
   }
   let toastTimer = null;
   function toast(msg) {
@@ -503,23 +540,34 @@
       block.className = 'lblock';
       const line = document.createElement('div');
       line.className = 'line' + (l.jp ? '' : ' en');
+      const ruby = S.ruby !== false;
+      let flat = [];
       if (l.segs && l.segs.length) {
         for (const sg of l.segs) {
           if (!sg.s) continue;
-          if (!sg.k) { line.appendChild(document.createTextNode(sg.s)); continue; }
-          const w = (sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null;
+          if (!sg.k) { line.appendChild(document.createTextNode(sg.s)); if (sg.s.trim()) flat.push(sg.s); continue; }
+          const sym = sg.k === 'sym';
+          const w = sym ? null : ((sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null);
           const span = document.createElement('span');
           span.className = 'w k-' + sg.k + (w && isKnown(w) ? ' known' : '');
           span.dataset.s = sg.s;
+          if (sym) span.dataset.plain = '1';
           if (sg.w && sg.b) span.dataset.w = sg.b;
+          const y = sg.y || '';
+          if (ruby) { const ri = document.createElement('i'); ri.className = 'r'; ri.textContent = y; span.appendChild(ri); }
           span.appendChild(document.createTextNode(sg.s));
           const g = meaningOf(w);
           if (g && g.length <= 14) { const gi = document.createElement('i'); gi.className = 'g'; gi.textContent = g; span.appendChild(gi); }
           line.appendChild(span);
+          flat.push(y || sg.s);
         }
-      } else line.textContent = l.text;
+      } else { line.textContent = l.text; flat = [l.romaji || l.text]; }
       block.appendChild(line);
-      if (S.romaji !== false && l.romaji && l.jp) { const r = document.createElement('div'); r.className = 'romaji'; r.textContent = l.romaji; block.appendChild(r); }
+      // 关掉逐词罗马音时，退回整行罗马音（按词断开，不再糊成一串）
+      if (!ruby && S.romaji !== false && l.jp) {
+        const txt = flat.join(' ').replace(/\s+/g, ' ').trim();
+        if (txt) { const r = document.createElement('div'); r.className = 'romaji'; r.textContent = txt; block.appendChild(r); }
+      }
       if (l.zh && S.zh !== false) { const z = document.createElement('div'); z.className = 'zh'; z.textContent = l.zh; block.appendChild(z); }
       block.dataset.i = String(i);
       host.appendChild(block);
@@ -531,12 +579,12 @@
     host.dataset.bound = '1';
     host.addEventListener('click', (e) => {
       const wEl = e.target.closest('.w');
-      if (wEl) { const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null; showPop(w, wEl.dataset.s); return; }
+      if (wEl && !wEl.dataset.plain) { const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null; showPop(w, wEl.dataset.s); return; }
       const b = e.target.closest('.lblock[data-i]');
       if (!b) return;
       const i = Number(b.dataset.i);
       const now = Date.now();
-      if (now - lastTap < 360 && lastTapIdx === i) { lastTap = 0; setLoop(i); toast('单句循环 开'); return; }   // 双击 = 单句循环
+      if (now - lastTap < 360 && lastTapIdx === i) { lastTap = 0; setLoop(i); toast('单句循环 开'); return; }   // 双击 → 切到单句循环
       lastTap = now; lastTapIdx = i;
       playFrom(i);
     });
@@ -571,9 +619,8 @@
           <div class="l3">原曲：${esc(t.base)} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''} · 已掌握 ${knownN}/${(t.vocabIds || []).length}</div>
         </div>
       </div>
-      <div class="segs" style="padding:0 0 6px">
-        <button id="t-vocab" class="on">词汇</button>
-        <button id="t-lyric">歌词</button>
+      <div class="row" style="margin:2px 0 10px">
+        <button class="btn-primary" id="t-sing">▶ 进入跟唱</button>
       </div>
       <div id="t-vocab-pane">
         <div class="chips" id="twchips">
@@ -583,31 +630,11 @@
         </div>
         <div class="sec-sub" id="twhead" style="margin:6px 0 2px"></div>
         <div class="list" id="twlist"></div>
-      </div>
-      <div id="t-lyric-pane" hidden>
-        <div class="chips" style="margin-bottom:6px">
-          <button class="chip ${S.gloss === false ? '' : 'on'}" id="b-gloss">词义</button>
-          <button class="chip ${S.zh === false ? '' : 'on'}" id="b-zh">中文</button>
-          <button class="chip ${S.romaji === false ? '' : 'on'}" id="b-romaji">罗马音</button>
-        </div>
-        <div class="legend"><span><i class="k-n" style="color:var(--p-n)">■</i>名词</span><span><i style="color:var(--p-v)">■</i>动词</span><span><i style="color:var(--p-a)">■</i>形容词</span><span><i style="color:var(--p-na)">■</i>形容动词</span><span><i style="color:var(--p-adv)">■</i>副词</span><span><i style="color:var(--p-prt)">■</i>助词</span></div>
-        <div id="lyric"></div>
-        <div class="hint">点句子 = 从这句继续往下播 · 双击或长按 = 单句循环 · 点词 = 看释义</div>
       </div>`;
     twFilter = 'all';
+    $('t-sing').onclick = () => { openPlayer(); if (!audio.src || audio.getAttribute('data-tid') !== t.id) playTrack(t); };
     renderTrackWords();
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
-    $('t-vocab').onclick = () => { $('t-vocab').classList.add('on'); $('t-lyric').classList.remove('on'); $('t-vocab-pane').hidden = false; $('t-lyric-pane').hidden = true; };
-    $('t-lyric').onclick = () => {
-      $('t-lyric').classList.add('on'); $('t-vocab').classList.remove('on');
-      $('t-lyric-pane').hidden = false; $('t-vocab-pane').hidden = true;
-      renderLyrics($('lyric'), t); bindLyrics($('lyric'));
-      document.body.classList.toggle('gloss', S.gloss !== false);
-    };
-    const repaint = () => { renderLyrics($('lyric'), t); renderLyrics($('plyric'), t); };
-    $('b-gloss').onclick = () => { S.gloss = S.gloss === false; save(); document.body.classList.toggle('gloss', S.gloss !== false); $('b-gloss').classList.toggle('on', S.gloss !== false); };
-    $('b-zh').onclick = () => { S.zh = S.zh === false; save(); $('b-zh').classList.toggle('on', S.zh !== false); repaint(); };
-    $('b-romaji').onclick = () => { S.romaji = S.romaji === false; save(); $('b-romaji').classList.toggle('on', S.romaji !== false); repaint(); };
     $('b-back').onclick = () => history.length > 1 ? history.back() : go('#/songs');
     $('p-title').textContent = t.title; $('p-artist').textContent = t.artist + ' · ' + t.album;
     if (t.coverFile) $('mb-cover').src = 'data/' + t.coverFile; else $('mb-cover').removeAttribute('src');
@@ -615,6 +642,10 @@
     $('minibar').classList.add('on');
     $('srcinfo').textContent = describeSource(t);
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
+    activeLine = -1; loopLine = null;
+    $('m-all').classList.toggle('on', mode === 'all');
+    $('m-loop').classList.toggle('on', mode === 'loop');
+    $('p-loop').classList.toggle('on', mode === 'loop');
     if (!raf) raf = requestAnimationFrame(frame);
     prepAudio(t);
     if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
@@ -626,12 +657,19 @@
     if (s && s.nid) return `当前音频：网易云 ${s.nid}${t.netease && t.netease.agreeRate != null ? `（歌词一致度 ${Math.round(t.netease.agreeRate * 100)}%）` : ''}`;
     return '这首还没有音频。可以粘一个网易云链接，或换有音频的曲目。';
   }
+  function applyDisplay() {
+    document.body.classList.toggle('gloss', S.gloss !== false);
+    document.body.classList.toggle('ruby', S.ruby !== false);
+    $('b-gloss').classList.toggle('on', S.gloss !== false);
+    $('b-zh').classList.toggle('on', S.zh !== false);
+    $('b-ruby').classList.toggle('on', S.ruby !== false);
+  }
   function openPlayer() {
     if (!curTrack) return;
-    if (!$('plyric').childElementCount) { renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); }
-    document.body.classList.toggle('gloss', S.gloss !== false);
+    renderLyrics($('plyric'), curTrack); bindLyrics($('plyric'));
+    applyDisplay();
     $('player').classList.add('on');
-    highlight(true);
+    requestAnimationFrame(() => highlight(true));
   }
 
   // ────────────── 词条弹层 ──────────────
@@ -688,6 +726,7 @@
   async function boot() {
     loadLS();
     document.body.classList.toggle('gloss', S.gloss !== false);
+    document.body.classList.toggle('ruby', S.ruby !== false);
     let data;
     try { data = await (await fetch('data/index.json')).json(); }
     catch { $('view-learn').innerHTML = '<div class="empty">载入 data/index.json 失败。本地请先起服务：node scripts/serve.mjs 8848</div>'; show('view-learn'); return; }
@@ -718,13 +757,17 @@
     bindAudio();
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();
-    $('mb-loop').onclick = (e) => { e.stopPropagation(); setLoop(null); toast('已退出单句循环'); };
+    $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('已切回整首播放'); };
     $('p-close').onclick = () => $('player').classList.remove('on');
     $('p-play').onclick = () => togglePlay();
     $('p-prev').onclick = () => step(-1);
     $('p-next').onclick = () => step(1);
-    $('p-loop').onclick = () => { if (loopLine != null) setLoop(null); else { const i = curLines.findIndex((l) => l.text && l.t != null); setLoop(i >= 0 ? i : 0); } };
-    $('p-mode').onclick = () => $('p-loop').click();
+    $('p-loop').onclick = () => setMode(mode === 'loop' ? 'all' : 'loop');
+    $('m-all').onclick = () => setMode('all');
+    $('m-loop').onclick = () => setMode('loop');
+    $('b-gloss').onclick = () => { S.gloss = S.gloss === false; save(); applyDisplay(); };
+    $('b-zh').onclick = () => { S.zh = S.zh === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
+    $('b-ruby').onclick = () => { S.ruby = S.ruby === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
     $('p-seek').oninput = (e) => { if (audio.duration) jump((Number(e.target.value) / 1000) * audio.duration); };
     $('p-rate').onclick = () => {
       const rates = [1, .9, .8, .7, .6, 1.1];
@@ -744,7 +787,7 @@
       $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus();
     };
     $('p-editinput').onkeydown = (e) => { if (e.key !== 'Enter' || !popWord) return; S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: e.target.value.trim() }); save(); showPop(popWord); };
-    $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) { renderLyrics($('lyric'), curTrack); renderLyrics($('plyric'), curTrack); } };
+    $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) renderLyrics($('plyric'), curTrack); };
     $('p-lines').onclick = () => {
       if (!popWord || !curTrack) return;
       const ls = curTrack.lines.filter((l) => (l.segs || []).some((s) => s.w && s.b === popWord.word));
