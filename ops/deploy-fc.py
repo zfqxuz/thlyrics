@@ -37,10 +37,11 @@ def build_zip():
         # 词典 18MB 在 OSS kuromoji/dict/，冷启动拉到 /tmp，也不进包。
         nm = os.path.join(os.path.dirname(HERE), 'node_modules')
         kuro = os.path.join(nm, 'kuromoji')
-        for f in os.listdir(os.path.join(kuro, 'src')):
-            p = os.path.join(kuro, 'src', f)
-            if os.path.isfile(p):
-                z.write(p, 'vendor/kuromoji/src/' + f)
+        src = os.path.join(kuro, 'src')
+        for root, _dirs, files in os.walk(src):          # 子目录（viterbi/loader/util/dict）也要打进去
+            for f in files:
+                p = os.path.join(root, f)
+                z.write(p, 'vendor/kuromoji/src/' + os.path.relpath(p, src))
         z.write(os.path.join(kuro, 'package.json'), 'vendor/kuromoji/package.json')
         for dep in ['async', 'doublearray', 'zlibjs', 'lodash']:
             base = os.path.join(nm, dep)
