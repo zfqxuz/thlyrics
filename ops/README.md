@@ -19,6 +19,7 @@
 | POST | `/api/register` | `{name, pass, data?}` → `{token, user}`；用户名唯一，密码 ≥6 位 |
 | POST | `/api/login` | `{name, pass}` → `{token, user}` |
 | GET | `/api/me` | 需要 `Authorization: Bearer <token>` |
+| POST | `/api/avatar` | `{avatar}`（data URL，≤80KB，128×128 jpeg）；头像存在 account.json 里 |
 | POST | `/api/password` | `{old, new}`，改完返回新 token |
 | GET | `/api/data` | 取记录 |
 | PUT | `/api/data` | `{data}`，**服务端按时间戳逐条合并**后返回全量（多设备不会互相覆盖） |

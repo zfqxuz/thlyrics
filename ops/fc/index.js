@@ -30,6 +30,14 @@ const TOKEN_DAYS = 180;
 const ALLOW = (ENV.ALLOW_ORIGINS || 'https://zfqxuz.github.io,http://127.0.0.1:8848,http://localhost:8848').split(',');
 const ADMINS = (ENV.ADMINS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);   // 管理员用户名（环境变量，可选）
 const MAX_BODY = 8 * 1024 * 1024;      // 单次请求体上限
+const AVATAR_MAX = 80000;              // 头像 data URL 上限（前端会压到 128×128 jpeg，约 6~12KB）
+/** 头像只收「128 小图」的 data URL，超了/格式不对就当没有 */
+function cleanAvatar(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(s)) return '';
+  return s.length <= AVATAR_MAX ? s : '';
+}
 const MAX_STORE = 12 * 1024 * 1024;    // 每个账号记录的存储上限
 
 // ─────────── OSS 读写（V1 签名，手写，避免打包依赖） ───────────
@@ -144,14 +152,22 @@ const INDEX_KEY = `${PREFIX}_index.json`;
 // ─────────── 记录合并（和时间戳规则同前端：谁改得晚听谁的） ───────────
 const n0 = (v) => (Number(v) || 0);
 function mergeStates(a, b) {
-  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, a || {});
-  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, b || {});
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, b || {});
   const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
   out.known = {};
   for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
     const x = n0(A.known[k]), y = n0(B.known[k]);
     const v = Math.abs(y) > Math.abs(x) ? y : x;
     if (v && Math.abs(v) > out.clearedAt) out.known[k] = v;
+  }
+  for (const kind of ['fav', 'sing']) {          // 收藏 / 会唱：同样取时间戳更新的一条
+    out[kind] = {};
+    for (const k of new Set([...Object.keys(A[kind]), ...Object.keys(B[kind])])) {
+      const x = n0(A[kind][k]), y = n0(B[kind][k]);
+      const v = Math.abs(y) > Math.abs(x) ? y : x;
+      if (v) out[kind][k] = v;
+    }
   }
   out.notes = {};
   for (const k of new Set([...Object.keys(A.notes), ...Object.keys(B.notes)])) {
@@ -426,13 +442,14 @@ exports.handler = async (event) => {
       const uid = rid(8);
       const salt = rid(16);
       const first = Object.keys(index).length === 0;      // 第一个注册的就是管理员
-      const acct = { uid, name, nameLower: key, salt, hash: hashPass(pass, salt), createdAt: new Date().toISOString(),
+      const avatar = cleanAvatar(body.avatar);
+      const acct = { uid, name, nameLower: key, salt, hash: hashPass(pass, salt), avatar, createdAt: new Date().toISOString(),
         admin: first || ADMINS.indexOf(key) >= 0 };
       await ossPutJson(acctKey(uid), acct);
       index[key] = uid;
       await ossPutJson(INDEX_KEY, index);
       if (body.data) await ossPutJson(dataKey(uid), { v: 1, at: new Date().toISOString(), data: body.data });
-      return reply(req, 200, { ok: true, token: tokenFor(uid, name), user: { uid, name, admin: !!acct.admin } });
+      return reply(req, 200, { ok: true, token: tokenFor(uid, name), user: { uid, name, admin: !!acct.admin, avatar: acct.avatar || '' } });
     }
 
     if (action === '/login' && method === 'POST') {
@@ -443,7 +460,7 @@ exports.handler = async (event) => {
       const acct = await ossGetJson(acctKey(uid));
       if (!acct || hashPass(pass, acct.salt) !== acct.hash) return reply(req, 401, { error: '用户名或密码不对' });
       const adm = !!acct.admin || ADMINS.indexOf(String(acct.nameLower || '').toLowerCase()) >= 0;
-      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name, admin: adm } });
+      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
     }
 
     // 余下的都要登录
@@ -453,7 +470,15 @@ exports.handler = async (event) => {
     if (action === '/me') {
       const acct0 = await ossGetJson(acctKey(me.sub));
       const adm = !!((acct0 && acct0.admin) || ADMINS.indexOf(String(me.name || '').toLowerCase()) >= 0);
-      return reply(req, 200, { ok: true, user: { uid: me.sub, name: me.name, admin: adm } });
+      return reply(req, 200, { ok: true, user: { uid: me.sub, name: me.name, admin: adm, avatar: (acct0 && acct0.avatar) || '' } });
+    }
+
+    if (action === '/avatar' && method === 'POST') {
+      const acct = await ossGetJson(acctKey(me.sub));
+      if (!acct) return reply(req, 404, { error: '账号不存在' });
+      acct.avatar = cleanAvatar(body.avatar);
+      await ossPutJson(acctKey(me.sub), acct);
+      return reply(req, 200, { ok: true, avatar: acct.avatar });
     }
 
     // ── 管理员：看 / 删 OSS 上的文件（只允许 sync/ 和 audio/ 前缀） ──
@@ -468,7 +493,7 @@ exports.handler = async (event) => {
       const a = await requireAdmin(req);
       if (a.err) return a.err;
       const key = String(body.key || '');
-      if (!/^(sync|audio)\//.test(key)) return reply(req, 400, { error: '只允许删 sync/ 或 audio/ 下的对象' });
+      if (!/^(sync|audio|kuromoji)\//.test(key)) return reply(req, 400, { error: '只允许删 sync/ / audio/ / kuromoji/ 下的对象' });
       const done = await ossDelete(key);
       return reply(req, done ? 200 : 500, { ok: done, key });
     }

@@ -17,6 +17,23 @@
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
   --p-n:#6fb6ff; --p-v:#ff9a76; --p-a:#ffd166; --p-na:#f2b366; --p-adv:#b79cff;
   --p-prt:#8b93a5; --p-aux:#79808f; --p-oth:#98a1b0;
+  /* 语义色：暖白主题里会整体换掉 */
+  --warm-ink:#ffe9df; --accent-ink:#ffb9ad; --accent-ink2:#f0a294; --danger-ink:#ff9f90; --ok-ink:#a5e6c2;
+  --hov:rgba(255,255,255,.03); --track:rgba(255,255,255,.07); --press:rgba(255,255,255,.09);
+  --sheetline:rgba(255,255,255,.08); --grab:rgba(255,255,255,.15); --bar:rgba(242,237,228,.10);
+  --shadow:0 -14px 40px rgba(0,0,0,.5);
+}
+/* 暖白（白天）主题：只换 token，不动布局 */
+body.warm{
+  --bg:#f7f1e6; --surface:#fffaf1; --surface2:#f0e6d6; --line:rgba(90,64,36,.16);
+  --ink:#2e2823; --ink2:#6a5f52; --ink3:#9b8f80; --paper:#fffaf1;
+  --accent:#c1462f; --accent-soft:rgba(193,70,47,.13); --ok:#2f7f57; --danger:#c1462f; --danger-soft:rgba(193,70,47,.12);
+  --p-n:#2c66a8; --p-v:#b0421f; --p-a:#8a6310; --p-na:#9c5a10; --p-adv:#6549ab;
+  --p-prt:#6b7280; --p-aux:#5c6470; --p-oth:#787f8a;
+  --warm-ink:#7c3a28; --accent-ink:#a8381f; --accent-ink2:#a8381f; --danger-ink:#a8381f; --ok-ink:#266b49;
+  --hov:rgba(120,90,50,.06); --track:rgba(120,90,50,.12); --press:rgba(120,90,50,.16);
+  --sheetline:rgba(120,90,50,.16); --grab:rgba(120,90,50,.28); --bar:rgba(120,90,50,.14);
+  --shadow:0 -14px 34px rgba(90,60,30,.16);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none !important}   /* 防止 display:inline-flex 这类规则把 hidden 覆盖掉 */
@@ -56,7 +73,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--sp-3);margin:var(--sp-2) 0 2px}
 .sec-title{font-size:var(--fs-title);font-weight:650;letter-spacing:.01em}
 .sec-sub{font-size:var(--fs-meta);color:var(--ink3);margin-top:3px}
-.bar{height:3px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:9px}
+.bar{height:3px;border-radius:3px;background:var(--track);overflow:hidden;margin-top:9px}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
 .hair{height:1px;background:var(--line);margin:var(--sp-5) 0}
 .hint{font-size:11.5px;color:var(--ink3);margin-top:10px;line-height:1.7}
@@ -66,7 +83,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .list{display:flex;flex-direction:column}
 .item{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s}
 .item:last-child{border-bottom:0}
-.item:active{background:rgba(255,255,255,.03)}
+.item:active{background:var(--hov)}
 .col{flex:1;min-width:0}
 .l1{font-size:var(--fs-body);font-weight:600;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .l1 .rd{font-size:12px;font-weight:400;color:var(--ink2);margin-left:7px}
@@ -90,7 +107,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .improw:last-child{border-bottom:0}
 .improw b{font-weight:500;color:var(--ink);flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .improw span{color:var(--ink3);font-size:11.5px;margin-left:auto;flex:0 0 auto}
-.improw.bad span{color:#ff9f90}
+.improw.bad span{color:var(--danger-ink)}
 .improw.ok span{color:var(--ok)}
 .segtext{display:flex;gap:2px;font-size:12.5px}
 .segtext button{padding:2px 7px;border-radius:8px;color:var(--ink3)}
@@ -115,14 +132,14 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .filtrow>*{flex:1 1 44%}
 .chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
   color:var(--ink2);font-size:var(--fs-meta);display:inline-flex;align-items:center}
-.chip.on{background:var(--accent-soft);border-color:rgba(255,95,69,.45);color:#ffb9ad}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
 .sel{height:34px;padding:0 10px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-size:var(--fs-sub)}
 .toolbtn{height:34px;padding:0 var(--sp-3);border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-size:var(--fs-sub)}
-.toolbtn.on{background:var(--accent-soft);border-color:rgba(255,95,69,.45);color:#ffb9ad}
+.toolbtn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
 #gate{position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:18px}
 #gate[hidden]{display:none}
 .gatecard{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px}
-.gatecard .gtitle{font-size:20px;color:#ffe9df}
+.gatecard .gtitle{font-size:20px;color:var(--warm-ink)}
 .gatecard .gsub{font-size:12px;color:var(--ink2);line-height:1.6}
 .gatecard .sel{height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);padding:0 12px;font-size:14px}
 .gatecard .row{display:flex;gap:8px}
@@ -130,7 +147,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .gatecard .gmsg{font-size:12px;color:var(--p-a);min-height:16px}
 .accbox{margin:var(--sp-4) 0 var(--sp-2);padding:0 0 var(--sp-4);border-bottom:1px solid var(--line)}
 .accbox.on{border-bottom-color:rgba(212,80,60,.35)}
-.accbox .l1{font-size:14px;color:#ffe9df}
+.accbox .l1{font-size:14px;color:var(--warm-ink)}
 .accbox .l2{font-size:11.5px;color:var(--ink2);line-height:1.55;margin-top:3px}
 .accbox .sel{height:38px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px}
 .btn-primary{height:40px;padding:0 16px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;font-size:14px}
@@ -138,7 +155,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 /* ── 按钮三档：主（朱红实心）/ 次（描边）/ 危险（红字） ── */
 .btn-main{height:44px;padding:0 18px;border-radius:12px;background:var(--accent);color:var(--paper);font-weight:600;font-size:var(--fs-body)}
 .btn-ghost{height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);color:var(--ink2);font-size:var(--fs-sub)}
-.btn-danger{height:34px;padding:0 12px;border-radius:11px;border:1px solid var(--danger-soft);color:#f0a294;font-size:var(--fs-meta)}
+.btn-danger{height:34px;padding:0 12px;border-radius:11px;border:1px solid var(--danger-soft);color:var(--accent-ink2);font-size:var(--fs-meta)}
 
 /* ── 搜索/列表的分段标题 ── */
 .srhead{font-size:var(--fs-meta);color:var(--ink3);letter-spacing:.14em;margin:var(--sp-5) 0 var(--sp-1)}
@@ -151,7 +168,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .revcard .rr{font-size:var(--fs-sub);color:var(--ink2)}
 .revcard .rm{font-size:var(--fs-title);color:var(--paper);margin-top:6px}
 .revcard .rx{font-size:var(--fs-sub);color:var(--ink2);line-height:1.7}
-.revbar{height:3px;border-radius:3px;background:rgba(242,237,228,.10);overflow:hidden;margin:14px 0}
+.revbar{height:3px;border-radius:3px;background:var(--bar);overflow:hidden;margin:14px 0}
 .revbar i{display:block;height:100%;background:var(--accent)}
 .revacts{display:flex;gap:10px;margin-top:16px}
 .revacts button{flex:1;height:46px;border-radius:12px;border:1px solid var(--line);color:var(--ink2);font-size:var(--fs-body)}
@@ -186,11 +203,11 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 #displaybox.on{display:block}
 #displaybox .dr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;font-size:var(--fs-sub)}
 #displaybox .dr button{height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink3);font-size:var(--fs-meta)}
-#displaybox .dr button.on{background:var(--accent-soft);border-color:rgba(212,80,60,.45);color:#f0a294;font-weight:600}
+#displaybox .dr button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink2);font-weight:600}
 
 /* ── 歌词：一句一块，三层排版绑死在块里 ── */
 .lblock{padding:8px 11px 9px;border-radius:12px;margin-bottom:2px;cursor:pointer;position:relative;transition:background .18s}
-.lblock:active{background:rgba(255,255,255,.03)}
+.lblock:active{background:var(--hov)}
 .lblock.playing{background:var(--accent-soft)}
 .lblock.playing::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--accent)}
 .line{font-size:16.5px;line-height:1.9;letter-spacing:.01em;min-height:2.35em;display:block}
@@ -199,7 +216,7 @@ main{padding:var(--sp-4) var(--sp-4) 140px}
 .lblock .zh{font-size:13px;color:var(--ink2);margin-top:4px;padding-left:10px;border-left:2px solid rgba(212,80,60,.32)}
 .space{height:10px}
 .line .w{cursor:pointer;border-radius:4px;padding:0 1px;transition:background .12s}
-.line .w:active{background:rgba(255,255,255,.09)}
+.line .w:active{background:var(--press)}
 .line .w.k-n{color:var(--p-n)} .line .w.k-v{color:var(--p-v)} .line .w.k-a{color:var(--p-a)}
 .line .w.k-na{color:var(--p-na)} .line .w.k-adv{color:var(--p-adv)}
 .line .w.k-prt,.line .w.k-aux{color:var(--p-prt)}
@@ -250,14 +267,14 @@ body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--i
 #player .time{font-size:10.5px;color:var(--ink3);font-variant-numeric:tabular-nums;min-width:34px;text-align:center}
 #player .btnrow{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:6px}
 #player .round{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);color:var(--ink2);display:grid;place-items:center;font-size:14px}
-#player .round.on{border-color:rgba(255,95,69,.5);color:#ffb9ad;background:var(--accent-soft)}
+#player .round.on{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
 #player .big{width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--paper);font-size:22px;display:grid;place-items:center}
 #player .big:active{transform:scale(.95)}
 .modeseg{display:flex;background:var(--surface);border-radius:11px;padding:2px;gap:2px;flex:0 0 auto}
 .modeseg button{height:26px;padding:0 10px;border-radius:9px;font-size:11.5px;color:var(--ink3)}
-.modeseg button.on{background:var(--accent-soft);color:#ffb9ad;font-weight:600}
+.modeseg button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 .modechip{height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);font-size:11.5px;display:inline-flex;align-items:center;gap:6px}
-.modechip.on{background:var(--accent-soft);border-color:rgba(255,95,69,.45);color:#ffb9ad}
+.modechip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
 
 /* 跟唱聚焦：有当前句时才把其他句压暗，否则整屏都清楚 */
 #plyric .lblock{transition:opacity .25s}
@@ -268,24 +285,63 @@ body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--i
 
 /* ── 底部弹层（词条 / 设置） ── */
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;transform:translateY(110%);transition:transform .26s cubic-bezier(.2,.8,.2,1);
-  background:var(--surface2);border-radius:18px 18px 0 0;border:1px solid rgba(255,255,255,.08);box-shadow:0 -14px 40px rgba(0,0,0,.5);
+  background:var(--surface2);border-radius:18px 18px 0 0;border:1px solid var(--sheetline);box-shadow:var(--shadow);
   max-height:74vh;overflow-y:auto;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
 .sheet.on{transform:none}
-.sheet .grab{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:0 auto 10px}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--grab);margin:0 auto 10px}
 #pop .r1{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
 #pop .w1{font-size:22px;font-weight:700}
 #pop .w2{font-size:13px;color:var(--p-n)}
 #pop .w3{font-size:11.5px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace}
-#pop .mg{font-size:15px;margin-top:8px;color:#ffe9df}
+#pop .mg{font-size:15px;margin-top:8px;color:var(--warm-ink)}
 #pop .mt{font-size:11.5px;color:var(--ink3);margin-top:6px}
 #pop .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-#pop .acts button{height:34px;padding:0 13px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:12.5px;color:var(--ink2)}
-#pop .acts button.k{border-color:rgba(78,201,138,.4);color:#a5e6c2}
-#pop input{width:100%;height:38px;padding:0 12px;border-radius:11px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink)}
+#pop .acts button{height:34px;padding:0 13px;border-radius:11px;border:1px solid var(--line);background:var(--hov);font-size:12.5px;color:var(--ink2)}
+#pop .acts button.k{border-color:var(--ok);color:var(--ok-ink)}
+#pop input{width:100%;height:38px;padding:0 12px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 
 details.src{border-top:1px solid var(--line);margin-top:18px;padding-top:10px}
 details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 0}
 .foot{font-size:10.5px;color:var(--ink3);text-align:center;margin-top:22px;line-height:1.9}
+
+/* ── 专辑：两列网格（封面 + 专辑名） ── */
+.albumgrid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-top:var(--sp-3)}
+.albumcard{cursor:pointer}
+.albumcard .cov{aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center}
+.albumcard .cov img{width:100%;height:100%;object-fit:cover;display:block}
+.albumcard .cov .ph{font-size:22px;color:var(--ink3)}
+.albumcard .nm{font-size:var(--fs-sub);font-weight:600;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.albumcard .mt{font-size:var(--fs-meta);color:var(--ink3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.albumcard:active .cov{transform:scale(.98)}
+
+/* ── 头像 / 头像下拉菜单 / 黑白开关 ── */
+.avwrap{position:relative}
+.avbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);overflow:hidden;display:grid;place-items:center}
+.av{width:100%;height:100%;border-radius:50%;object-fit:cover;display:grid;place-items:center;font-size:14px;font-weight:650;color:var(--ink2);background:var(--surface2)}
+.av.av24{width:24px;height:24px;font-size:11px;flex:0 0 auto}
+.av.av48{width:48px;height:48px;font-size:19px;flex:0 0 auto}
+.avdrop{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:200px;background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:var(--shadow)}
+.avdrop[hidden]{display:none}
+.avdrop .mi{display:flex;align-items:center;gap:9px;width:100%;padding:9px 10px;border-radius:10px;font-size:var(--fs-sub);color:var(--ink);text-align:left}
+.avdrop .mi:hover{background:var(--hov)}
+.avdrop .sep{height:1px;background:var(--line);margin:5px 2px}
+.sw{width:42px;height:24px;border-radius:999px;background:var(--surface);border:1px solid var(--line);position:relative;flex:0 0 auto;transition:.18s}
+.sw i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--ink3);transition:.18s}
+.sw.on{background:var(--accent-soft);border-color:var(--accent)}
+.sw.on i{left:20px;background:var(--accent)}
+.avpick{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink2);cursor:pointer}
+.avpick .av{width:40px;height:40px;border:1px dashed var(--line);font-size:16px}
+
+/* ── 设置行（我的页） ── */
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:0}
+.setrow .k{font-size:var(--fs-body)}
+.setrow .k small{display:block;font-size:var(--fs-meta);color:var(--ink3);font-weight:400;margin-top:2px}
+.sect{font-size:var(--fs-meta);color:var(--ink3);letter-spacing:.14em;margin:var(--sp-5) 0 var(--sp-1)}
+.code{width:100%;min-height:76px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px;
+  font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;resize:vertical}
+.marktag{font-size:10.5px;color:var(--ink3);letter-spacing:.02em}
+.marktag.on{color:var(--accent)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .row label{font-size:12px;color:var(--ink3)}
 .meta{font-size:11.5px;color:var(--ink3)}
@@ -295,7 +351,13 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
 <div id="gate" hidden></div>
 <div class="topbar">
   <div class="brand" id="brand" style="cursor:pointer">TH Lyrics <small id="headstat"></small></div>
-  <button class="iconbtn" id="btn-search" title="搜索">搜</button>
+  <div class="row" style="gap:8px;flex-wrap:nowrap">
+    <button class="iconbtn" id="btn-search" title="搜索">搜</button>
+    <div class="avwrap">
+      <button class="avbtn" id="btn-av" title="我的"></button>
+      <div class="avdrop" id="avdrop" hidden></div>
+    </div>
+  </div>
 </div>
 
 <div class="searchwrap" id="searchwrap">
@@ -310,6 +372,7 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
     <button id="tab-learn" class="on">学词</button>
     <button id="tab-songs">曲库</button>
     <button id="tab-mine">生词本</button>
+    <button id="tab-me">我的</button>
   </nav>
 
   <main>
@@ -321,6 +384,8 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
     <section id="view-track" class="view" hidden></section>
     <section id="view-search" class="view" hidden></section>
     <section id="view-review" class="view" hidden></section>
+    <section id="view-me" class="view" hidden></section>
+    <section id="view-admin" class="view" hidden></section>
 
     <div id="srcslot" hidden>
     <details class="src" id="srcbox">
@@ -420,6 +485,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js?v=20261014s"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script src="app.js?v=20261014u"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014s';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014u';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -37,13 +37,104 @@
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true };
+  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, rate: 1, ruby: true, gloss: false, zh: true,
+    mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { try { ACC = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch { ACC = null; } };
   const saveAcc = () => { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch {} };
-  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.autoSync = S.autoSync !== false; }
+  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {};
+    S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new'; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} queueSync(); };
+
+  // ── 主题：深色 / 暖白（白天）/ 跟随系统 ──
+  const THEMES = [['dark', '深色'], ['warm', '暖白'], ['auto', '跟随系统']];
+  const prefersLight = () => !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+  function applyTheme() {
+    const t = S.theme || 'dark';
+    document.body.classList.toggle('warm', t === 'warm' || (t === 'auto' && prefersLight()));
+  }
+  if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if ((S.theme || 'dark') === 'auto') applyTheme(); }); } catch {} }
+
+  // ── 曲目排序：默认按入库时间（新→旧） ──
+  const TRACK_SORTS = [['new', '入库 新→旧'], ['old', '入库 旧→新'], ['az', '标题 升序'], ['azd', '标题 降序']];
+  const trackTime = (t) => Number((t && t.addedAt) || 0);
+  const byTitle = (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'ja');
+  function sortTracks(list) {
+    const arr = [...list];
+    const by = S.tSort || 'new';
+    if (by === 'old') return arr.sort((a, b) => trackTime(a) - trackTime(b) || byTitle(a, b));
+    if (by === 'az') return arr.sort(byTitle);
+    if (by === 'azd') return arr.sort((a, b) => byTitle(b, a));
+    return arr.sort((a, b) => trackTime(b) - trackTime(a) || byTitle(a, b));
+  }
+  // ── 头像：只存 128×128 的小图（data URL），注册时可传，之后可换 ──
+  const avatarHtml = (who, cls) => {
+    const a = (who && who.avatar) || '';
+    const name = (who && who.name) || '?';
+    return a ? `<img class="av ${cls || ''}" src="${esc(a)}" alt="">`
+      : `<span class="av ${cls || ''}">${esc(String(name).slice(0, 1).toUpperCase())}</span>`;
+  };
+  /** 选图 → 压到 128×128 jpeg（约 6~12KB）再回调 */
+  function pickAvatar(file, cb) {
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) { toast('选一张图片'); return; }
+    if (file.size > 8 * 1024 * 1024) { toast('图片太大了（8MB 以内）'); return; }
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const SZ = 128, c = document.createElement('canvas'); c.width = SZ; c.height = SZ;
+          const g = c.getContext('2d');
+          const side = Math.min(img.width, img.height) || 1;
+          g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, SZ, SZ);
+          cb(c.toDataURL('image/jpeg', 0.82));
+        } catch { toast('这张图处理不了'); }
+      };
+      img.onerror = () => toast('这张图读不了');
+      img.src = String(fr.result);
+    };
+    fr.readAsDataURL(file);
+  }
+
+  /** 顶栏头像 + 下拉菜单（我的 / 管理员 / 主题开关都收在这里） */
+  function renderAv() {
+    const btn = $('btn-av');
+    if (btn) btn.innerHTML = avatarHtml(ACC, '');
+    const d = $('avdrop');
+    if (!d) return;
+    const light = document.body.classList.contains('warm');
+    d.innerHTML = `
+      <div class="mi">${avatarHtml(ACC, 'av24')}<span style="flex:1">${ACC ? esc(ACC.name) : '未登录'}</span></div>
+      <div class="sep"></div>
+      <button class="mi" id="av-theme"><span style="flex:1">${light ? '暖白（白天）' : '深色'}</span><span class="sw ${light ? 'on' : ''}"><i></i></span></button>
+      <div class="sep"></div>
+      <button class="mi" id="av-home">首页</button>
+      <button class="mi" id="av-songs">曲库</button>
+      <button class="mi" id="av-search">搜索</button>
+      <button class="mi" id="av-me">我的</button>
+      ${ACC && ACC.admin ? '<button class="mi" id="av-admin">管理员</button>' : ''}
+      <div class="sep"></div>
+      <button class="mi" id="av-out">退出登录</button>`;
+    const close = () => { d.hidden = true; };
+    if ($('av-theme')) $('av-theme').onclick = () => { S.theme = light ? 'dark' : 'warm'; save(); applyTheme(); renderAv(); };
+    if ($('av-home')) $('av-home').onclick = () => { close(); go('#/home'); };
+    if ($('av-songs')) $('av-songs').onclick = () => { close(); go('#/songs'); };
+    if ($('av-search')) $('av-search').onclick = () => { close(); $('searchwrap').classList.add('on'); $('q').focus(); };
+    if ($('av-me')) $('av-me').onclick = () => { close(); go('#/me'); };
+    if ($('av-admin')) $('av-admin').onclick = () => { close(); go('#/admin'); };
+    if ($('av-out')) $('av-out').onclick = () => { ACC = null; saveAcc(); close(); renderAv(); showGate(''); };
+  }
+
+  // ── 收藏 / 会唱（存时间戳，取消标记存负数：同步时按时间戳合并） ──
+  const isFav = (id) => Number((S.fav || {})[id]) > 0;
+  const isSing = (id) => Number((S.sing || {})[id]) > 0;
+  const toggleMark = (kind, id) => {
+    const m = S[kind] || (S[kind] = {});
+    m[id] = (Number(m[id]) > 0) ? -Date.now() : Date.now();
+    save();
+  };
   // 已掌握记的是时间戳：正数=标了，负数=明确取消（云端合并时按时间戳取胜，不会被旧数据顶回来）
   const isKnown = (w) => !!(w && Number(S.known[w.id]) > 0);
   const meaningOf = (w) => (w && ((S.notes[w.id] && S.notes[w.id].meaning) || w.meaning)) || '';
@@ -398,6 +489,7 @@
     const by = S.dSort || 'easy';
     if (by === 'freq') return [...list].sort((a, b) => b.count - a.count || a.diff - b.diff);
     if (by === 'az') return [...list].sort((a, b) => String(a.reading).localeCompare(String(b.reading), 'ja'));
+    if (by === 'azd') return [...list].sort((a, b) => String(b.reading).localeCompare(String(a.reading), 'ja'));
     return [...list].sort((a, b) => a.diff - b.diff || a.id - b.id);
   }
 
@@ -543,7 +635,7 @@
           <option value="形容詞">形容词</option><option value="副詞">副词</option>
         </select>
         <select class="sel" id="d-sort">
-          <option value="easy">从易到难</option><option value="freq">最常见</option><option value="az">五十音</option>
+          <option value="easy">从易到难</option><option value="freq">最常见</option><option value="az">五十音 ↑</option><option value="azd">五十音 ↓</option>
         </select>
         <button class="toolbtn ${S.hideKnown !== false ? 'on' : ''}" id="d-hideknown">隐藏已掌握</button>
       </div>
@@ -566,6 +658,8 @@
     const tags = [];
     if (t.imp) tags.push('导入');
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push('有声'); else tags.push('无音源');
+    if (isFav(t.id)) tags.push('♥ 收藏');
+    if (isSing(t.id)) tags.push('会唱');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
     if (brN) tags.push(`标日 ${brN}`);
@@ -799,7 +893,7 @@
     const ids = new Set();
     for (const l of lines) for (const sg of l.segs) if (sg.w && sg.b) ids.add(sg.b);
     return {
-      id: rec.id, imp: true, title: rec.title, artist: rec.artist, album: rec.album,
+      id: rec.id, imp: true, addedAt: Number(rec.at) || 0, title: rec.title, artist: rec.artist, album: rec.album,
       base: '', coverUrl: rec.cover || '', plName: rec.plName || '', plId: rec.plId || '',
       audio: { type: 'netease', nid: rec.nid }, timing: 'netease',
       lineCount: lines.filter((l) => l.text.trim()).length,
@@ -1030,14 +1124,22 @@
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
-    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, a);
-    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, b);
+    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, a);
+    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, b);
     const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
     out.known = {};
     for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
       const x = n0(A.known[k]), y = n0(B.known[k]);
       const v = Math.abs(y) > Math.abs(x) ? y : x;              // 正=标了，负=取消
       if (v && Math.abs(v) > out.clearedAt) out.known[k] = v;    // 比“清空进度”更早的一律丢掉
+    }
+    for (const kind of ['fav', 'sing']) {                        // 收藏 / 会唱：取时间戳更新的一条（负=取消）
+      out[kind] = {};
+      for (const k of new Set([...Object.keys(A[kind]), ...Object.keys(B[kind])])) {
+        const x = n0(A[kind][k]), y = n0(B[kind][k]);
+        const v = Math.abs(y) > Math.abs(x) ? y : x;
+        if (v) out[kind][k] = v;
+      }
     }
     out.notes = {};
     for (const k of new Set([...Object.keys(A.notes), ...Object.keys(B.notes)])) {
@@ -1057,7 +1159,8 @@
     }
     return out;
   }
-  const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {}, clearedAt: n0(o.clearedAt) });
+  const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {},
+    fav: o.fav || {}, sing: o.sing || {}, clearedAt: n0(o.clearedAt) });
 
   /** 合并后多出来的导入曲目，挂进内存里的曲库 */
   function registerImpTracks() {
@@ -1071,6 +1174,7 @@
       indexLibrary();
       if (location.hash.startsWith('#/songs')) renderSongs();
       if (location.hash.startsWith('#/mine')) renderMine();
+      if (location.hash.startsWith('#/me')) renderMe();
     }
     return added;
   }
@@ -1128,7 +1232,13 @@
   // ────────────── 账号（注册 / 登录 / 退出 / 改密码） ──────────────
   function accHtml() {
     if (ACC && ACC.token) {
-      return `<div class="accbox on"><div class="col"><div class="l1">已登录：${esc(ACC.name)}</div></div>
+      return `<div class="accbox on">
+        <div class="row" style="gap:10px;align-items:center">
+          ${avatarHtml(ACC, 'av48')}
+          <div class="col"><div class="l1">已登录：${esc(ACC.name)}</div></div>
+          <button class="toolbtn" id="acc-av">换头像</button>
+          <input type="file" id="acc-avf" accept="image/*" hidden>
+        </div>
         <div class="row"><button class="toolbtn" id="acc-out">退出</button></div></div>
         <div class="row" id="acc-pwrow" style="display:none;margin-top:8px">
           <input class="sel" id="acc-old" type="password" placeholder="原密码" style="flex:1;min-width:110px;height:38px">
@@ -1151,20 +1261,6 @@
   // ────────────── 管理员模式：看/删 OSS 上的文件 ──────────────
   let adminFiles = null, adminPrefix = 'sync/';
   const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(2) + 'MB' : (n / 1024).toFixed(1) + 'KB');
-  function adminHtml() {
-    if (!ACC || !ACC.admin) return '';
-    const total = adminFiles ? adminFiles.reduce((n, f) => n + f.size, 0) : null;
-    return `<div class="accbox on" id="adminbox">
-      <div class="col"><div class="l1">管理员模式</div>
-      <div class="l2">${total != null ? `${esc(adminPrefix)}：${adminFiles.length} 个文件 · ${fmtSize(total)}` : 'sync/users/ 账号数据 · audio/ 音频'}</div></div>
-      <div class="row" style="margin-top:8px">
-        <button class="toolbtn" id="adm-list">${adminFiles ? '刷新列表' : '查看 OSS 文件'}</button>
-        <button class="toolbtn ${adminPrefix === 'sync/' ? 'on' : ''}" id="adm-sync">账号数据</button>
-        <button class="toolbtn ${adminPrefix === 'audio/' ? 'on' : ''}" id="adm-audio">音频</button>
-      </div>
-      ${adminFiles ? (adminFiles.length ? `<div class="list" style="margin-top:8px">${adminFiles.map((f) => `<div class="item"><div class="col"><div class="l1" style="font-size:12px;word-break:break-all;font-weight:400">${esc(f.key)}</div><div class="l2">${fmtSize(f.size)} · ${esc(String(f.at || '').slice(0, 16).replace('T', ' '))}</div></div><button class="toolbtn" data-admdel="${esc(f.key)}">删除</button></div>`).join('')}</div>` : '<div class="meta" style="margin-top:8px">这个前缀下没有文件</div>') : ''}
-    </div>`;
-  }
   async function loadAdminFiles(prefix) {
     if (prefix) adminPrefix = prefix;
     try {
@@ -1172,7 +1268,7 @@
       const r = await apiCall('/admin/files?prefix=' + encodeURIComponent(adminPrefix));
       adminFiles = r.files || [];
       setLoad(false);
-      renderMine();
+      if (location.hash.startsWith('#/admin')) renderAdmin(); else renderMe();
     } catch (e) { setLoad(false); toast('读取失败：' + e.message); }
   }
   async function adminDelete(key) {
@@ -1186,11 +1282,11 @@
 
   // ────────────── 登录闸门（没登录不让用） ──────────────
   function gateMsg(t) { const el = $('g-msg'); if (el) el.textContent = t || ''; }
+  let gateAvatar = '';                                    // 注册时选的头像
   function afterLogin() {
     const g = $('gate'); if (g) g.hidden = true;
     document.body.classList.remove('gated');
     route();
-    if (location.hash.startsWith('#/mine')) renderMine();
   }
   function showGate(msg) {
     const g = $('gate'); if (!g) return;
@@ -1198,11 +1294,19 @@
     document.body.classList.add('gated');
     g.innerHTML = `<div class="gatecard">
       <div class="gtitle">TH Lyrics</div>
+      <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选，注册后也能换）</span></label>
+      <input type="file" id="g-av" accept="image/*" hidden>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
       <input class="sel" id="g-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
       <div class="row"><button class="btn-primary" id="g-login">登录</button><button class="toolbtn" id="g-reg">注册新账号</button></div>
       <div class="gmsg" id="g-msg">${esc(msg || '')}</div>
     </div>`;
+    gateAvatar = '';
+    if ($('g-av')) $('g-av').onchange = (e) => pickAvatar(e.target.files[0], (url) => {
+      gateAvatar = url;
+      const p = $('g-avp');
+      if (p) p.outerHTML = `<img class="av" id="g-avp" src="${url}" alt="">`;
+    });
     $('g-login').onclick = () => authFrom('login', 'g-name', 'g-pass', afterLogin);
     $('g-reg').onclick = () => authFrom('reg', 'g-name', 'g-pass', afterLogin);
     const onKey = (e) => { if (e.key === 'Enter') authFrom('login', 'g-name', 'g-pass', afterLogin); };
@@ -1216,14 +1320,14 @@
     setLoad(true, kind === 'reg' ? '注册中…' : '登录中…');
     try {
       const body = { name, pass };
-      if (kind === 'reg') body.data = userState(S);         // 注册时把本机已有记录一起带上去
+      if (kind === 'reg') { body.data = userState(S); if (gateAvatar) body.avatar = gateAvatar; }   // 注册时把本机记录 + 头像一起带上去
       const res = await apiCall('/' + (kind === 'reg' ? 'register' : 'login'), { method: 'POST', body });
-      ACC = { token: res.token, name: res.user.name, uid: res.user.uid, admin: !!res.user.admin };
-      saveAcc();
+      ACC = { token: res.token, name: res.user.name, uid: res.user.uid, admin: !!res.user.admin, avatar: res.user.avatar || '' };
+      saveAcc(); renderAv();
       setLoad(false);
       toast(kind === 'reg' ? `注册好了，欢迎 ${res.user.name}` : `已登录：${res.user.name}`);
       if (after) { await syncNow({ auto: true }); after(); }   // 闸门里登录：拉一次再放行
-      else { await syncNow({ auto: true }); renderMine(); }
+      else { await syncNow({ auto: true }); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); }
     } catch (e) {
       setLoad(false);
       const msg = (kind === 'reg' ? '注册失败：' : '登录失败：') + e.message;
@@ -1411,6 +1515,23 @@
   }
 
   let songQ = '', songView = 'list';
+  /** 专辑：两列网格（封面 + 专辑名），点开 = 按专辑过滤曲库 */
+  function albumGridHtml(list) {
+    const m = new Map();
+    for (const t of list) {
+      const k = String(t.album || '未知专辑').trim() || '未知专辑';
+      if (!m.has(k)) m.set(k, { name: k, cover: '', n: 0, artist: '' });
+      const a = m.get(k); a.n++;
+      if (!a.cover) a.cover = t.coverUrl || (t.coverFile ? 'data/' + t.coverFile : '');
+      if (!a.artist) a.artist = t.artist || '';
+    }
+    return [...m.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+      .map((a) => `<div class="albumcard" data-album="${esc(a.name)}">
+        <div class="cov">${a.cover ? `<img loading="lazy" src="${esc(a.cover)}" alt="">` : '<span class="ph">♪</span>'}</div>
+        <div class="nm">${esc(a.name)}</div>
+        <div class="mt">${esc(a.artist)} · ${a.n} 首</div>
+      </div>`).join('');
+  }
   /** 按社团/专辑分组（原生 details 折叠，不用额外状态） */
   function groupsHtml(list) {
     const key = songView === 'artist' ? 'artist' : 'album';
@@ -1423,13 +1544,15 @@
     return [...m.entries()]
       .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], 'ja'))
       .map(([k, arr]) => `<details class="grp"><summary>${esc(k)}<span class="meta">${arr.length} 首</span></summary>
-        <div class="list">${arr.map(trackRow).join('')}</div></details>`).join('');
+        <div class="list">${sortTracks(arr).map(trackRow).join('')}</div></details>`).join('');
   }
   function renderSongs() {
     const nq = norm(songQ.trim());
     const list = IDX.tracks.filter((t) => {
       if (filter === 'audio' && !(t.audioOss || t.audio || S.audio[t.id])) return false;
       if (filter === 'imp' && !t.imp) return false;
+      if (filter === 'fav' && !isFav(t.id)) return false;
+      if (filter === 'sing' && !isSing(t.id)) return false;
       if (filter === 'zh' && !t.lines.some((l) => l.zh)) return false;
       if (filter === 'known') {
         const k = (t.vocabIds || []).filter((i) => Number(S.known[i]) > 0).length;
@@ -1438,9 +1561,10 @@
       if (nq && !norm(`${t.title} ${t.artist} ${t.album} ${t.plName || ''}`).includes(nq)) return false;
       return true;
     });
+    const sorted = sortTracks(list);
     $('view-songs').innerHTML = `
       <div class="sec-head">
-        <div><div class="sec-title">曲库</div><div class="sec-sub">${IDX.tracks.length} 首 · 显示 ${list.length} 首</div></div>
+        <div><div class="sec-title">曲库</div><div class="sec-sub">${IDX.tracks.length} 首 · 显示 ${sorted.length} 首</div></div>
         <div class="segtext">
           <button class="${songView === 'list' ? 'on' : ''}" data-v="list">列表</button>
           <button class="${songView === 'artist' ? 'on' : ''}" data-v="artist">社团</button>
@@ -1449,12 +1573,15 @@
       </div>
       <div class="row" style="margin:2px 0 0">
         <input id="qs" class="sel" style="flex:1;min-width:150px;height:34px" placeholder="搜曲名 / 社团 / 专辑" value="${esc(songQ)}">
+        <select id="tsort" class="sel" style="height:34px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
       </div>
       <div class="chips">
         <button class="chip ${filter === 'all' ? 'on' : ''}" data-f="all">全部</button>
         <button class="chip ${filter === 'audio' ? 'on' : ''}" data-f="audio">有音频</button>
         <button class="chip ${filter === 'zh' ? 'on' : ''}" data-f="zh">有中文</button>
         <button class="chip ${filter === 'imp' ? 'on' : ''}" data-f="imp">我导入的</button>
+        <button class="chip ${filter === 'fav' ? 'on' : ''}" data-f="fav">♥ 收藏</button>
+        <button class="chip ${filter === 'sing' ? 'on' : ''}" data-f="sing">会唱</button>
         <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">跳过已掌握</button>
       </div>
       <details class="impbox" ${impState.fails.length || impState.msg || impState.open || !IDX.tracks.length ? 'open' : ''}>
@@ -1472,8 +1599,10 @@
         </div>
       </details>
       ${songView === 'list'
-        ? `<div class="list" id="list">${list.map(trackRow).join('') || emptyBox(songQ ? `没有匹配「${songQ}」的曲目` : (IDX.tracks.length ? '这个筛选下没有曲目' : '曲库是空的'), '', IDX.tracks.length ? [['e-pick', '清空搜索与筛选']] : [['e-imp', '导入']])}</div>`
-        : (groupsHtml(list) || emptyBox('这个筛选下没有曲目', '', [['e-pick', '清空搜索与筛选']]))}`;
+        ? `<div class="list" id="list">${sorted.map(trackRow).join('') || emptyBox(songQ ? `没有匹配「${songQ}」的曲目` : (IDX.tracks.length ? '这个筛选下没有曲目' : '曲库是空的'), '', IDX.tracks.length ? [['e-pick', '清空搜索与筛选']] : [['e-imp', '导入']])}</div>`
+        : songView === 'album'
+          ? `<div class="albumgrid">${albumGridHtml(sorted)}</div>${sorted.length ? '' : emptyBox('这个筛选下没有专辑', '', [['e-pick', '清空搜索与筛选']])}`
+          : (groupsHtml(sorted) || emptyBox('这个筛选下没有曲目', '', [['e-pick', '清空搜索与筛选']]))}`;
     impState.open = false;
     $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
     $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; renderSongs(); }));
@@ -1491,6 +1620,10 @@
     $('view-songs').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); }));
     if ($('plgo')) $('plgo').onclick = () => startImport();
     if ($('plchk')) $('plchk').onclick = () => checkPlaylists({ manual: true });
+    if ($('tsort')) $('tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderSongs(); };
+    $('view-songs').querySelectorAll('.albumcard').forEach((el) => (el.onclick = () => {
+      songQ = el.dataset.album; songView = 'list'; filter = 'all'; renderSongs();
+    }));
     if ($('e-pick')) $('e-pick').onclick = () => { songQ = ''; filter = 'all'; renderSongs(); };
     if ($('e-imp')) $('e-imp').onclick = () => { impState.open = true; renderSongs(); };
     if ($('plretry')) $('plretry').onclick = () => retryFailed();
@@ -1502,44 +1635,119 @@
     const knownList = VOCAB.filter(isKnown);
     const noted = VOCAB.filter((v) => S.notes[v.id] && S.notes[v.id].meaning);
     $('view-mine').innerHTML = `
-      <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词 · 导入的歌 ${Object.keys(S.imp || {}).length} 首</div></div></div>
-      ${accHtml()}
-      <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
-      ${adminHtml()}
-      <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : ''}</div>
+      <div class="sec-head">
+        <div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词</div></div>
+        <button class="toolbtn" id="m-review">开始复习</button>
+      </div>
+      ${knownList.length ? `<div class="chips">${knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('')}</div>` : ''}
       ${knownList.length ? '' : emptyBox('还没有标过词', '', [['e-mlearn', '去学词'], ['e-mreview', '复习']])}
       <div class="hair"></div>
-      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有改过释义</div>'}
-      <div class="row" style="margin-top:18px">
-        <button class="toolbtn" id="m-export">导出到文件</button>
-        <button class="toolbtn" id="m-import">从文件导入</button>
+      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有改过释义</div>'}`;
+    $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
+    if ($('e-mlearn')) $('e-mlearn').onclick = () => go('#/learn');
+    if ($('e-mreview')) $('e-mreview').onclick = () => go('#/review');
+    if ($('m-review')) $('m-review').onclick = () => { startReview(20); go('#/review'); };
+  }
+
+  // ── 分享码：只带「歌单/专辑/单曲的来源」，对方导入时重新解析 ──
+  const b64u = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unb64u = (str) => decodeURIComponent(escape(atob(String(str).replace(/-/g, '+').replace(/_/g, '/'))));
+  function shareSources() {
+    const pl = new Set(), al = new Set(), sg = new Set();
+    for (const r of Object.values(S.imp || {})) {
+      const pid = String((r && r.plId) || '');
+      if (/^\d+$/.test(pid)) pl.add(pid);
+      else if (/^al\d+$/.test(pid)) al.add(pid.slice(2));
+      else if (/^sg\d+$/.test(pid)) sg.add(pid.slice(2));
+      else if (r && r.nid) sg.add(String(r.nid));
+    }
+    return { v: 1, pl: [...pl], al: [...al], sg: [...sg] };
+  }
+  const shareCode = () => 'TL1.' + b64u(JSON.stringify(shareSources()));
+  async function importShareCode(code, onStep) {
+    const raw = String(code || '').trim().replace(/^TL1[.\s]*/, '').replace(/\s+/g, '');
+    let src = null;
+    try { src = JSON.parse(unb64u(raw)); } catch { return { error: '分享码读不出来' }; }
+    const jobs = [];
+    for (const id of src.pl || []) jobs.push(() => importPlaylistById(String(id), '', 0, onStep));
+    for (const id of src.al || []) jobs.push(() => importFrom('https://music.163.com/album?id=' + id, 0, onStep));
+    for (const id of src.sg || []) jobs.push(() => importFrom('https://music.163.com/song?id=' + id, 0, onStep));
+    if (!jobs.length) return { error: '分享码里没有歌单 / 专辑 / 单曲' };
+    let ok = 0, skip = 0, fail = 0;
+    for (const run of jobs) {
+      try {
+        const r = await run();
+        if (!r || r.error) { fail++; continue; }
+        ok += (r.ok || []).length; skip += (r.skip || []).length; fail += (r.fail || []).length;
+      } catch { fail++; }
+    }
+    for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+    indexLibrary();
+    return { ok, skip, fail };
+  }
+
+  // ────────────── 我的（账号 / 主题 / 数据） ──────────────
+  let shMsg = '';                                          // 分享码的结果提示（重渲染后还在）
+  function renderMe() {
+    const favN = Object.keys(S.fav || {}).filter((k) => Number(S.fav[k]) > 0).length;
+    const singN = Object.keys(S.sing || {}).filter((k) => Number(S.sing[k]) > 0).length;
+    const theme = S.theme || 'dark';
+    const seg = (id, cur, opts) => `<div class="segtext" id="${id}">${opts.map(([k, t]) => `<button data-v="${k}" class="${cur === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+    $('view-me').innerHTML = `
+      <div class="sec-head"><div><div class="sec-title">我的</div>
+        <div class="sec-sub">导入 ${Object.keys(S.imp || {}).length} 首 · 收藏 ${favN} · 会唱 ${singN}</div></div></div>
+      ${accHtml()}
+      <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
+      <div class="sect">外观</div>
+      <div class="setrow"><div class="k">主题</div>${seg('me-theme', theme, THEMES)}</div>
+      <div class="setrow"><div class="k">曲目排序</div>
+        <select class="sel" id="me-tsort">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="setrow"><div class="k">逐词罗马音</div><button class="toolbtn ${S.ruby !== false ? 'on' : ''}" id="me-ruby">${S.ruby !== false ? '开' : '关'}</button></div>
+      <div class="setrow"><div class="k">整句中文</div><button class="toolbtn ${S.zh !== false ? 'on' : ''}" id="me-zh">${S.zh !== false ? '开' : '关'}</button></div>
+      <div class="setrow"><div class="k">逐词中文</div><button class="toolbtn ${S.gloss !== false ? 'on' : ''}" id="me-gloss">${S.gloss !== false ? '开' : '关'}</button></div>
+      <div class="sect">同步</div>
+      <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">立即同步</button>
         <button class="toolbtn" id="m-pull">从云端拉回</button>
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
-        <button class="toolbtn" id="m-review">开始复习</button>
-        <button class="toolbtn" id="m-clear">清空进度</button>
       </div>
-`;
-    $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
+      <div class="sect">数据</div>
+      <div class="setrow"><div class="k">导出 / 导入<small>JSON 文件，备份或换设备</small></div>
+        <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
+      <div class="setrow"><div class="k">清空进度<small>导入的歌保留</small></div><button class="btn-danger" id="m-clear">清空</button></div>
+      <div class="sect">分享歌单</div>
+      <textarea class="code" id="sh-code" placeholder="「生成分享码」复制给别人；别人给的粘这里再点「导入分享码」"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="toolbtn" id="sh-gen">生成分享码</button>
+        <button class="toolbtn on" id="sh-imp">导入分享码</button>
+        <button class="toolbtn" id="sh-copy">复制</button>
+      </div>
+      <div class="meta" id="sh-stat" style="margin-top:8px">${esc(shMsg)}</div>
+      ${ACC && ACC.admin ? `<div class="sect">管理员</div><div class="row" style="margin-top:8px"><button class="toolbtn" id="me-admin">OSS 文件管理</button></div>` : ''}`;
+
     const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
     if (accReg) accReg.onclick = () => doAuth('reg');
     if (accLogin) accLogin.onclick = () => doAuth('login');
-    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录'); showGate(''); };
-    if ($('e-mlearn')) $('e-mlearn').onclick = () => go('#/learn');
-    if ($('e-mreview')) $('e-mreview').onclick = () => go('#/review');
-    if ($('adm-list')) $('adm-list').onclick = () => loadAdminFiles();
-    if ($('adm-sync')) $('adm-sync').onclick = () => loadAdminFiles('sync/');
-    if ($('adm-audio')) $('adm-audio').onclick = () => loadAdminFiles('audio/');
-    $('view-mine').querySelectorAll('[data-admdel]').forEach((el) => (el.onclick = () => adminDelete(el.dataset.admdel)));
+    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); renderAv(); toast('已退出登录'); showGate(''); };
+    if ($('acc-av')) $('acc-av').onclick = () => $('acc-avf').click();
+    if ($('acc-avf')) $('acc-avf').onchange = (e) => pickAvatar(e.target.files[0], async (url) => {
+      try { await apiCall('/avatar', { method: 'POST', body: { avatar: url } }); ACC.avatar = url; saveAcc(); renderAv(); toast('头像已换'); renderMe(); }
+      catch (err) { toast('换头像失败：' + err.message); }
+    });
     const accPw = $('acc-pw'), accPwDo = $('acc-pwdo');
     if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
     if (accPwDo) accPwDo.onclick = () => changePass();
+    $('view-me').querySelectorAll('#me-theme button').forEach((el) => (el.onclick = () => { S.theme = el.dataset.v; save(); applyTheme(); renderMe(); }));
+    if ($('me-tsort')) $('me-tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderMe(); };
+    const disp = (key, id) => { const el = $(id); if (el) el.onclick = () => { S[key] = S[key] === false; save(); applyDisplay(); renderMe(); }; };
+    disp('ruby', 'me-ruby'); disp('zh', 'me-zh'); disp('gloss', 'me-gloss');
+    if ($('me-admin')) $('me-admin').onclick = () => go('#/admin');
     $('m-push').onclick = () => pushCloud();
     $('m-pull').onclick = () => pullCloud();
     $('m-auto').onclick = () => {
       S.autoSync = S.autoSync === false;
       applying = true; save(); applying = false;
-      renderMine();
+      renderMe();
       if (S.autoSync === false) toast('自动同步已关');
       else { toast('自动同步已开'); syncNow({ auto: true }); }
     };
@@ -1550,11 +1758,59 @@
     };
     $('m-import').onclick = () => {
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json';
-      inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, local: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
+      inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
-    if ($('m-review')) $('m-review').onclick = () => { startReview(20); go('#/review'); };
-    $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清（导入的歌保留）')) return; S.known = {}; S.notes = {}; S.clearedAt = Date.now(); save(); renderMine(); };
+    if ($('m-clear')) $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清（导入的歌保留）')) return; S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.clearedAt = Date.now(); save(); renderMe(); };
+    const shStat = $('sh-stat');
+    if ($('sh-gen')) $('sh-gen').onclick = async () => {
+      const code = shareCode();
+      $('sh-code').value = code;
+      try { await navigator.clipboard.writeText(code); shMsg = '已生成并复制（' + Object.keys(S.imp || {}).length + ' 首的来源）'; }
+      catch { shMsg = '已生成（点「复制」）'; }
+      if (shStat) shStat.textContent = shMsg;
+    };
+    if ($('sh-copy')) $('sh-copy').onclick = async () => {
+      const v = ($('sh-code').value || '').trim(); if (!v) return;
+      try { await navigator.clipboard.writeText(v); toast('已复制'); } catch { toast('复制失败，手动选中吧'); }
+    };
+    if ($('sh-imp')) $('sh-imp').onclick = async () => {
+      const v = ($('sh-code').value || '').trim();
+      if (!v) { shMsg = '先把分享码粘进来'; if (shStat) shStat.textContent = shMsg; return; }
+      shMsg = '正在导入…'; if (shStat) shStat.textContent = shMsg;
+      const r = await importShareCode(v, null);
+      if (r.error) { shMsg = r.error; if (shStat) shStat.textContent = shMsg; return; }
+      shMsg = `导入完成：入库 ${r.ok} 首 · 跳过 ${r.skip} 首 · 失败 ${r.fail} 首`;
+      toast(`导入完成：${r.ok} 首`);
+      renderMe();
+    };
+  }
+
+  // ────────────── 管理员（OSS 文件） ──────────────
+  function renderAdmin() {
+    if (!ACC || !ACC.admin) {
+      $('view-admin').innerHTML = emptyBox('没有管理员权限', '', [['a-home', '回首页']]);
+      if ($('a-home')) $('a-home').onclick = () => go('#/home');
+      return;
+    }
+    const total = adminFiles ? adminFiles.reduce((n, f) => n + f.size, 0) : 0;
+    $('view-admin').innerHTML = `
+      <div class="sec-head">
+        <div><div class="sec-title">管理员</div>
+          <div class="sec-sub">${adminFiles ? `${adminFiles.length} 个文件 · ${fmtSize(total)}` : 'OSS 存储'}</div></div>
+        <button class="toolbtn" id="adm-list">${adminFiles ? '刷新' : '读取'}</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="toolbtn ${adminPrefix === 'sync/' ? 'on' : ''}" id="adm-sync">账号数据</button>
+        <button class="toolbtn ${adminPrefix === 'audio/' ? 'on' : ''}" id="adm-audio">音频</button>
+        <button class="toolbtn ${adminPrefix === 'kuromoji/' ? 'on' : ''}" id="adm-kuro">分词词典</button>
+      </div>
+      ${adminFiles ? (adminFiles.length ? `<div class="list" style="margin-top:8px">${adminFiles.map((f) => `<div class="item"><div class="col"><div class="l1" style="font-size:12px;word-break:break-all;font-weight:400">${esc(f.key)}</div><div class="l2">${fmtSize(f.size)} · ${esc(String(f.at || '').slice(0, 16).replace('T', ' '))}</div></div><button class="toolbtn" data-admdel="${esc(f.key)}">删除</button></div>`).join('')}</div>` : '<div class="meta" style="margin-top:8px">这个前缀下没有文件</div>') : ''}`;
+    if ($('adm-list')) $('adm-list').onclick = () => loadAdminFiles();
+    if ($('adm-sync')) $('adm-sync').onclick = () => loadAdminFiles('sync/');
+    if ($('adm-audio')) $('adm-audio').onclick = () => loadAdminFiles('audio/');
+    if ($('adm-kuro')) $('adm-kuro').onclick = () => loadAdminFiles('kuromoji/');
+    $('view-admin').querySelectorAll('[data-admdel]').forEach((el) => (el.onclick = () => adminDelete(el.dataset.admdel)));
   }
 
   // ────────────── 词条详情 ──────────────
@@ -1619,7 +1875,7 @@
       else if (norm(v.word + ' ' + v.reading + ' ' + v.romaji + ' ' + meaningOf(v) + ' ' + forms.join(' ')).includes(nq)) sc = 5;
       return sc < 99 ? { v, sc } : null;
     }).filter(Boolean).sort((a, b) => a.sc - b.sc || a.v.diff - b.v.diff).slice(0, 40).map((x) => x.v);
-    const tracks = IDX.tracks.filter((t) => norm(t.title + ' ' + t.artist + ' ' + t.album + ' ' + t.base).includes(nq));
+    const tracks = sortTracks(IDX.tracks.filter((t) => norm(t.title + ' ' + t.artist + ' ' + t.album + ' ' + t.base).includes(nq)));
     const originals = IDX.originals.filter((o) => (o.tracks || []).some((id) => TRACK.has(id)) && norm(o.name).includes(nq)).slice(0, 12);
     return { words, tracks, originals };
   }
@@ -1801,6 +2057,8 @@
       </div>
       <div class="row" style="margin:2px 0 10px">
         <button class="btn-primary" id="t-sing">▶ 进入跟唱</button>
+        <button class="toolbtn ${isFav(t.id) ? 'on' : ''}" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
+        <button class="toolbtn ${isSing(t.id) ? 'on' : ''}" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
       </div>
       <div id="t-vocab-pane">
         <div class="chips" id="twchips">
@@ -1813,6 +2071,8 @@
       </div>`;
     twFilter = 'all';
     $('t-sing').onclick = () => { openPlayer(); if (!audio.src || audio.getAttribute('data-tid') !== t.id) playTrack(t); };
+    $('t-fav').onclick = () => { toggleMark('fav', t.id); showTrack(t.id); };
+    $('t-mark').onclick = () => { toggleMark('sing', t.id); showTrack(t.id); };
     renderTrackWords();
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
     $('b-back').onclick = () => history.length > 1 ? history.back() : go('#/songs');
@@ -1832,6 +2092,7 @@
     $('m-all').classList.toggle('on', mode === 'all');
     $('m-loop').classList.toggle('on', mode === 'loop');
     if (!raf) raf = requestAnimationFrame(frame);
+    renderLyrics($('plyric'), t); bindLyrics($('plyric'));   // 先进跟唱页时就绪，不白屏
     prepAudio(t);
     if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
     else {
@@ -1900,16 +2161,17 @@
   const hidePop = () => { const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; } $('pop').classList.remove('on'); };
 
   // ────────────── 路由 ──────────────
-  const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-word', 'view-track', 'view-search', 'view-review'];
+  const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-me', 'view-admin', 'view-word', 'view-track', 'view-search', 'view-review'];
   function show(which) {
+    const avd = $('avdrop'); if (avd) avd.hidden = true;
     // 首页已经自带次级入口了，全局 tab 行在首页收起来（别让两排入口抢注意力）
     if ($('tabs')) $('tabs').hidden = (which === 'view-home');
     // 音频配置不再挂在每个页面底部：只在生词本（设置）和单曲页出现
     const slot = $('srcslot');
-    if (slot) slot.hidden = !(which === 'view-mine' || which === 'view-track');   // ⚠️ 别挪进 view：render* 会用 innerHTML 把它冲掉
+    if (slot) slot.hidden = !(which === 'view-me' || which === 'view-track');   // ⚠️ 别挪进 view：render* 会用 innerHTML 把它冲掉
     VIEWS.forEach((v) => { const el = $(v); if (el) el.hidden = v !== which; });
-    const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine' };
-    ['tab-learn', 'tab-songs', 'tab-mine'].forEach((t) => $(t).classList.toggle('on', map[which] === t));
+    const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine', 'view-me': 'tab-me', 'view-admin': 'tab-me' };
+    ['tab-learn', 'tab-songs', 'tab-mine', 'tab-me'].forEach((t) => { const el = $(t); if (el) el.classList.toggle('on', map[which] === t); });
     window.scrollTo(0, 0);
   }
   const go = (h) => { location.hash = h; };
@@ -1926,6 +2188,8 @@
     if (v === 'review') { show('view-review'); return renderReview(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
     if (v === 'mine') { show('view-mine'); return renderMine(); }
+    if (v === 'me') { show('view-me'); return renderMe(); }
+    if (v === 'admin') { show('view-admin'); return renderAdmin(); }
     show('view-learn'); renderLearn();
   }
 
@@ -1933,6 +2197,7 @@
   async function boot() {
     loadAcc();
     loadLS();
+    applyTheme();
     document.body.classList.toggle('gloss', S.gloss !== false);
     document.body.classList.toggle('ruby', S.ruby !== false);
     let data;
@@ -1962,9 +2227,13 @@
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     if ($('brand')) $('brand').onclick = () => go('#/home');
+    renderAv();
+    if ($('btn-av')) $('btn-av').onclick = (e) => { e.stopPropagation(); const d = $('avdrop'); d.hidden = !d.hidden; if (!d.hidden) renderAv(); };
+    document.addEventListener('click', (e) => { const d = $('avdrop'); if (d && !d.hidden && !e.target.closest('.avwrap')) d.hidden = true; });
     $('tab-learn').onclick = () => go('#/learn');
     $('tab-songs').onclick = () => go('#/songs');
     $('tab-mine').onclick = () => go('#/mine');
+    if ($('tab-me')) $('tab-me').onclick = () => go('#/me');
     $('btn-search').onclick = () => { const w = $('searchwrap'); w.classList.toggle('on'); if (w.classList.contains('on')) $('q').focus(); else if (location.hash.startsWith('#/search')) go(lastNonSearch); };
     let qt = null;
     $('q').oninput = (e) => {
@@ -2071,7 +2340,7 @@
     route();
     // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
     if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
-    apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; saveAcc(); if (location.hash.startsWith('#/mine')) renderMine(); } }).catch(() => {});
+    apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; ACC.avatar = r.user.avatar || ACC.avatar || ''; saveAcc(); renderAv(); if (location.hash.startsWith('#/mine')) renderMine(); else if (location.hash.startsWith('#/me') || location.hash.startsWith('#/admin')) route(); } }).catch(() => {});
     // 老数据补分词：只补没有 segs 的（静默，慢一点没关系）；测试里不跑
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉

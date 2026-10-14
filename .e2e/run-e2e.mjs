@@ -220,6 +220,7 @@ await page.goto(BASE, { waitUntil: 'load', timeout: 30000 });
 // ═══════ 0 登录闸门（没注册没登录不让用） ═══════
 await page.waitForSelector('#g-reg', { timeout: 25000 });
 check('未登录：只有登录闸门，看不到任何内容', (await page.locator('#gate').isVisible()) && (await page.locator('#deck .word').count()) === 0, ((await txt('.gatecard .gtitle')) || '').slice(0, 20));
+check('注册闸门带可选头像入口', (await page.locator('#g-av').count()) === 1 && (await page.locator('#g-avp').count()) === 1, '头像 ＋');
 await page.locator('#g-name').fill('e2e_user');
 await page.locator('#g-pass').fill('e2e-pass-123');
 await page.locator('#g-reg').click();
@@ -447,7 +448,28 @@ check('OSS 里的音频已经清空（曲目全部改走网易云解析）', oss
 await page.locator('#tab-mine').click();
 await page.waitForTimeout(400);
 check('生词本能列出已掌握词', await page.locator('#view-mine .chip').count() > 0, (await page.locator('#view-mine .chip').count()) + ' 个');
-check('生词本有导出/导入', await page.locator('#m-export').count() > 0 && await page.locator('#m-import').count() > 0);
+await page.locator('#tab-me').click();
+await page.waitForTimeout(500);
+check('「我的」页有导出/导入与主题设置', (await page.locator('#m-export').count()) > 0 && (await page.locator('#m-import').count()) > 0 && (await page.locator('#me-theme button').count()) === 3, '主题三档');
+check('头像下拉菜单：账号 / 主题开关 / 我的 / 退出', await page.evaluate(async () => {
+  document.getElementById('btn-av').click();
+  await new Promise((r) => setTimeout(r, 150));
+  const d = document.getElementById('avdrop');
+  return !d.hidden && !!d.querySelector('#av-theme') && !!d.querySelector('#av-me') && !!d.querySelector('#av-out');
+}), '菜单项');
+// 黑白模式开关
+const themeBefore = await page.evaluate(() => document.body.classList.contains('warm'));
+await page.evaluate(async () => { document.getElementById('btn-av').click(); await new Promise((r) => setTimeout(r, 120)); document.getElementById('av-theme').click(); });
+await page.waitForTimeout(400);
+const themeAfter = await page.evaluate(() => ({ warm: document.body.classList.contains('warm'), theme: JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').theme }));
+check('黑白模式开关：一键切暖白并记住', themeBefore === false && themeAfter.warm === true && themeAfter.theme === 'warm', `${themeBefore} → ${themeAfter.warm} · theme=${themeAfter.theme}`);
+await page.reload({ waitUntil: 'load' });
+await page.waitForTimeout(1200);
+check('刷新后仍是暖白（主题持久化）', await page.evaluate(() => document.body.classList.contains('warm')), 'warm');
+await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); j.theme = 'dark'; localStorage.setItem('thlyrics.tool.v1', JSON.stringify(j)); });
+await page.goto(BASE + '?th=1#/learn', { waitUntil: 'load' });
+await page.waitForTimeout(900);
+check('切回深色也生效', await page.evaluate(() => !document.body.classList.contains('warm')), 'dark');
 await page.reload({ waitUntil: 'load' });
 await page.waitForSelector('#view-mine .chip, #deck .word', { timeout: 15000 });
 await page.locator('#tab-learn').click();
@@ -509,7 +531,7 @@ await page.waitForTimeout(250);
 check('分组能展开看曲目', (await page.locator('#view-songs .grp').first().locator('.track').count()) > 0);
 await page.locator('#view-songs .segtext button[data-v="album"]').click();
 await page.waitForTimeout(350);
-check('可以按专辑分组', (await page.locator('#view-songs .grp').count()) > 5, (await page.locator('#view-songs .grp').count()) + ' 张专辑');
+check('专辑视图能渲染（网格）', (await page.locator('#view-songs .albumgrid .albumcard').count()) > 5, (await page.locator('#view-songs .albumgrid .albumcard').count()) + ' 张专辑');
 await page.locator('#view-songs .segtext button[data-v="list"]').click();
 await page.waitForTimeout(250);
 await page.locator('#view-songs .chip[data-f="imp"]').click();
@@ -579,6 +601,7 @@ await page.waitForTimeout(500);
 check('导入的歌可以删掉', (await page.locator('#list .track').count()) === 1, (await page.locator('#list .track').count()) + ' 首');
 
 // 专辑导入：一条链接进来整张
+if (!(await page.locator('.impbox').evaluate((el) => el.open))) { await page.locator('.impbox summary').click(); await page.waitForTimeout(300); }
 await page.locator('#plinput').fill('https://music.163.com/album?id=900001');
 await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 60000 });
@@ -607,6 +630,85 @@ const opened = await page.evaluate(() => {
 check('点开曲目自动起播（不用再点一次「进入跟唱」）', !!firstImpId && opened.tid === firstImpId && !!opened.src && opened.bar, `${opened.tid} · src ${opened.src.slice(0, 36)}`);
 check('迷你播放条显示专辑小图（导入曲目）', /e2e-cover/.test(opened.cover), opened.cover.slice(0, 56));
 check('导入曲目用的是服务端分词（词性/读音来自 kuromoji）', (await page.locator('#plyric .w.k-prt').count()) >= 0 && (await page.locator('#twlist .word').count()) > 0, '词汇 ' + (await page.locator('#twlist .word').count()));
+
+// ═══════ 12.5 排序 / 专辑网格 / 收藏会唱 / 分享码 ═══════
+await page.goto(BASE + '?org=1#/songs', { waitUntil: 'load' });
+await page.waitForSelector('#list .track', { timeout: 15000 });
+await page.waitForTimeout(500);
+const firstTitle = await page.evaluate(() => (document.querySelector('#list .track .l1') || {}).textContent || '');
+check('曲库默认按入库时间（新→旧）', /E2E 单曲/.test(firstTitle), '第一首：' + firstTitle.trim());
+const titlesOf = () => page.evaluate(() => [...document.querySelectorAll('#list .track .l1')].map((e) => e.textContent.trim()));
+const byTitleAsc = await page.evaluate(() => { const t0 = [...document.querySelectorAll('#list .track .l1')].map((e) => e.textContent.trim()); return t0; });
+await page.locator('#tsort').selectOption('az');
+await page.waitForTimeout(400);
+const asc = await titlesOf();
+const sortedOk = [...asc].sort((a, b) => a.localeCompare(b, 'ja')).every((x, i) => x === asc[i]);
+check('按标题升序可用（五十音顺序）', sortedOk && asc.length > 1, asc.slice(0, 3).join(' / '));
+await page.locator('#tsort').selectOption('azd');
+await page.waitForTimeout(400);
+const desc = await titlesOf();
+check('按标题降序可用（正好倒过来）', desc.length === asc.length && desc[0] === asc[asc.length - 1], `${asc[0]} ⇄ ${desc[0]}`);
+await page.locator('#tsort').selectOption('new');
+await page.waitForTimeout(400);
+
+// 专辑视图：两列网格 + 封面 + 专辑名
+await page.locator('#view-songs .segtext button[data-v="album"]').click();
+await page.waitForTimeout(500);
+const grid = await page.evaluate(() => {
+  const g = document.querySelector('.albumgrid');
+  if (!g) return null;
+  const cards = [...g.querySelectorAll('.albumcard')];
+  return { n: cards.length, cols: getComputedStyle(g).gridTemplateColumns.split(' ').length,
+    withCover: cards.filter((c) => c.querySelector('img')).length,
+    first: cards[0] ? { nm: cards[0].querySelector('.nm').textContent.trim(), img: !!cards[0].querySelector('img') } : null };
+});
+check('专辑页是两列网格', !!grid && grid.cols === 2 && grid.n > 0, grid ? `${grid.n} 张专辑 · ${grid.cols} 列` : '没有网格');
+check('专辑卡片有专辑名（有封面的会显示封面）', !!grid && grid.first && grid.first.nm.length > 0 && grid.withCover > 0, grid ? `首张 ${grid.first.nm} · ${grid.withCover} 张有封面` : '');
+await page.locator('.albumcard').first().click();
+await page.waitForTimeout(500);
+const filtered = await page.evaluate(() => ({ view: !!document.querySelector('#list'), n: document.querySelectorAll('#list .track').length }));
+check('点专辑能筛出这张专辑的歌', filtered.view && filtered.n > 0, filtered.n + ' 首');
+await page.locator('#e-pick').click().catch(() => {});
+await page.waitForTimeout(400);
+
+// 收藏 / 会唱
+await page.locator('#list .track').first().click();
+await page.waitForSelector('#t-fav', { timeout: 15000 });
+await page.locator('#t-fav').click();
+await page.waitForTimeout(400);
+await page.locator('#t-mark').click();
+await page.waitForTimeout(400);
+const marked = await page.evaluate(() => {
+  const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}');
+  const fav = Object.keys(j.fav || {}).filter((k) => j.fav[k] > 0);
+  const sing = Object.keys(j.sing || {}).filter((k) => j.sing[k] > 0);
+  return { fav: fav.length, sing: sing.length, label1: (document.getElementById('t-fav') || {}).textContent.trim(), label2: (document.getElementById('t-mark') || {}).textContent.trim() };
+});
+check('能标记收藏与会唱', marked.fav === 1 && marked.sing === 1 && /已收藏/.test(marked.label1) && /会唱/.test(marked.label2), `${marked.label1} / ${marked.label2}`);
+await page.goto(BASE + '?org=2#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(800);
+await page.locator('#view-songs .chip[data-f="fav"]').click();
+await page.waitForTimeout(400);
+const favN = await page.locator('#list .track').count();
+const favTag = await page.evaluate(() => (document.querySelector('#list .track .l3') || {}).textContent || '');
+check('曲库能筛「收藏」且列表上有标记', favN === 1 && /收藏/.test(favTag), `${favN} 首 · ${favTag.trim().slice(0, 30)}`);
+await page.locator('#view-songs .chip[data-f="sing"]').click();
+await page.waitForTimeout(400);
+check('曲库能筛「会唱」', (await page.locator('#list .track').count()) === 1, '1 首');
+await page.locator('#view-songs .chip[data-f="all"]').click();
+await page.waitForTimeout(300);
+
+// 分享码：生成 + 导入（对方再导一遍 = 全部跳过，不重复入库）
+await page.locator('#tab-me').click();
+await page.waitForTimeout(500);
+await page.locator('#sh-gen').click();
+await page.waitForTimeout(400);
+const code = await page.evaluate(() => (document.getElementById('sh-code') || {}).value || '');
+check('能生成分享码（TL1. 开头的短码）', /^TL1\./.test(code) && code.length < 400, `${code.length} 字符`);
+await page.locator('#sh-imp').click();
+await page.waitForTimeout(1500);
+const shStat = (await txt('#sh-stat')) || '';
+check('导入别人的分享码：跑通并逐条报数', /导入完成：入库 \d+ 首/.test(shStat), shStat.slice(0, 40));
 
 // ═══════ 13 单词页 → 去这句（要真的换歌、跳句、出声） ═══════
 await page.goto(BASE + '#/track/t1');
@@ -769,21 +871,23 @@ await page.goto(BASE + '?pos=1#/home', { waitUntil: 'load' });
 await page.waitForSelector('#view-home .nowcard', { timeout: 15000 });
 check('首页「正在学习」显示上次听到哪', /上次听到 1:23/.test((await txt('#view-home .nowcard .a')) || ''), ((await txt('#view-home .nowcard .a')) || '').slice(0, 34));
 check('音频设置不再挂在每个页面（首页看不到）', await page.locator('#srcslot').isHidden(), '首页隐藏');
-await page.goto(BASE + '?pos=1#/mine', { waitUntil: 'load' });
+await page.goto(BASE + '?pos=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#m-push', { timeout: 15000 });
-check('音频设置只在生词本/单曲页里出现', await page.locator('#srcslot').isVisible(), '生词本可见');
+check('音频设置只在「我的」/单曲页里出现', await page.locator('#srcslot').isVisible(), '我的页可见');
 
 // ═══════ 14 账号：自动同步 / 墓碑 / 清空 / 换设备登录恢复 ═══════
 if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
-await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
+await page.goto(BASE + '?acc=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#m-push', { timeout: 15000 });
 await page.waitForTimeout(1500);
 const accData = () => (apiState.users['e2e_user'] || {}).data || {};
-check('生词本给出同步入口与自动同步开关', (await page.locator('#m-push').count()) === 1 && (await page.locator('#m-auto').count()) === 1, await txt('#m-push'));
+check('「我的」里给出同步入口与自动同步开关', (await page.locator('#m-push').count()) === 1 && (await page.locator('#m-auto').count()) === 1, await txt('#m-push'));
 check('状态行写明已登录哪个账号', /账号 e2e_user/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 30));
 check('本机已有记录在注册时就带上去了', Object.keys(accData().known || {}).length > 0, `账号里 ${Object.keys(accData().known || {}).length} 个词`);
 
 // 改一条释义：一个按钮都不点，应该自己同步进账号
+await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#view-mine .chip', { timeout: 15000 });
 const widMine = await page.evaluate(() => { const el = document.querySelector('#view-mine .chip'); return el ? el.dataset.w : null; });
 await page.goto(BASE + '?acc=1#/word/' + widMine);
 await page.waitForTimeout(800);
@@ -809,7 +913,7 @@ if (delId2) { await page.locator(`#list [data-del="${delId2}"]`).first().click()
 check('删掉的导入曲目会记墓碑，不会被账号拉回来', !!delId2 && !!accData().del[delId2] && !accData().imp[delId2], delId2 ? `墓碑 ${accData().del[delId2] ? '有' : '无'} · 账号还留着 ${accData().imp[delId2] ? '是' : '否'}` : '没找到可删的导入曲目');
 
 // 清空进度：账号里也要清掉，否则重登又被顶回来
-await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
+await page.goto(BASE + '?acc=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#m-clear', { timeout: 15000 });
 await page.locator('#m-clear').click();
 await page.waitForTimeout(4500);
@@ -818,7 +922,7 @@ check('清空进度会一起清掉（重登不会被账号顶回来）', localPo
 
 // 换设备 = 清掉浏览器数据：先被闸门挡住，登录同账号后记录回来
 await page.evaluate(() => localStorage.clear());
-await page.goto(BASE + '?acc=2#/mine', { waitUntil: 'load' });
+await page.goto(BASE + '?acc=2#/me', { waitUntil: 'load' });
 await page.waitForSelector('#g-login', { timeout: 15000 });
 check('清掉浏览器数据后：又被闸门挡住', (await page.locator('#gate').isVisible()) && (await page.locator('#view-mine .chip').count()) === 0, '闸门');
 expect401 = true;
@@ -837,18 +941,20 @@ check('换设备登录同账号：账号里的记录（含删除墓碑）都回�
 check('登录后闸门放行，能正常用', (await page.locator('#gate').isVisible()) === false && (await page.locator('#m-push').count()) === 1, '已进入');
 
 // 管理员模式：只有第一个注册的账号（本次 e2e_user）能看到 OSS 文件管理
-await page.goto(BASE + '?admin=1#/mine', { waitUntil: 'load' });
+await page.goto(BASE + '?admin=1#/admin', { waitUntil: 'load' });
 await page.waitForSelector('#adm-list', { timeout: 15000 });
-check('管理员模式：生词本出现 OSS 文件管理入口', (await page.locator('#adm-list').count()) === 1, await txt('#adm-list'));
+check('管理员有独立页面（头像菜单进得来）', (await page.locator('#view-admin').isVisible()) && (await page.locator('#adm-list').count()) === 1, await txt('#adm-list'));
 await page.locator('#adm-list').click();
 await page.waitForTimeout(1500);
-const adminRows = await page.locator('#adminbox .item').count();
+const adminRows = await page.locator('#view-admin .item').count();
 check('管理员：能列出 OSS 上的文件（带大小）', adminRows >= 2, adminRows + ' 行');
-const delKey = await page.evaluate(() => { const el = document.querySelector('#adminbox [data-admdel]'); return el ? el.dataset.admdel : null; });
-if (delKey) { await page.locator(`#adminbox [data-admdel="${delKey}"]`).first().click(); await page.waitForTimeout(1500); }
+const delKey = await page.evaluate(() => { const el = document.querySelector('#view-admin [data-admdel]'); return el ? el.dataset.admdel : null; });
+if (delKey) { await page.locator(`#view-admin [data-admdel="${delKey}"]`).first().click(); await page.waitForTimeout(1500); }
 check('管理员：能删 OSS 上的文件（走管理员接口）', !!delKey && apiState.deleted.indexOf(delKey) >= 0, delKey ? `已请求删除 ${delKey}` : '没找到可删的');
 
 // 退出 → 回到闸门（本机记录保留）
+await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });
+await page.waitForSelector('#acc-out', { timeout: 15000 });
 await page.locator('#acc-out').click();
 await page.waitForTimeout(1000);
 check('退出登录：回到闸门', (await page.locator('#gate').isVisible()) && (await page.locator('#g-login').count()) === 1, '闸门');
