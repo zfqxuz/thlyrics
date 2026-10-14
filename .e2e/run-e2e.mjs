@@ -127,13 +127,18 @@ const apiStub = (route) => {
     if (/song/.test(raw)) return send(200, E2E_SONG);
     return send(200, { ok: true, type: 'playlist', id: '999000123', name: 'E2E 测试歌单', cover: '', total: 4, tracks: [] });
   }
+  if (path === '/avatar') {
+    if (!me) return send(401, { error: '请先登录' });
+    me.avatar = String(body.avatar || '');
+    return send(200, { ok: true, avatar: me.avatar });
+  }
   if (path === '/register') {
     const key = String(body.name || '').toLowerCase();
     if (apiState.users[key]) return send(409, { error: '这个用户名已经被用了' });
     if (String(body.pass || '').length < 6) return send(400, { error: '密码至少 6 位' });
     const u = { uid: 'u' + (++apiState.seq), name: body.name, pass: String(body.pass), token: 'tok' + apiState.seq, data: body.data || null, at: null, admin: apiState.seq === 1 };
     apiState.users[key] = u;
-    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name, admin: !!u.admin } });
+    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name, admin: !!u.admin, avatar: u.avatar || '' } });
   }
   if (path === '/login') {
     const u = apiState.users[String(body.name || '').toLowerCase()];
@@ -141,7 +146,7 @@ const apiStub = (route) => {
     return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name, admin: !!u.admin } });
   }
   if (!me) return send(401, { error: '请先登录' });
-  if (path === '/me') return send(200, { ok: true, user: { uid: me.uid, name: me.name, admin: !!me.admin } });
+  if (path === '/me') return send(200, { ok: true, user: { uid: me.uid, name: me.name, admin: !!me.admin, avatar: me.avatar || '' } });
   if (path === '/admin/files') {
     if (!me.admin) return send(403, { error: '需要管理员账号' });
     const files = [
@@ -697,6 +702,19 @@ await page.waitForTimeout(400);
 check('曲库能筛「会唱」', (await page.locator('#list .track').count()) === 1, '1 首');
 await page.locator('#view-songs .chip[data-f="all"]').click();
 await page.waitForTimeout(300);
+
+// 头像：换一张 → 压缩后上传 → 顶栏用图片显示
+await page.goto(BASE + '?av=1#/me', { waitUntil: 'load' });
+await page.waitForSelector('#acc-avf', { timeout: 15000, state: 'attached' });
+await page.setInputFiles('#acc-avf', { name: 'av.png', mimeType: 'image/png',
+  buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII=', 'base64') });
+await page.waitForTimeout(2500);
+const avOk = await page.evaluate(() => ({
+  img: !!document.querySelector('#btn-av img'),
+  store: (JSON.parse(localStorage.getItem('thlyrics.account.v1') || '{}').avatar || '').slice(0, 12),
+  card: !!document.querySelector('#view-me img.av'),
+}));
+check('换头像：canvas 压缩后上传、顶栏与我的页都用图片', avOk.img && avOk.store === 'data:image/j' && avOk.card, JSON.stringify(avOk));
 
 // 分享码：生成 + 导入（对方再导一遍 = 全部跳过，不重复入库）
 await page.locator('#tab-me').click();

@@ -78,6 +78,47 @@ await page.waitForTimeout(2500);
 const deckN = await page.locator('#deck .word').count();
 const stat = ((await page.locator('#headstat').textContent()) || '').trim();
 check('学词页的词来自导入曲库', deckN > 0 && /首/.test(stat), `${deckN} 张词卡 · 头部「${stat}」`);
+// ── 新一批 UI：我的页 / 黑白开关 / 入库倒序 / 专辑网格 / 收藏会唱 ──
+await page.goto(BASE + '?ui=1#/me', { waitUntil: 'load' });
+await page.waitForSelector('#m-push', { timeout: 30000 });
+const meOk = await page.evaluate(() => ({ theme: document.querySelectorAll('#me-theme button').length, share: !!document.getElementById('sh-code'), av: !!document.getElementById('btn-av') }));
+check('「我的」页：主题三档 + 分享码 + 头像入口', meOk.theme === 3 && meOk.share && meOk.av, JSON.stringify(meOk));
+const warmBefore = await page.evaluate(() => document.body.classList.contains('warm'));
+await page.evaluate(async () => { document.getElementById('btn-av').click(); await new Promise((r) => setTimeout(r, 150)); document.getElementById('av-theme').click(); });
+await page.waitForTimeout(500);
+const warmAfter = await page.evaluate(() => document.body.classList.contains('warm'));
+check('头像菜单里的黑白开关能切暖白', warmBefore === false && warmAfter === true, `${warmBefore} → ${warmAfter}`);
+
+await page.goto(BASE + '?ui=2#/songs', { waitUntil: 'load' });
+await page.waitForSelector('#list .track', { timeout: 30000 });
+await page.waitForTimeout(600);
+const firstTitle = await page.evaluate(() => ((document.querySelector('#list .track .l1') || {}).textContent || '').trim());
+check('曲库默认按入库时间倒序', firstTitle.length > 0, '第一首：' + firstTitle.slice(0, 26));
+await page.locator('#view-songs .segtext button[data-v="album"]').click();
+await page.waitForTimeout(600);
+const grid = await page.evaluate(() => {
+  const g = document.querySelector('.albumgrid'); if (!g) return null;
+  const cards = [...g.querySelectorAll('.albumcard')];
+  return { n: cards.length, cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, cover: cards.filter((c) => c.querySelector('img')).length, first: cards[0] ? cards[0].querySelector('.nm').textContent.trim() : '' };
+});
+check('专辑页两列网格 + 封面', !!grid && grid.cols === 2 && grid.n > 0 && grid.cover > 0, grid ? `${grid.n} 张 · ${grid.cover} 张有封面 · 首张 ${grid.first}` : '没有网格');
+
+await page.goto(BASE + '?ui=3#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(900);
+await page.locator('#list .track').first().click();
+await page.waitForSelector('#t-fav', { timeout: 30000 });
+await page.locator('#t-fav').click();
+await page.waitForTimeout(300);
+await page.locator('#t-mark').click();
+await page.waitForTimeout(600);
+const marks = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { fav: Object.keys(j.fav || {}).filter((k) => j.fav[k] > 0).length, sing: Object.keys(j.sing || {}).filter((k) => j.sing[k] > 0).length }; });
+check('能收藏 / 标会唱', marks.fav === 1 && marks.sing === 1, JSON.stringify(marks));
+await page.goto(BASE + '?ui=4#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(900);
+await page.locator('#view-songs .chip[data-f="fav"]').click();
+await page.waitForTimeout(400);
+check('曲库能按收藏筛', (await page.locator('#list .track').count()) === 1, '1 首');
+
 console.log('报错：', errs.length ? errs.slice(0, 3).join(' || ') : '无');
 console.log(bad === 0 && errs.length === 0 ? '\n===== 真机导入链路通过 =====' : `\n===== 有 ${bad} 项失败 / ${errs.length} 条报错 =====`);
 await browser.close();
