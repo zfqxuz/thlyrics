@@ -76,7 +76,7 @@ const apiMerge = (a, b) => {
   const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, a || {});
   const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, b || {});
   const n = (v) => Number(v) || 0;
-  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del), fav: {}, sing: {} };
+  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del), fav: {}, sing: {}, roma: {} };
   for (const kind of ['fav', 'sing']) {
     for (const k of new Set([...Object.keys(A[kind]), ...Object.keys(B[kind])])) {
       const x = n(A[kind][k]), y = n(B[kind][k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
