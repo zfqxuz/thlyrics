@@ -290,3 +290,25 @@
   （以前导入完要手动刷新才认那些导入的歌）。
 - 真机验证：`.e2e/sync-probe.mjs`（不带桩，真读写 OSS）→ GET 200 / PUT 200；
   E2E 里用桩，86/86。
+
+### 账号 / 同步后端：函数计算 + 自己 OSS（2026-10-14 晚，已上线）
+
+- 需求来源：用户问「我导入的只在我浏览器上吗？换设备就看不见了」→ 先做了「自动同步到 OSS 预签名对象」，
+  用户接着要求「做用户登录，开个 serverless pgsql 也行」。
+- 结论：RDS PostgreSQL **Serverless 在 cn-hangzhou 没有可卖规格**（`DescribeAvailableZones` 空），
+  所以账号体系走「**函数计算 FC 3.0 HTTP 函数 + 用户自己 OSS**」，零额外费用、无第三方。
+  - API：`https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api`（函数 `thlyrics-auth`）
+  - 代码 `ops/fc/index.js`（无依赖，node:crypto + node:https），部署 `python3 ops/deploy-fc.py`
+  - 数据：`thlyrics-audio` 桶 `sync/users/<uid>/{account,data}.json` + `sync/users/_index.json`
+  - 令牌密钥：`~/.dsh/thlyrics-fc.secret`（600，不进仓库）；函数环境变量里放的还是账号 AK，
+    **建议后续换成只有 `sync/users/*` 权限的 RAM 子账号**（当前 AK 是 PowerUserAccess，不含 RAM 管理，建不了）。
+  - 详见 `ops/README.md`。
+- 前端：`docs/app.js` 的 `API_BASE` + `ACC`（`localStorage['thlyrics.account.v1']`）；
+  **登录后 `syncNow()` 走账号模式**（一次 PUT，服务端按时间戳逐条合并后返回全量），未登录回落到原来的
+  「公开预签名对象」路子，所以没登录的人行为不变。界面在「生词本」顶部：注册并登录 / 登录 / 退出 / 改密码。
+- 记录本身（`S`）早在这一轮之前就改成**逐条带时间戳合并 + 删除墓碑 + clearedAt**，
+  所以多设备、清空浏览器数据、离线改动都不会丢；`save()` 挂钩 1.8s 去抖自动同步。
+- E2E 102/102（第 15 节新增 8 条：账号入口、注册登录、注册时带本机数据、登录后标词进账号、
+  退出、密码错提示、清浏览器数据后登录同账号恢复）。账号那节在 `.e2e/run-e2e.mjs` 里是**打桩**的
+  （拦 `thlyrics-auth-*.cn-hangzhou.fcapp.run`），别让它打真 API。
+- 真机验证脚本：`.e2e/sync-real.mjs <url>`（真 OSS；跑完记得把云端对象恢复成空）。

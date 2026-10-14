@@ -61,8 +61,68 @@ const OTHER_DEVICE_TRACK = {
   lines: [{ t: 1, text: '流れてく　時の中ででも', zh: '就算在流逝的时间中' }, { t: 3, text: '気だるさが', zh: '仍能发现' }, { t: 5, text: 'ほらグルグル廻って', zh: '只在原地打转不停' }],
   plId: '1', plName: '另一台设备的歌单', at: Date.now(),
 };
+// 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
+const apiState = { users: {}, seq: 0, calls: [] };
+const apiMerge = (a, b) => {
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, b || {});
+  const n = (v) => Number(v) || 0;
+  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del) };
+  for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
+    const x = n(A.known[k]), y = n(B.known[k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
+    if (v && Math.abs(v) > out.clearedAt) out.known[k] = v;
+  }
+  for (const k of new Set([...Object.keys(A.notes), ...Object.keys(B.notes)])) {
+    const x = A.notes[k] || {}, y = B.notes[k] || {}; const v = n(y.u) > n(x.u) ? y : x;
+    if (v && v.meaning) out.notes[k] = v;
+  }
+  out.audio = Object.assign({}, B.audio, A.audio);
+  for (const [k, v] of Object.entries(A.del)) out.del[k] = Math.max(n(out.del[k]), n(v));
+  for (const k of new Set([...Object.keys(A.imp), ...Object.keys(B.imp)])) {
+    const x = A.imp[k] || {}, y = B.imp[k] || {}; const v = n(y.at) > n(x.at) ? y : x;
+    if (n(out.del[k]) > n(v.at)) continue;
+    out.imp[k] = v;
+  }
+  return out;
+};
+const apiStub = (route) => {
+  const req = route.request();
+  const path = new URL(req.url()).pathname.replace(/^\/api/, '');
+  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, authorization', 'access-control-allow-methods': 'GET, POST, PUT, OPTIONS' }, body: '' });
+  const send = (code, obj) => route.fulfill({ status: code, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, authorization', 'access-control-allow-methods': 'GET, POST, PUT, OPTIONS' }, body: JSON.stringify(obj) });
+  apiState.calls.push(req.method() + ' ' + path);
+  let body = {};
+  try { body = JSON.parse(req.postData() || '{}'); } catch {}
+  const tok = (req.headers()['authorization'] || '').replace(/^Bearer\s+/i, '');
+  const me = Object.values(apiState.users).find((x) => x.token === tok);
+  if (path === '/health') return send(200, { ok: true });
+  if (path === '/register') {
+    const key = String(body.name || '').toLowerCase();
+    if (apiState.users[key]) return send(409, { error: '这个用户名已经被用了' });
+    if (String(body.pass || '').length < 6) return send(400, { error: '密码至少 6 位' });
+    const u = { uid: 'u' + (++apiState.seq), name: body.name, pass: String(body.pass), token: 'tok' + apiState.seq, data: body.data || null, at: null };
+    apiState.users[key] = u;
+    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name } });
+  }
+  if (path === '/login') {
+    const u = apiState.users[String(body.name || '').toLowerCase()];
+    if (!u || u.pass !== String(body.pass)) return send(401, { error: '用户名或密码不对' });
+    return send(200, { ok: true, token: u.token, user: { uid: u.uid, name: u.name } });
+  }
+  if (!me) return send(401, { error: '请先登录' });
+  if (path === '/me') return send(200, { ok: true, user: { uid: me.uid, name: me.name } });
+  if (path === '/data') {
+    if (req.method() === 'GET') return send(200, { ok: true, at: me.at, data: me.data });
+    me.data = apiMerge(body.data || {}, me.data || {});
+    me.at = new Date().toISOString();
+    return send(200, { ok: true, at: me.at, data: me.data });
+  }
+  return send(404, { error: '没有这个接口' });
+};
+
 const baseRoute = (route) => {
   const u = route.request().url();
+  if (/^https:\/\/thlyrics-auth-[^/]+\.cn-hangzhou\.fcapp\.run\//.test(u)) return apiStub(route);
   if (/data\/oss-sync\.json/.test(u)) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
       imports: { get: 'https://sync.e2e/imports-get', put: 'https://sync.e2e/imports-put' },
@@ -107,7 +167,8 @@ page.on('dialog', (d) => d.accept());   // 删除导入曲目要确认
 const errors = [];
 const netReqs = [];
 page.on('response', (r) => { if (/gdstudio|music\.126/.test(r.url())) netReqs.push(r.status() + ' ' + r.url().slice(0, 50)); });
-page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 140)); });
+let expect401 = false;   // 故意用错密码那一步会打一条 401 控制台错误，不算 bug
+page.on('console', (m) => { if (m.type() === 'error' && !(expect401 && /status of 401/.test(m.text()))) errors.push('console: ' + m.text().slice(0, 140)); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message.slice(0, 140)));
 page.on('crash', () => errors.push('渲染进程崩溃'));
 
@@ -572,6 +633,54 @@ await page.waitForTimeout(4500);
 const cloud3 = cloudView();
 const clearedLocal = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return Object.values(j.known || {}).filter((v) => v > 0).length; });
 check('清空进度后不会被云端拉回来', clearedLocal === 0 && Object.values(cloud3.known || {}).filter((v) => v > 0).length === 0, `本机 ${clearedLocal} 词 · 云端 ${Object.values(cloud3.known || {}).filter((v) => v > 0).length} 词`);
+
+// ═══════ 15 账号（注册 / 登录 / 退出 / 换设备） ═══════
+await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#acc-reg', { timeout: 15000 });
+check('生词本给出账号入口', (await page.locator('#acc-reg').count()) === 1 && (await page.locator('#acc-login').count()) === 1, await txt('#acc-reg'));
+check('未登录时状态行说明记录只在本机', /未登录/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 30));
+
+await page.locator('#acc-name').fill('e2e_user');
+await page.locator('#acc-pass').fill('e2e-pass-123');
+await page.locator('#acc-reg').click();
+await page.waitForTimeout(2500);
+check('注册并登录成功（界面切到已登录）', (await page.locator('#acc-out').count()) === 1 && /账号 e2e_user/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 26));
+check('注册时把本机已有的记录一起带上去', !!apiState.users['e2e_user'], apiState.users['e2e_user'] ? `已掌握 ${Object.keys(apiState.users['e2e_user'].data.known || {}).length} 词 · 导入 ${Object.keys(apiState.users['e2e_user'].data.imp || {}).length} 首` : '—');
+
+const uidWord = await page.evaluate(async () => {
+  location.hash = '#/learn';
+  return null;
+});
+await page.waitForSelector('#deck .word .tick:not(.on)', { timeout: 15000 });
+const accWordId = await page.evaluate(() => { const el = document.querySelector('#deck .word .tick:not(.on)'); return el ? el.closest('.word').dataset.id : null; });
+await page.locator('#deck .word .tick:not(.on)').first().click();
+await page.waitForTimeout(4500);
+check('登录后标词自动存进账号', !!accWordId && n0((apiState.users['e2e_user'] || {}).data.known[accWordId]) > 0, `词 id ${accWordId} → 账号里 ${apiState.users['e2e_user'] ? JSON.stringify(apiState.users['e2e_user'].data.known[accWordId]) : '—'}`);
+
+await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#acc-out', { timeout: 15000 });
+await page.locator('#acc-out').click();
+await page.waitForTimeout(600);
+check('退出登录：回到未登录界面（本机记录还在）', (await page.locator('#acc-reg').count()) === 1 && (await page.locator('#view-mine .chip').count()) > 0, (await page.locator('#view-mine .chip').count()) + ' 个词');
+
+// 换设备 = 清掉浏览器数据，重新登录同一个账号
+await page.evaluate(() => localStorage.clear());
+await page.goto(BASE + '?acc=2#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#acc-login', { timeout: 15000 });
+await page.waitForTimeout(3500);                       // 等进页面那次自动同步（它会 toast + 重渲染，会把输入框清掉）
+expect401 = true;
+await page.locator('#acc-name').fill('e2e_user');
+await page.locator('#acc-pass').fill('wrong-pass');
+await page.locator('#acc-login').click();
+await page.waitForTimeout(2000);
+check('密码错给明确提示', /用户名或密码不对/.test((await txt('#p-state')) || '') && (await page.locator('#acc-out').count()) === 0, ((await txt('#p-state')) || '').slice(0, 24));
+expect401 = false;
+await page.locator('#acc-name').fill('e2e_user');      // 再填一遍（上一步的 toast/渲染可能把表单清了）
+await page.locator('#acc-pass').fill('e2e-pass-123');
+await page.locator('#acc-login').click();
+await page.waitForTimeout(4000);
+const backAcc = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { known: Object.keys(j.known || {}).filter((k) => j.known[k] > 0).length, imp: Object.keys(j.imp || {}).length }; });
+check('换设备登录同一个账号：记录全回来', backAcc.known > 0 && backAcc.imp > 0, `${backAcc.known} 词 · ${backAcc.imp} 首`);
 
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 

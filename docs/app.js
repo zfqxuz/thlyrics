@@ -5,6 +5,8 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
+  const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
+  const ACC_KEY = 'thlyrics.account.v1';
 
   // ────────────── 工具 ──────────────
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -23,6 +25,9 @@
 
   // ────────────── 本地状态 ──────────────
   let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true };
+  let ACC = null;                                  // {token, name, uid}
+  const loadAcc = () => { try { ACC = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch { ACC = null; } };
+  const saveAcc = () => { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch {} };
   function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.autoSync = S.autoSync !== false; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} queueSync(); };
@@ -737,6 +742,20 @@
     }
     return syncCfg;
   }
+  /** 账号 API（函数计算）：带 token 的 JSON 调用 */
+  async function apiCall(path, opts = {}) {
+    const headers = { 'content-type': 'application/json' };
+    if (ACC && ACC.token) headers.authorization = 'Bearer ' + ACC.token;
+    const r = await fetch(API_BASE + path, {
+      method: opts.method || 'GET', headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    });
+    let j = null;
+    try { j = await r.json(); } catch {}
+    if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+    return j || {};
+  }
+
   async function readJson(url) {
     if (!url) return null;
     const r = await fetch(url, { cache: 'no-store' });
@@ -804,6 +823,21 @@
     if (importing || syncBusy) { syncQueued = true; return false; }
     syncBusy = true;
     try {
+      if (ACC && ACC.token) {                     // 账号模式：一次 PUT 就够（服务端合并后返回全量）
+        const res = await apiCall('/data', { method: 'PUT', body: { data: userState(S) } });
+        const mergedAcc = mergeStates(userState(S), res.data || {});
+        if (JSON.stringify(mergedAcc) !== JSON.stringify(userState(S))) {
+          await ensureReadings().catch(() => {});
+          applying = true;
+          S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
+          S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.clearedAt = mergedAcc.clearedAt;
+          save(); applying = false;
+          registerImpTracks();
+        }
+        applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; save(); applying = false;
+        syncErr = '';
+        return true;
+      }
       const cfg = await syncUrls();
       const [cProg, cImp] = await Promise.all([readJson(cfg.progress.get), readJson(cfg.imports.get)]);
       const cState = Object.assign({}, cProg && cProg.data ? cProg.data : (cProg || {}));
@@ -845,11 +879,70 @@
 
   function refreshSyncMsg() { const el = $('syncmsg'); if (el) el.textContent = syncMsgHtml(); }
   function syncMsgHtml() {
-    if (S.autoSync === false) return '云端：自动同步已关（点「自动同步：关」可打开）';
-    if (syncBusy) return '云端：同步中…';
-    if (syncErr) return '云端：上次同步失败（' + esc(syncErr) + '），有改动会自动重试';
-    if (S.syncAt) return '云端：已自动同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + '　·　标词 / 改释义 / 导入都会自己存上去，换设备或清掉浏览器数据后打开就自动恢复';
-    return '云端：等着第一次同步…';
+    const logged = !!(ACC && ACC.token);
+    const who = logged ? '账号 ' + esc(ACC.name) : '未登录';
+    if (S.autoSync === false) return '云端：自动同步已关（点「自动同步：关」可打开）· ' + who;
+    if (syncBusy) return '云端：同步中… · ' + who;
+    if (syncErr) return '云端：上次同步失败（' + esc(syncErr) + '），有改动会自动重试 · ' + who;
+    const tail = logged
+      ? '　·　换设备登录同一个账号就全回来了（清掉浏览器数据也不怕）'
+      : '　·　未登录：记录只在这台浏览器和你自己的 OSS 里，登录后跟着账号走';
+    if (S.syncAt) return '云端：已自动同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who + tail;
+    return '云端：等着第一次同步… · ' + who;
+  }
+
+  // ────────────── 账号（注册 / 登录 / 退出 / 改密码） ──────────────
+  function accHtml() {
+    if (ACC && ACC.token) {
+      return `<div class="accbox on"><div class="col"><div class="l1">已登录：${esc(ACC.name)}</div>
+        <div class="l2">标词 / 改释义 / 导入都会存到你的账号，换设备登录同一个账号就有</div></div>
+        <div class="row"><button class="toolbtn" id="acc-out">退出</button></div></div>
+        <div class="row" id="acc-pwrow" style="display:none;margin-top:8px">
+          <input class="sel" id="acc-old" type="password" placeholder="原密码" style="flex:1;min-width:110px;height:38px">
+          <input class="sel" id="acc-new" type="password" placeholder="新密码（≥6 位）" style="flex:1;min-width:110px;height:38px">
+          <button class="toolbtn" id="acc-pwdo">改密码</button>
+        </div>
+        <div class="row" style="margin-top:8px"><button class="toolbtn" id="acc-pw">改密码</button></div>`;
+    }
+    return `<div class="accbox"><div class="col"><div class="l1">登录后记录跟着账号走</div>
+      <div class="l2">现在未登录：进度只在本机浏览器 + 一个公开对象里。注册一个账号（只存用户名和密码哈希），<br>换手机、清掉浏览器数据，登录一下记录就全回来了。</div></div>
+      <div class="row" style="margin-top:8px">
+        <input class="sel" id="acc-name" placeholder="用户名" style="flex:1;min-width:100px;height:38px" autocomplete="username">
+        <input class="sel" id="acc-pass" type="password" placeholder="密码（≥6 位）" style="flex:1;min-width:100px;height:38px" autocomplete="current-password">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="toolbtn on" id="acc-reg">注册并登录</button>
+        <button class="toolbtn" id="acc-login">登录</button>
+      </div></div>`;
+  }
+
+  async function doAuth(kind) {
+    const name = ($('acc-name') && $('acc-name').value || '').trim();
+    const pass = ($('acc-pass') && $('acc-pass').value) || '';
+    if (!name || !pass) { toast('用户名和密码都要填'); return; }
+    setLoad(true, kind === 'reg' ? '注册中…' : '登录中…');
+    try {
+      const body = { name, pass };
+      if (kind === 'reg') body.data = userState(S);         // 注册时把本机已有记录一起带上去
+      const res = await apiCall('/' + (kind === 'reg' ? 'register' : 'login'), { method: 'POST', body });
+      ACC = { token: res.token, name: res.user.name, uid: res.user.uid };
+      saveAcc();
+      setLoad(false);
+      toast(kind === 'reg' ? `注册好了，欢迎 ${res.user.name}` : `已登录：${res.user.name}`);
+      await syncNow({ auto: true });                        // 立刻拉一次（PUT 会带回服务端合并后的全量）
+      renderMine();
+    } catch (e) { setLoad(false); toast((kind === 'reg' ? '注册失败：' : '登录失败：') + e.message); }
+  }
+
+  async function changePass() {
+    const oldp = ($('acc-old') && $('acc-old').value) || '', newp = ($('acc-new') && $('acc-new').value) || '';
+    if (!oldp || newp.length < 6) { toast('原密码填一下，新密码至少 6 位'); return; }
+    try {
+      const res = await apiCall('/password', { method: 'POST', body: { old: oldp, new: newp } });
+      ACC.token = res.token; saveAcc();
+      toast('密码改好了（其它设备需要重新登录）');
+      renderMine();
+    } catch (e) { toast('改密码失败：' + e.message); }
   }
 
   async function pushCloud() {
@@ -1041,7 +1134,8 @@
     const noted = VOCAB.filter((v) => S.notes[v.id] && S.notes[v.id].meaning);
     $('view-mine').innerHTML = `
       <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词 · 导入的歌 ${Object.keys(S.imp || {}).length} 首</div></div></div>
-      <div class="meta" id="syncmsg" style="color:var(--ink2)">${syncMsgHtml()}</div>
+      ${accHtml()}
+      <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
       <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : '<span class="meta">还没标过词</span>'}</div>
       <div class="hair"></div>
       ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有自定义释义</div>'}
@@ -1055,6 +1149,13 @@
       </div>
       <div class="meta" style="margin-top:10px;color:var(--ink2)">云端存的是你自己的记录（进度 / 自定义释义 / 导入的歌单），放在你自己的 OSS 里，不经过第三方。本机绑定的音频文件（大）不同步。</div>`;
     $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
+    const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
+    if (accReg) accReg.onclick = () => doAuth('reg');
+    if (accLogin) accLogin.onclick = () => doAuth('login');
+    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录（本机记录还在，随时可以再登）'); renderMine(); };
+    const accPw = $('acc-pw'), accPwDo = $('acc-pwdo');
+    if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
+    if (accPwDo) accPwDo.onclick = () => changePass();
     $('m-push').onclick = () => pushCloud();
     $('m-pull').onclick = () => pullCloud();
     $('m-auto').onclick = () => {
@@ -1423,6 +1524,7 @@
 
   // ────────────── 启动 ──────────────
   async function boot() {
+    loadAcc();
     loadLS();
     document.body.classList.toggle('gloss', S.gloss !== false);
     document.body.classList.toggle('ruby', S.ruby !== false);
