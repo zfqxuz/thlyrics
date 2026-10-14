@@ -134,3 +134,20 @@
 - E2E 48/48（`.e2e/run-e2e.mjs`）
 - 已实测结论（别重复踩）：OSS 默认域名的 Content-Disposition: attachment **不影响** `<audio>` 播放；
   点句子会开单句循环是当前设计，用户认为像"只能一句一句播"，要按 PLAN 改。
+
+### 本轮补充（2026-10-14 上午，session mv73e2a0 → mv7ht1t1）
+
+- **QQ 机器人掉线事故**：07:02 机器人账号（2267595782）被 QQ 踢下线（KickedOffLine），
+  桥本身没挂。10:33 用户重新扫码后恢复；NapCat 掉线期间收到的消息会在重连后补投。
+  二维码每 2 分钟过期，别再发 PNG 截图，用实时页面：
+  `nohup node /home/zfq/qqbot/tools/qq-login-page.mjs &` → http://127.0.0.1:8899/
+  （自动刷新二维码 + 显示在线状态/解码链接；状态靠 ss 看 6700 上有没有连接）。
+- **逐词罗马音修了个真 bug**：`segs[].y` 以前取的是**词典形**读音（咲い→saku、来→kuru、
+  し→shisuru、待っ→tsu），跟唱时看到的是错的。现在取**表面形**读音 + 词尾促音按下一词补辅音
+  （待ってて→mattete）。全量重建后"不符"从 990 处降到 0。
+  `segs[].l`（词典形读音）与词表 `v.romaji` 保持词典形，不要动。
+- 重建顺序：`node scripts/build-index.mjs --stats` → `node scripts/build-web.mjs`
+  （`build-web` 会把 `data/audio-oss.json` 里的 OSS 地址合回 `track.audioOss`，不要手工改
+  `docs/data/index.json` 的音频字段）。
+- 待办仍在：①账号级"阻止公共访问"（不关也能跑，现在是 10 年签名 URL）；
+  ②剩下 34 首等音源；③QQ 发工作区文件报 ENOENT（容器没挂 thlyrics，两个修法待用户选）。
