@@ -508,6 +508,12 @@ async function main() {
           }
         }
         const learn = isWorthLearning(tk, lemma);
+        // 逐词罗马音（跟唱时看到的那一行）必须等于"实际唱出来的音"：
+        // 用表面形读音（咲い→サイ→sai），不能用词典形读音（→saku）。
+        // 词典形读音仍然保存在 l 字段里，供词表词条（v.romaji）使用。
+        const surfaceKana = /^[\u3041-\u3096\u30fc]+$/.test(surfaceReading)
+          ? surfaceReading
+          : (/^[\u3041-\u3096\u30fc]+$/.test(surf) ? surf : '');
         segs.push({
           s: surf,
           k: posKind(tk),
@@ -515,17 +521,28 @@ async function main() {
           b: learn ? lemma : undefined,
           l: learn ? fixedReading || undefined : undefined,
           r: reading || undefined,
-          y: fixedReading ? kanaToRomaji(fixedReading) : undefined,
+          y: surfaceKana ? kanaToRomaji(surfaceKana) : undefined,
           p: learn ? tk.pos : undefined,
         });
       }
       if (cursor < l.text.length) segs.push({ s: l.text.slice(cursor), w: false });
-      // 整行罗马音：词用词典读音转写，空格/标点原样
-      const lineRomaji = segs
-        .map((sg) => (sg.w || sg.r ? sg.y || kanaToRomaji(sg.s) : kanaToRomaji(sg.s)))
-        .join('')
-        .replace(/\s+/g, ' ')
-        .trim();
+      // 整行罗马音：逐词罗马音拼起来；词尾促音（っ）要把该占的辅音补上（待っ + て = matte）
+      const rom = segs.map((sg) => {
+        const kana = sg.r
+          ? toHira(sg.r)
+          : (/^[\u3041-\u3096\u30fc]+$/.test(sg.s || '') ? sg.s : '');
+        const base = sg.y != null ? sg.y : (kana ? kanaToRomaji(kana) : kanaToRomaji(sg.s || ''));
+        return { base, tsu: /\u3063$/.test(kana) };
+      });
+      rom.forEach((x, i) => {
+        if (!x.tsu) return;
+        const rest = rom.slice(i + 1).map((y) => y.base).find((t) => /[a-z]/.test(t || ''));
+        const cluster = rest ? (rest.match(/^[^aeiou]+/) || [''])[0] : '';
+        if (!cluster) return;
+        x.base += cluster[0];
+        if (segs[i] && segs[i].y != null) segs[i].y = x.base;   // 逐词视图同步
+      });
+      const lineRomaji = rom.map((x) => x.base).join('').replace(/\s+/g, ' ').trim();
       return { t: l.time, text: l.text, jp: isJapanese(l.text), romaji: lineRomaji, segs };
     });
 
