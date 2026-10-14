@@ -1,6 +1,10 @@
 package com.zfqxuz.thlyrics;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.os.Build;
 
 import com.getcapacitor.JSObject;
@@ -45,6 +49,36 @@ public class MediaSessionPlugin extends Plugin {
         } catch (Throwable e) {
             call.reject(String.valueOf(e.getMessage()));
         }
+    }
+
+
+    /** 有没有被系统放进电池优化白名单（没放进去的话，息屏放一会儿可能被掐） */
+    @PluginMethod
+    public void isIgnoringBatteryOptimizations(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("ignoring", ignoring());
+        call.resolve(o);
+    }
+
+    /** 弹系统对话框请求加入白名单（用户点了才生效） */
+    @PluginMethod
+    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+        try {
+            if (ignoring()) { call.resolve(); return; }
+            Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            i.setData(Uri.parse("package:" + getContext().getPackageName()));
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Throwable e) {
+            call.reject(String.valueOf(e.getMessage()));
+        }
+    }
+
+    private boolean ignoring() {
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            return pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
+        } catch (Throwable e) { return true; }
     }
 
     private static double orZero(Double d) { return d == null ? 0 : d; }

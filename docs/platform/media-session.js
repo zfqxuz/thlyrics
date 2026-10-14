@@ -73,3 +73,16 @@ export const mediaSession = {
     if (nativePlugin) { try { nativePlugin.stop().catch(() => {}); } catch { /* 忽略 */ } }
   },
 };
+
+/** 电池优化白名单（只原生壳有）：华为/小米这类 ROM 不加白名单会把后台音频掐掉 */
+export const batteryExempt = {
+  available: !!nativePlugin,
+  async check() {
+    if (!nativePlugin) return true;
+    try { const r = await nativePlugin.isIgnoringBatteryOptimizations(); return !!(r && r.ignoring); } catch { return true; }
+  },
+  async request() {
+    if (!nativePlugin) return false;
+    try { await nativePlugin.requestIgnoreBatteryOptimizations(); return true; } catch { return false; }
+  },
+};

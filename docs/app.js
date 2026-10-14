@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore } from './platform/index.js?v=20261015h';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015j';
 
 (() => {
   'use strict';
@@ -8,6 +8,9 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   const ACC_KEY = 'thlyrics.account.v1';
 
   // ────────────── 工具 ──────────────
+  /** 图片地址统一转 https：页面跑在 https 下，http 图会被当混合内容直接拦掉
+   *  （真机踩过：网易云封面就是 http://p3.music.126.net/...，全都裂） */
+  const httpsImg = (u) => { const t = String(u == null ? '' : u); return t.startsWith('http://') ? 'https://' + t.slice(7) : t; };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = (s) => (!s || !isFinite(s)) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const norm = (s) => String(s || '').toLowerCase().replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
@@ -209,8 +212,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const act = (a && a.action) || '';
     if (act === 'play') audio.play().catch(() => {});
     else if (act === 'pause') audio.pause();
-    else if (act === 'next') step(1);
-    else if (act === 'prev') step(-1);
+    else if (act === 'next') stepTrack(1);
+    else if (act === 'prev') stepTrack(-1);
     else if (act === 'seek') jump(Number(a.position) || 0);
     else if (act === 'stop') { audio.pause(); mediaSession.stop(); }
   });
@@ -274,6 +277,18 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     urlCache.set(cacheKey, { url, at: Date.now() }); saveUrlCache();
     markTrial(track, st);
     return url;
+  }
+
+  /** 媒体键的「上一首/下一首」：按曲库当前排序走（跟曲库页顺序一致，跟界面筛选无关） */
+  function stepTrack(dir) {
+    const list = sortTracks(IDX.tracks.slice());
+    if (!list.length) return;
+    const i = curTrack ? list.findIndex((t) => t.id === curTrack.id) : -1;
+    const n = i < 0 ? (dir > 0 ? 0 : list.length - 1) : (i + dir + list.length) % list.length;
+    const t = list[n];
+    if (!t || (curTrack && t.id === curTrack.id)) return;
+    go('#/track/' + t.id);                       // 进去就自动起播（showTrack 里已经这么做）
+    toast((dir > 0 ? '下一首：' : '上一首：') + t.title);
   }
 
   /** 沙盒里没人认领的本机音频：解绑/删曲目后留下的副本，开机清一次 */
@@ -401,6 +416,15 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       }
       setState('音频加载失败，点播放重试');
     });
+    // 第一次出声时问一次：让系统别在息屏/后台把播放掐掉（只问一次）
+    if (batteryExempt.available && !S.bgAsked) {
+      S.bgAsked = 1; save();
+      batteryExempt.check().then((ok) => {
+        if (ok) return;
+        toast('想让它在后台继续播？请在接下来的弹窗里点「允许」');
+        setTimeout(() => batteryExempt.request(), 900);
+      }).catch(() => {});
+    }
     // 整首听完了：把进度清掉，下次点开从头开始
     // （踩过：不清的话「续播」会把 20 秒的曲子直接跳到结尾，看起来像坏了）
     audio.addEventListener('ended', () => {
@@ -789,7 +813,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (brN) tags.push(`标日 ${brN}`);
     // 只有真有封面素材才放图；没有就不放空占位框（不为了填满空间做装饰卡片）
     const cover = t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
-      : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(t.coverUrl)}" alt="">` : '');
+      : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '');
     return `<div class="item track" data-id="${t.id}">
       ${cover}
       <div class="col">
@@ -1673,7 +1697,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const k = String(t.album || '未知专辑').trim() || '未知专辑';
       if (!m.has(k)) m.set(k, { name: k, cover: '', n: 0, artist: '' });
       const a = m.get(k); a.n++;
-      if (!a.cover) a.cover = t.coverUrl || (t.coverFile ? 'data/' + t.coverFile : '');
+      if (!a.cover) a.cover = httpsImg(t.coverUrl) || (t.coverFile ? 'data/' + t.coverFile : '');
       if (!a.artist) a.artist = t.artist || '';
     }
     return [...m.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
@@ -2177,10 +2201,13 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     host.addEventListener('click', (e) => {
       const wEl = e.target.closest('.w');
       if (wEl && !wEl.dataset.plain) {
+        // 再点同一个词 = 收起（不然抽屉开着没地方关，真机反馈过）
+        if (popWordEl === wEl && $('pop').classList.contains('on')) { hidePop(); return; }
         const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
         const blk = e.target.closest('.lblock[data-i]');
         showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '',
           li: blk ? Number(blk.dataset.i) : null, ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
+        popWordEl = wEl;
         return;
       }
       const b = e.target.closest('.lblock[data-i]');
@@ -2217,7 +2244,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">← 返回</button></div>
       <div class="item" style="border:0;padding:0 0 12px;cursor:default">
         ${t.coverFile ? `<img class="cover big" src="data/${t.coverFile}" alt="">`
-          : (t.coverUrl ? `<img class="cover big" src="${esc(t.coverUrl)}" alt="">` : '<div class="cover big"></div>')}
+          : (t.coverUrl ? `<img class="cover big" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover big"></div>')}
         <div class="col">
           <div class="l1" style="font-size:17px">${esc(t.title)}</div>
           <div class="l2">${esc(t.artist)} · ${esc(t.album)}</div>
@@ -2248,7 +2275,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('p-title').textContent = t.title; $('p-artist').textContent = t.artist + ' · ' + t.album;
     const mbCover = $('mb-cover');
     if (mbCover) {
-      const src = t.coverFile ? 'data/' + t.coverFile : (t.coverUrl || '');
+      const src = t.coverFile ? 'data/' + t.coverFile : httpsImg(t.coverUrl);
       if (src) { mbCover.src = src; mbCover.hidden = false; }
       else { mbCover.removeAttribute('src'); mbCover.hidden = true; }
     }
@@ -2296,6 +2323,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
 
   // ────────────── 词条弹层 ──────────────
   let popWord = null, popFallback = null, popSeg = null, popPos = null, romaCtx = null, romaWasPlaying = false;
+  let popWordEl = null;                                  // 当前抽屉是点哪个词开的（再点它要收起）
   function showPop(w, fallback, seg) {
     popFallback = fallback || null;
     popSeg = seg || null;
@@ -2332,6 +2360,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   }
   /** 关弹层：顺手把罗马音编辑器收起来，编辑时停掉的播放继续 */
   const hidePop = () => {
+    popWordEl = null;
     const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; }
     closeRomaEditor();
     $('pop').classList.remove('on');

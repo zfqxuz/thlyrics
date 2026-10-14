@@ -103,11 +103,11 @@ public class PlaybackService extends Service {
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
-        b.addAction(new NotificationCompat.Action(android.R.drawable.ic_media_previous, "上一句", pi("prev")));
+        b.addAction(new NotificationCompat.Action(android.R.drawable.ic_media_previous, "上一首", pi("prev")));
         b.addAction(playing
                 ? new NotificationCompat.Action(android.R.drawable.ic_media_pause, "暂停", pi("pause"))
                 : new NotificationCompat.Action(android.R.drawable.ic_media_play, "播放", pi("play")));
-        b.addAction(new NotificationCompat.Action(android.R.drawable.ic_media_next, "下一句", pi("next")));
+        b.addAction(new NotificationCompat.Action(android.R.drawable.ic_media_next, "下一首", pi("next")));
         if (session != null) {
             try {
                 b.setStyle(new MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0, 1, 2));
