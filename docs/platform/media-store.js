@@ -87,9 +87,22 @@ export const mediaStore = {
 
   /** 删掉本机那份（网页端顺手回收 objectURL） */
   async remove(ref) {
-    if (!ref) return;
-    if (native) return;                       // 沙盒文件留给系统清理，不做删除接口
+    if (!ref || !ref.key) return;
+    if (plugin) { try { await plugin.remove({ key: ref.key }); } catch { /* 文件可能已经没了 */ } return; }
     if (objUrls.has(ref.key)) { try { URL.revokeObjectURL(objUrls.get(ref.key)); } catch { /* 忽略 */ } objUrls.delete(ref.key); }
-    if (ref.key) await idbRun('readwrite', (s) => s.delete(ref.key));
+    await idbRun('readwrite', (s) => s.delete(ref.key));
   },
+
+  /** 按文件名删（孤儿清理用） */
+  async removeByKey(key) { return mediaStore.remove({ key }); },
+
+  /** 列出本机已存的音频（孤儿清理用） */
+  async list() {
+    if (plugin) { const r = await plugin.list(); return (r && r.files) || []; }
+    const keys = await idbRun('readonly', (s) => s.getAllKeys());
+    return (keys || []).map((k) => ({ key: String(k) }));
+  },
+
+  /** 是不是原生壳（决定要不要做沙盒清理：网页端 IndexedDB 也一样） */
+  native,
 };

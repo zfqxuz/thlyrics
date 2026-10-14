@@ -8,6 +8,7 @@ import android.provider.OpenableColumns;
 
 import androidx.activity.result.ActivityResult;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -77,6 +78,45 @@ public class LocalAudioPlugin extends Plugin {
         } finally {
             try { if (in != null) in.close(); } catch (Throwable ignored) {}
             try { if (out != null) out.close(); } catch (Throwable ignored) {}
+        }
+    }
+
+    /** 列出沙盒里已有的本机音频（给前端做孤儿清理） */
+    @PluginMethod
+    public void list(PluginCall call) {
+        try {
+            File dir = new File(getContext().getFilesDir(), "audio");
+            JSArray arr = new JSArray();
+            File[] files = dir.listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (!f.isFile()) continue;
+                    JSObject o = new JSObject();
+                    o.put("key", f.getName());
+                    o.put("size", f.length());
+                    arr.put(o);
+                }
+            }
+            JSObject ret = new JSObject();
+            ret.put("files", arr);
+            call.resolve(ret);
+        } catch (Throwable e) {
+            call.reject(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /** 删掉沙盒里的一份（只认文件名，挡掉路径穿越） */
+    @PluginMethod
+    public void remove(PluginCall call) {
+        try {
+            String key = call.getString("key", "");
+            if (key.isEmpty() || key.contains("/") || key.contains("..")) { call.reject("文件名不合法"); return; }
+            File f = new File(new File(getContext().getFilesDir(), "audio"), key);
+            JSObject o = new JSObject();
+            o.put("ok", f.delete());
+            call.resolve(o);
+        } catch (Throwable e) {
+            call.reject(String.valueOf(e.getMessage()));
         }
     }
 

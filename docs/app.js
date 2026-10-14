@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore } from './platform/index.js?v=20261015f';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore } from './platform/index.js?v=20261015h';
 
 (() => {
   'use strict';
@@ -237,10 +237,12 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
 
   // fcJson / gdJson / apiCall 等网络调用已搬到 platform/net.js
   /** 可播地址：netease 走后端再回落公共接口；tencent(QQ音乐) 只走后端（公共中继没有 QQ 源）*/
+  let lastAudioMeta = null;            // 最近一次解析拿到的 {size,br}：用来判断"是不是 30 秒试听片段"
   async function resolveAudioUrl(nid, br, src) {
     const source = src || 'netease';
     const extra = source === 'tencent' ? '&source=tencent' : '';
-    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`); if (j && j.url) return j.url; } catch {}
+    lastAudioMeta = null;
+    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`); if (j && j.url) { lastAudioMeta = { size: Number(j.size) || 0, br: Number(j.br) || 0 }; return j.url; } } catch {}
     if (source !== 'netease') return null;
     try { const j = await gdJson(`types=url&source=netease&id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
     return null;
@@ -270,7 +272,45 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const url = await resolveAudioUrl(st.nid, 320, st.type);
     if (!url) throw new Error('取不到音频地址');
     urlCache.set(cacheKey, { url, at: Date.now() }); saveUrlCache();
+    markTrial(track, st);
     return url;
+  }
+
+  /** 沙盒里没人认领的本机音频：解绑/删曲目后留下的副本，开机清一次 */
+  async function gcLocalAudio() {
+    if (!mediaStore.native) return;
+    try {
+      const files = await mediaStore.list();
+      if (!files || !files.length) return;
+      const keep = new Set(Object.values(S.audio || {}).filter((x) => x && x.type === 'local' && x.key).map((x) => x.key));
+      let n = 0;
+      for (const f of files) if (f && f.key && !keep.has(f.key)) { await mediaStore.removeByKey(f.key); n++; }
+      if (n) console.info('[thlyrics] 清理了 ' + n + ' 个没人认领的本机音频');
+    } catch { /* 清理失败不影响使用 */ }
+  }
+
+  /** 网易云对会员曲只给 30 秒试听：用 size/码率估时长，标出来免得以为播放器坏了 */
+  function markTrial(track, st) {
+    const m = lastAudioMeta;
+    if (!track || !m || !m.size || !m.br) return;
+    const secs = m.size / (m.br / 8);
+    const trial = secs > 0 && secs < 60;
+    const cur = S.audio[track.id] || track.audio || {};
+    if (!!cur.trial === trial) return;
+    S.audio[track.id] = Object.assign({}, cur, { trial });
+    save();
+    scheduleTrialRender();          // 徽章/来源行要跟着刷（解析是异步的，渲染早于它）
+  }
+
+  /** 试听标记是解析完才知道的：合并几次变化，晚一点统一刷一次界面 */
+  let trialRenderTimer = null;
+  function scheduleTrialRender() {
+    if (trialRenderTimer) return;
+    trialRenderTimer = setTimeout(() => {
+      trialRenderTimer = null;
+      if (location.hash.startsWith('#/songs')) renderSongs();
+      if (curTrack && $('srcinfo')) $('srcinfo').textContent = describeSource(curTrack);
+    }, 500);
   }
 
   /** 进单曲/跟唱页就把音频准备好：有直链的开始缓冲，没有的先解析地址 */
@@ -743,6 +783,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (isFav(t.id)) tags.push('♥ 收藏');
     if (isSing(t.id)) tags.push('会唱');
     if (t.imp && t.audio && t.audio.type === 'tencent') tags.push('QQ音乐');
+    if ((S.audio[t.id] && S.audio[t.id].trial) || (t.audio && t.audio.trial)) tags.push('试听片段');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
     if (brN) tags.push(`标日 ${brN}`);
@@ -1581,6 +1622,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     TRACK.delete(id);
     indexLibrary();
     if (curTrack && curTrack.id === id) { audio.pause(); audio.removeAttribute('src'); curTrack = null; mediaSession.stop(); }
+    if (S.audio[id] && S.audio[id].type === 'local') { mediaStore.remove(S.audio[id]); delete S.audio[id]; }
     renderSongs();
   }
   function impRowsHtml() {
@@ -2232,7 +2274,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (t.audioOss) return `音频：阿里云 OSS`;
     const s = S.audio[t.id] || t.audio;
     if (s && s.type === 'local') return `音频：本机文件${s.name ? ' · ' + s.name : ''}`;
-    if (s && s.nid) return `音频：${s.type === 'tencent' ? 'QQ音乐' : '网易云'}`;
+    if (s && s.nid) return `音频：${s.type === 'tencent' ? 'QQ音乐' : '网易云'}${s.trial ? ' · 试听片段（约 30 秒）' : ''}`;
     return '没有音频';
   }
   function applyDisplay() {
@@ -2526,6 +2568,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const raw = $('nidinput').value.trim();
       const qq = raw.match(/songDetail\/([A-Za-z0-9]{10,})/) || (/^[A-Za-z0-9]{12,16}$/.test(raw) ? [null, raw] : null);
       const m = raw.match(/(\d{3,})/);
+      const prev = S.audio[curTrack.id];
+      if (prev && prev.type === 'local') mediaStore.remove(prev);      // 换回在线源：本机那份不再需要
       if (qq) S.audio[curTrack.id] = { type: 'tencent', nid: qq[1] };
       else if (m) S.audio[curTrack.id] = { type: 'netease', nid: m[1] };
       else { alert('没识别出歌曲 ID（网易云数字 ID 或 QQ 歌曲 mid 都行）'); return; }
@@ -2546,6 +2590,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; ACC.avatar = r.user.avatar || ACC.avatar || ''; saveAcc(); renderAv(); if (location.hash.startsWith('#/mine')) renderMine(); else if (location.hash.startsWith('#/me') || location.hash.startsWith('#/admin')) route(); } }).catch(() => {});
     // 老数据补分词：只补没有 segs 的（静默，慢一点没关系）；测试里不跑
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
+    setTimeout(() => gcLocalAudio(), 3000);            // 清掉没人认领的本机音频副本
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
     if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {
       setTimeout(() => checkPlaylists({ silent: true }), 9000);
