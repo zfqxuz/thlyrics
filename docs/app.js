@@ -21,6 +21,12 @@
     if (v.jl === 3) return 4;
     return 5;
   }
+  /** 空状态：说清发生了什么 + 给下一步按钮（不要只丢一句"没有内容"） */
+  const emptyBox = (title, sub, acts) => `<div class="emptybox">
+    <div class="et">${esc(title)}</div>
+    ${sub ? `<div class="es">${esc(sub)}</div>` : ''}
+    ${(acts && acts.length) ? `<div class="row" style="justify-content:center;margin-top:14px">${acts.map(([k, t]) => `<button class="toolbtn" id="${k}">${esc(t)}</button>`).join('')}</div>` : ''}
+  </div>`;
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
@@ -60,7 +66,7 @@
   (function loadUrlCache() { try { const o = JSON.parse(localStorage.getItem(UC_KEY) || '{}'); for (const k of Object.keys(o)) if (o[k] && o[k].url) urlCache.set(k, o[k]); } catch {} })();
   const saveUrlCache = () => { try { const o = {}; for (const [k, v] of urlCache) if (Date.now() - v.at < URL_TTL) o[k] = v; localStorage.setItem(UC_KEY, JSON.stringify(o)); } catch {} };
 
-  let stationNid = null, seekTime = null, prepToken = 0;
+  let stationNid = null, seekTime = null, prepToken = 0, posSavedAt = 0;
   const setNow = (t) => { const el = $('p-now'); if (el) el.textContent = t; };
   const setState = (t) => { const el = $('p-state'); if (el) el.textContent = t || ''; };
   function setLoad(on, text) {
@@ -151,6 +157,16 @@
     audio.addEventListener('play', () => { $('playbtn').textContent = '❚❚'; $('p-play').textContent = '❚❚'; });
     audio.addEventListener('pause', () => { $('playbtn').textContent = '▶'; $('p-play').textContent = '▶'; });
     audio.addEventListener('error', () => { if (stationNid) urlCache.delete(String(stationNid)); setLoad(false); setState('音频加载失败，点播放重试'); });
+    // 记住听到哪：每 3 秒落一次，下次进这首歌从这儿继续
+    audio.addEventListener('timeupdate', () => {
+      if (!curTrack || !(audio.currentTime > 3)) return;
+      const now = Date.now();
+      if (now - posSavedAt < 3000) return;
+      posSavedAt = now;
+      S.pos = S.pos || {};
+      S.pos[curTrack.id] = Math.round(audio.currentTime);
+      save();
+    });
   }
 
   // ────────────── 单句循环 / 播放帧 ──────────────
@@ -340,7 +356,7 @@
       ${last ? `<div class="nowcard">
         <div class="k">NOW LEARNING · 正在学习</div>
         <div class="t">${esc(last.title)}</div>
-        <div class="a">${esc(last.artist)}${last.base ? ' · 原曲：' + esc(last.base) : ''}</div>
+        <div class="a">${esc(last.artist)}${last.base ? ' · 原曲：' + esc(last.base) : ''}${(S.pos || {})[last.id] > 5 ? ` · 上次听到 ${fmt(S.pos[last.id])}` : ''}</div>
         <div class="acts"><button class="btn-main" id="h-continue">继续学唱</button><button class="btn-ghost" id="h-pick">换一首</button></div>
       </div>` : `<div class="nowcard">
         <div class="k">开始</div>
@@ -364,6 +380,59 @@
     $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => goHome('#/word/' + el.dataset.w)));
   }
   let homeQt = null;
+
+  // ────────────── 复习（生词本的学习闭环：看词 → 回忆 → 看释义 → 标记） ──────────────
+  let revDeck = [], revI = 0, revShown = false, revStat = { ok: 0, again: 0 };
+  function startReview(n) {
+    const pool = VOCAB.filter((v) => !isKnown(v) && v.examples && v.examples.length);
+    const pick = [];
+    const step = Math.max(1, Math.floor(pool.length / (n || 20)));
+    for (let i = 0; i < pool.length && pick.length < (n || 20); i += step) pick.push(pool[i]);
+    revDeck = pick.length ? pick : VOCAB.slice(0, 10);
+    revI = 0; revShown = false; revStat = { ok: 0, again: 0 };
+  }
+  function renderReview() {
+    if (!revDeck.length) startReview(20);
+    const v = revDeck[revI];
+    if (!v) {
+      $('view-review').innerHTML = `<div class="revwrap">
+        <div class="sec-head"><div><div class="sec-title">复习完成</div><div class="sec-sub">这轮 ${revDeck.length} 个词 · 记住了 ${revStat.ok} · 还要再看 ${revStat.again}</div></div></div>
+        ${emptyBox('这一轮过完了', '记住的已经进了生词本；"还要再看"的下一轮还会出现。', [])}
+        <div class="row" style="justify-content:center;gap:8px">
+          <button class="toolbtn" id="rev-again">再来一轮</button>
+          <button class="toolbtn" id="rev-mine">回生词本</button>
+        </div></div>`;
+      if ($('rev-again')) $('rev-again').onclick = () => { startReview(20); renderReview(); };
+      if ($('rev-mine')) $('rev-mine').onclick = () => go('#/mine');
+      return;
+    }
+    const ex = (v.examples || [])[0];
+    $('view-review').innerHTML = `<div class="revwrap">
+      <div class="sec-head"><div><div class="sec-title">复习</div><div class="sec-sub">第 ${revI + 1} / ${revDeck.length} 个 · 记住 ${revStat.ok} · 还要再看 ${revStat.again}</div></div></div>
+      <div class="revbar"><i style="width:${Math.round(((revI) / revDeck.length) * 100)}%"></i></div>
+      <div class="revcard">
+        <div class="rw">${esc(v.word)}</div>
+        ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(v.romaji || '')}</div>
+          <div class="rm">${esc(meaningOf(v) || '（没有释义）')}</div>
+          ${ex ? `<div class="rx">${esc(ex.track || '')}<br>${esc(ex.jp)}${ex.zh ? '<br>' + esc(ex.zh) : ''}</div>` : ''}`
+        : '<div class="rr">先自己想一下意思，再点下面的按钮</div>'}
+      </div>
+      <div class="revacts">
+        ${revShown ? `<button id="rev-again2">还不熟</button><button class="k" id="rev-ok">记住了</button>`
+        : `<button class="k" id="rev-show">看释义</button>`}
+      </div>
+      <div class="row" style="justify-content:center;margin-top:12px;gap:8px">
+        ${ex && ex.tid ? `<button class="toolbtn" id="rev-cue">去这句</button>` : ''}
+        <button class="toolbtn" id="rev-detail">词条详情</button>
+        <button class="toolbtn" id="rev-stop">结束</button>
+      </div></div>`;
+    if ($('rev-show')) $('rev-show').onclick = () => { revShown = true; renderReview(); };
+    if ($('rev-ok')) $('rev-ok').onclick = () => { toggleKnown(v); revStat.ok++; revI++; revShown = false; renderReview(); };
+    if ($('rev-again2')) $('rev-again2').onclick = () => { if (isKnown(v)) toggleKnown(v); revStat.again++; revDeck.push(v); revI++; revShown = false; renderReview(); };
+    if ($('rev-cue')) $('rev-cue').onclick = () => go('#/track/' + ex.tid + '@' + ex.li);
+    if ($('rev-detail')) $('rev-detail').onclick = () => go('#/word/' + v.id);
+    if ($('rev-stop')) $('rev-stop').onclick = () => go('#/mine');
+  }
 
   function renderLearn() {
     const known = VOCAB.filter(isKnown).length;
@@ -410,18 +479,19 @@
   function trackRow(t) {
     const tags = [];
     if (t.imp) tags.push('导入');
-    if (t.audioOss) tags.push('阿里云');
-    else if (t.audio || S.audio[t.id] || S.local[t.id]) tags.push('音频');
+    if (t.audio || t.audioOss || S.audio[t.id] || S.local[t.id]) tags.push('有声'); else tags.push('无音源');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
     if (brN) tags.push(`标日 ${brN}`);
+    // 只有真有封面素材才放图；没有就不放空占位框（不为了填满空间做装饰卡片）
+    const cover = t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
+      : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(t.coverUrl)}" alt="">` : '');
     return `<div class="item track" data-id="${t.id}">
-      ${t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
-        : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(t.coverUrl)}" alt="">` : '<div class="cover"></div>')}
+      ${cover}
       <div class="col">
         <div class="l1">${esc(t.title)}</div>
-        <div class="l2">${esc(t.artist)}</div>
-        <div class="l3">${esc(t.album)} · ${t.lineCount} 行${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
+        <div class="l2">${esc(t.artist)}${t.base ? ' · ' + esc(t.base) : (t.album ? ' · ' + esc(t.album) : '')}</div>
+        <div class="l3">${t.lineCount} 行歌词${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
       ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">✕</button>` : '<span class="mini">›</span>'}
     </div>`;
@@ -1232,8 +1302,8 @@
         </div>
       </details>
       ${songView === 'list'
-        ? `<div class="list" id="list">${list.map(trackRow).join('') || '<div class="empty">没有匹配的曲目</div>'}</div>`
-        : (groupsHtml(list) || '<div class="empty">没有匹配的曲目</div>')}`;
+        ? `<div class="list" id="list">${list.map(trackRow).join('') || emptyBox(songQ ? `没有匹配「${songQ}」的曲目` : '这个筛选下没有曲目', '换个关键词，或者把筛选清掉；也可以把自己的网易云歌单导进来。', [['e-pick', '清空搜索与筛选'], ['e-imp', '导入歌单']])}</div>`
+        : (groupsHtml(list) || emptyBox('这个筛选下没有曲目', '把筛选清掉试试。', [['e-pick', '清空搜索与筛选']]))}`;
     impState.open = false;
     $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
     $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; renderSongs(); }));
@@ -1251,6 +1321,8 @@
     $('view-songs').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); }));
     if ($('plgo')) $('plgo').onclick = () => startImport();
     if ($('plchk')) $('plchk').onclick = () => checkPlaylists({ manual: true });
+    if ($('e-pick')) $('e-pick').onclick = () => { songQ = ''; filter = 'all'; renderSongs(); };
+    if ($('e-imp')) $('e-imp').onclick = () => { impState.open = true; renderSongs(); };
     if ($('plretry')) $('plretry').onclick = () => retryFailed();
     if ($('plinput')) $('plinput').onkeydown = (e) => { if (e.key === 'Enter') startImport(); };
     if (importing) setTimeout(() => { if (!importing) renderSongs(); }, 800);
@@ -1264,15 +1336,17 @@
       ${accHtml()}
       <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
       ${adminHtml()}
-      <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : '<span class="meta">还没标过词</span>'}</div>
+      <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : ''}</div>
+      ${knownList.length ? '' : emptyBox('还没有标过词', '去学词页，每张词卡右上角的 ✓ 就是"已掌握"；在跟唱页点词也能标。', [['e-mlearn', '去学词'], ['e-mreview', '随便练几个']])}
       <div class="hair"></div>
-      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有自定义释义</div>'}
+      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有改过释义。点词卡或跟唱页里的词，就能改。</div>'}
       <div class="row" style="margin-top:18px">
         <button class="toolbtn" id="m-export">导出到文件</button>
         <button class="toolbtn" id="m-import">从文件导入</button>
         <button class="toolbtn" id="m-push">立即同步</button>
         <button class="toolbtn" id="m-pull">从云端拉回</button>
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
+        <button class="toolbtn" id="m-review">开始复习</button>
         <button class="toolbtn" id="m-clear">清空进度</button>
       </div>
       <div class="meta" style="margin-top:10px;color:var(--ink2)">云端存的是你自己的记录（进度 / 自定义释义 / 导入的歌单），放在你自己的 OSS 里，不经过第三方。本机绑定的音频文件（大）不同步。</div>`;
@@ -1281,6 +1355,8 @@
     if (accReg) accReg.onclick = () => doAuth('reg');
     if (accLogin) accLogin.onclick = () => doAuth('login');
     if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录（本机记录还在，再登回来即可）'); showGate('已退出登录。本机记录还在，登录即可继续。'); };
+    if ($('e-mlearn')) $('e-mlearn').onclick = () => go('#/learn');
+    if ($('e-mreview')) $('e-mreview').onclick = () => go('#/review');
     if ($('adm-list')) $('adm-list').onclick = () => loadAdminFiles();
     if ($('adm-sync')) $('adm-sync').onclick = () => loadAdminFiles('sync/');
     if ($('adm-audio')) $('adm-audio').onclick = () => loadAdminFiles('audio/');
@@ -1307,6 +1383,7 @@
       inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, local: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
+    if ($('m-review')) $('m-review').onclick = () => { startReview(20); go('#/review'); };
     $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清（导入的歌保留）')) return; S.known = {}; S.notes = {}; S.clearedAt = Date.now(); save(); renderMine(); };
   }
 
@@ -1393,7 +1470,11 @@
       ${r.words.length ? `<div class="hair"></div><div class="list">${r.words.map(wordRow).join('')}</div>` : ''}
       ${r.tracks.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:4px">曲目</div><div class="list">${r.tracks.map(trackRow).join('')}</div>` : ''}
       ${r.originals.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">原曲</div><div class="chips">${r.originals.map((o) => `<span class="chip" data-base="${esc(o.name)}">${esc(o.name)} · ${o.tracks.length}</span>`).join('')}</div>` : ''}
-      ${!r.words.length && !r.tracks.length && !r.originals.length ? '<div class="empty">没有匹配的内容</div>' : ''}`;
+      ${!r.words.length && !r.tracks.length && !r.originals.length ? (() => {
+        const hot = [...new Set(IDX.tracks.map((t) => t.artist).filter(Boolean))].slice(0, 6);
+        return emptyBox(`没找到「${q.trim()}」`, '可以试试：社团名、原曲名、假名写法、或者中文释义。搜「东方」「幽閉」这类词也行。', [['e-sc', '清空搜索'], ['e-ssongs', '去曲库翻']]) +
+          `<div class="sec-sub" style="margin-top:18px">试试这些社团</div><div class="chips">${hot.map((a) => `<span class="chip" data-artist="${esc(a)}">${esc(a)}</span>`).join('')}</div>`;
+      })() : ''}`;
     wireWords($('view-search'));
     $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
       if (e.target.closest('[data-del]')) return;
@@ -1401,6 +1482,9 @@
     }));
     $('view-search').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); if (!IDX.tracks.some((t) => t.id === el.dataset.del)) showSearch(q); }));
     $('view-search').querySelectorAll('[data-base]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.base; go('#/search/' + encodeURIComponent(el.dataset.base)); }));
+    $('view-search').querySelectorAll('[data-artist]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.artist; go('#/search/' + encodeURIComponent(el.dataset.artist)); }));
+    if ($('e-sc')) $('e-sc').onclick = () => { $('q').value = ''; go('#/home'); };
+    if ($('e-ssongs')) $('e-ssongs').onclick = () => go('#/songs');
   }
 
   // ────────────── 单曲页 ──────────────
@@ -1441,6 +1525,12 @@
     host.querySelectorAll('.word').forEach((el) => (el.onclick = (e) => { if (!e.target.closest('[data-line]')) go('#/word/' + el.dataset.id); }));
   }
   function renderLyrics(host, t) {
+    if (!t || !t.lines || !t.lines.length) {
+      host.innerHTML = emptyBox('这首歌还没有歌词', '换一首，或者去曲库粘一个带时间轴歌词的网易云歌单。', [['e-noly', '去曲库']]);
+      const b = host.querySelector('#e-noly');
+      if (b) b.onclick = () => { $('player').classList.remove('on'); go('#/songs'); };
+      return;
+    }
     host.innerHTML = '';
     t.lines.forEach((l, i) => {
       if (!l.text.trim()) { const sp = document.createElement('div'); sp.className = 'space'; host.appendChild(sp); return; }
@@ -1578,6 +1668,10 @@
     if (!raf) raf = requestAnimationFrame(frame);
     prepAudio(t);
     if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
+    else {
+      const p0 = (S.pos || {})[t.id];
+      if (p0 > 5) { jump(p0); toast(`接着上次听：${fmt(p0)}`); }
+    }
   }
   function describeSource(t) {
     if (S.local[t.id]) return '音频：本地文件';
@@ -1615,11 +1709,16 @@
       $('p-romaji').textContent = (seg && seg.y) || '';
       $('p-meaning').textContent = rd ? '词表里没有这个词（读音在上面）' : '词表里没有这个词，也没查到读音';
       $('p-ex').textContent = ''; $('p-meta').textContent = '';
-      $('p-known').style.display = 'none'; $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none'; $('p-edit').style.display = 'none';
+      $('p-known').style.display = 'none'; $('p-goto').style.display = 'none';
+      $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none'; $('p-edit').style.display = 'none';
+      if ($('p-morebox')) $('p-morebox').hidden = true;
       $('pop').classList.add('on'); return;
     }
     popWord = w;
-    ['p-known', 'p-detail', 'p-lines', 'p-edit'].forEach(on);
+    ['p-known', 'p-goto', 'p-detail', 'p-lines', 'p-edit'].forEach(on);
+    if ($('p-morebox')) $('p-morebox').hidden = true;
+    const exG = (w.examples || [])[0];
+    if ($('p-goto')) $('p-goto').style.display = exG && exG.tid ? '' : 'none';
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = w.romaji || '';
@@ -1634,10 +1733,13 @@
   const hidePop = () => $('pop').classList.remove('on');
 
   // ────────────── 路由 ──────────────
-  const VIEWS = ['view-learn', 'view-songs', 'view-mine', 'view-word', 'view-track', 'view-search'];
+  const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-word', 'view-track', 'view-search', 'view-review'];
   function show(which) {
     // 首页已经自带次级入口了，全局 tab 行在首页收起来（别让两排入口抢注意力）
     if ($('tabs')) $('tabs').hidden = (which === 'view-home');
+    // 音频配置不再挂在每个页面底部：只在生词本（设置）和单曲页出现
+    const slot = $('srcslot');
+    if (slot) slot.hidden = !(which === 'view-mine' || which === 'view-track');   // ⚠️ 别挪进 view：render* 会用 innerHTML 把它冲掉
     VIEWS.forEach((v) => { const el = $(v); if (el) el.hidden = v !== which; });
     const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine' };
     ['tab-learn', 'tab-songs', 'tab-mine'].forEach((t) => $(t).classList.toggle('on', map[which] === t));
@@ -1654,6 +1756,7 @@
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
     if (v === 'search') { show('view-search'); $('searchwrap').classList.add('on'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
     if (v === 'home') { show('view-home'); return renderHome(); }
+    if (v === 'review') { show('view-review'); return renderReview(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
     if (v === 'mine') { show('view-mine'); return renderMine(); }
     show('view-learn'); renderLearn();
@@ -1667,7 +1770,13 @@
     document.body.classList.toggle('ruby', S.ruby !== false);
     let data;
     try { data = await (await fetch('data/index.json')).json(); }
-    catch { $('view-learn').innerHTML = '<div class="empty">载入 data/index.json 失败。本地请先起服务：node scripts/serve.mjs 8848</div>'; show('view-learn'); return; }
+    catch {
+      $('view-learn').innerHTML = emptyBox('曲库数据没加载出来', '可能是网络问题，也可能是本地没起服务（node scripts/serve.mjs 8848）。点下面重试一次。', [['e-retry', '重试']]);
+      show('view-learn');
+      if ($('tabs')) $('tabs').hidden = false;
+      if ($('e-retry')) $('e-retry').onclick = () => location.reload();
+      return;
+    }
     IDX = data; VOCAB = data.vocab;
     // 读音兜底表只在有导入曲目时才拉（没有导入的用不上），而且要等它就绪，
     // 否则导入的歌会用不完整的表分词 → 一堆本该有读音的汉字词没罗马音
@@ -1735,6 +1844,14 @@
     };
     $('p-editinput').onkeydown = (e) => { if (e.key !== 'Enter' || !popWord) return; S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: e.target.value.trim(), u: Date.now() }); save(); showPop(popWord); };
     $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) renderLyrics($('plyric'), curTrack); };
+    $('p-more').onclick = () => { const b = $('p-morebox'); if (b) b.hidden = !b.hidden; };
+    $('p-goto').onclick = () => {
+      if (!popWord) return;
+      const ex = (popWord.examples || [])[0];
+      if (!ex || !ex.tid) { toast('这个词还没配例句'); return; }
+      $('pop').classList.remove('on');
+      go('#/track/' + ex.tid + '@' + ex.li);
+    };
     $('p-lines').onclick = () => {
       if (!popWord || !curTrack) return;
       const ls = curTrack.lines.filter((l) => (l.segs || []).some((s) => s.w && s.b === popWord.word));
@@ -1765,7 +1882,7 @@
     $('audiofile').onchange = (e) => {
       const f = e.target.files[0]; if (!f || !curTrack) return;
       if (f.size > 60 * 1024 * 1024) { alert('文件太大（≤60MB）'); return; }
-      idbSet(curTrack.id, f).then(() => { delete S.local[curTrack.id]; save(); $('srcinfo').textContent = describeSource(curTrack); alert('已保存'); }).catch(() => alert('保存失败'));
+      idbSet(curTrack.id, f).then(() => { delete S.local[curTrack.id]; save(); $('srcinfo').textContent = describeSource(curTrack); toast('本地音频已绑到这首，下次点开就出声'); }).catch(() => toast('保存失败：浏览器没让存，换个文件再试'));
     };
     $('audioclear').onclick = async () => { if (!curTrack) return; delete S.local[curTrack.id]; save(); try { await idbDel(curTrack.id); } catch {} $('srcinfo').textContent = describeSource(curTrack); };
 

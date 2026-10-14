@@ -593,6 +593,50 @@ await page.waitForTimeout(5000);
 const chkMsg = (await txt('#plstat')) || '';
 check('检查歌单更新：能跑通并报出每张歌单的情况', /线上 \d+ 首/.test(chkMsg) && /库里 \d+ 首/.test(chkMsg), chkMsg.slice(0, 60).replace(/\n/g, ' | '));
 
+// ═══════ 13.6 空状态 / 复习闭环 / 手机宽度 / 继续学习 ═══════
+await page.goto(BASE + '?emp=1#/search/zzzzzz', { waitUntil: 'load' });
+await page.waitForTimeout(1200);
+const emptyTxt = (await txt('#view-search')) || '';
+check('搜索没结果时给可执行建议（不是一句"没有内容"）', /没找到/.test(emptyTxt) && /试试/.test(emptyTxt) && (await page.locator('#e-ssongs').count()) === 1, emptyTxt.replace(/\s+/g, ' ').slice(0, 40));
+await page.locator('#e-ssongs').click();
+await page.waitForTimeout(600);
+check('空状态里的按钮能走（去曲库）', await page.locator('#view-songs').isVisible());
+
+await page.goto(BASE + '?rev=1#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#m-review', { timeout: 15000 });
+await page.locator('#m-review').click();
+await page.waitForTimeout(800);
+check('生词本有「开始复习」并进入复习页', await page.locator('#view-review').isVisible() && (await page.locator('.revcard .rw').count()) === 1, ((await txt('.revcard .rw')) || '').slice(0, 12));
+const revWord = await txt('.revcard .rw');
+await page.locator('#rev-show').click();
+await page.waitForTimeout(400);
+check('复习卡：点「看释义」才显示释义', (await page.locator('.revcard .rm').count()) === 1 && (await page.locator('#rev-ok').count()) === 1, ((await txt('.revcard .rm')) || '').slice(0, 20));
+const knownBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').known || {}).filter((k) => JSON.parse(localStorage.getItem('thlyrics.tool.v1')).known[k] > 0).length);
+await page.locator('#rev-ok').click();
+await page.waitForTimeout(600);
+const knownAfter = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').known || {}).filter((k) => JSON.parse(localStorage.getItem('thlyrics.tool.v1')).known[k] > 0).length);
+check('复习：点「记住了」会标已掌握并进下一个', knownAfter === knownBefore + 1, `${knownBefore} → ${knownAfter} 个已掌握 · 上一个词 ${revWord}`);
+
+// 手机窄屏：不横向溢出
+await page.setViewportSize({ width: 320, height: 720 });
+for (const [name, hash] of [['首页', '#/home'], ['曲库', '#/songs'], ['生词本', '#/mine'], ['学词', '#/learn']]) {
+  await page.goto(BASE + '?w=320' + hash, { waitUntil: 'load' });
+  await page.waitForTimeout(700);
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  check(`320px 窄屏不横向溢出：${name}`, over <= 1, `溢出 ${over}px`);
+}
+await page.setViewportSize({ width: 400, height: 850 });
+
+// 继续学习：记住听到哪，首页显示出来
+await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); j.pos = { t1: 83 }; j.lastTrack = 't1'; localStorage.setItem('thlyrics.tool.v1', JSON.stringify(j)); });
+await page.goto(BASE + '?pos=1#/home', { waitUntil: 'load' });
+await page.waitForSelector('#view-home .nowcard', { timeout: 15000 });
+check('首页「正在学习」显示上次听到哪', /上次听到 1:23/.test((await txt('#view-home .nowcard .a')) || ''), ((await txt('#view-home .nowcard .a')) || '').slice(0, 34));
+check('音频设置不再挂在每个页面（首页看不到）', await page.locator('#srcslot').isHidden(), '首页隐藏');
+await page.goto(BASE + '?pos=1#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#m-push', { timeout: 15000 });
+check('音频设置只在生词本/单曲页里出现', await page.locator('#srcslot').isVisible(), '生词本可见');
+
 // ═══════ 14 账号：自动同步 / 墓碑 / 清空 / 换设备登录恢复 ═══════
 if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
 await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
