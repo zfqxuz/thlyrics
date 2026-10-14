@@ -459,6 +459,14 @@
     DICT_MAX = Math.min(DICT_MAX, 8);
   }
   const jpText = (s) => /[\u3041-\u30ff\u4e00-\u9fff]/.test(String(s || ''));
+  let readingsReady = null;
+  /** 读音兜底表（~400KB）只拉一次；导入前必须确保它已经就绪，否则新歌的第一个字就查不到读音 */
+  function ensureReadings() {
+    if (!readingsReady) {
+      readingsReady = fetch('data/readings.json').then((r) => r.json()).then(buildReadings).catch(() => {});
+    }
+    return readingsReady;
+  }
   function buildReadings(map) {
     RDL = new Map();
     for (const [k, v] of Object.entries(map || {})) RDL.set(k, v);
@@ -699,9 +707,10 @@
     const stat = $('plstat');
     impState.fails = []; impState.msg = '';
     importing = true;
-    if (stat) stat.textContent = '正在读取歌单…';
-    if ($('plgo')) $('plgo').disabled = true;
+    if ($('plgo')) $('plgo').disabled = true;      // 先锁住按钮：中间还有可能要等读音表
     if ($('pllist')) $('pllist').innerHTML = '';
+    if (stat) stat.textContent = '正在读取歌单…';
+    await ensureReadings();
     const res = await importInto(input, 0, (n, total, title, mark, kind) => {
       if (kind === 'fail') { impState.fails.push({ title, mark }); if ($('pllist')) $('pllist').innerHTML = impRowsHtml(); }
       if (stat) stat.textContent = `正在导入 ${n}/${total}…`;
@@ -1132,7 +1141,9 @@
     try { data = await (await fetch('data/index.json')).json(); }
     catch { $('view-learn').innerHTML = '<div class="empty">载入 data/index.json 失败。本地请先起服务：node scripts/serve.mjs 8848</div>'; show('view-learn'); return; }
     IDX = data; VOCAB = data.vocab;
-    fetch('data/readings.json').then((r) => r.json()).then(buildReadings).catch(() => {});
+    // 读音兜底表只在有导入曲目时才拉（没有导入的用不上），而且要等它就绪，
+    // 否则导入的歌会用不完整的表分词 → 一堆本该有读音的汉字词没罗马音
+    if (Object.keys(S.imp || {}).length) await ensureReadings();
     VBY = new Map(VOCAB.map((w) => [w.word, w]));
     VBYID = new Map(VOCAB.map((w) => [w.id, w]));
     for (const w of VOCAB) { SURF.set(w.word, w); for (const f of Object.keys(w.forms || {})) if (!SURF.has(f)) SURF.set(f, w); }

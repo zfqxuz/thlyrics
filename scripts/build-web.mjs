@@ -226,7 +226,10 @@ async function main() {
 
   // 读音兜底表：把内置曲目里出现过的每个词（含助词/活用形）连同读音、词性导出成一个很小的表。
   // 前端给「导入的歌」补词表外的读音时用它 —— 比在浏览器里挂一套分词词典便宜得多。
-  const rd = {};
+  // 底表：scripts/build-readings.mjs 从大量日语歌词里抽出来的「表面形 → 读音/词性」
+  // （连活用形，例如 咲き/揺ら/纏い），内置曲目里出现的 token 优先级更高、覆盖写一遍。
+  const rd = readJson(path.join(DATA, 'readings-extra.json'), {});
+  const extraN = Object.keys(rd).length;
   for (const tr of idx.tracks) {
     for (const l of tr.lines) {
       for (const sg of l.segs || []) {
@@ -236,7 +239,7 @@ async function main() {
     }
   }
   fs.writeFileSync(path.join(WEB_DATA, 'readings.json'), JSON.stringify(rd), 'utf8');
-  console.log(`读音兜底表：${Object.keys(rd).length} 条 → docs/data/readings.json`);
+  console.log(`读音兜底表：${Object.keys(rd).length} 条（语料 ${extraN} + 内置曲目）→ docs/data/readings.json`);
 
   const s = idx.stats;
   console.log(`曲目 ${s.tracks} · 并入网易云 ${s.withNetease} · 有时间轴 ${s.tracksWithTiming} · 行级译文 ${s.withTranslations} 行`);
