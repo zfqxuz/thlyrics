@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014z';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261015a';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -221,15 +221,21 @@
       return j;
     } finally { clearTimeout(timer); }
   }
-  /** 可播地址：后端优先，失败回落公共解析接口 */
-  async function resolveAudioUrl(nid, br) {
-    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
+  /** 可播地址：netease 走后端再回落公共接口；tencent(QQ音乐) 只走后端（公共中继没有 QQ 源）*/
+  async function resolveAudioUrl(nid, br, src) {
+    const source = src || 'netease';
+    const extra = source === 'tencent' ? '&source=tencent' : '';
+    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`); if (j && j.url) return j.url; } catch {}
+    if (source !== 'netease') return null;
     try { const j = await gdJson(`types=url&source=netease&id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
     return null;
   }
   /** 歌词 + 翻译：同上；接口通了但没歌词（纯音乐）会返回空 lyric，不算失败 */
-  async function resolveLyric(nid) {
-    try { const j = await fcJson(`/lyric?id=${encodeURIComponent(nid)}`); if (j) return { lyric: j.lyric || '', tlyric: j.tlyric || '' }; } catch {}
+  async function resolveLyric(nid, src) {
+    const source = src || 'netease';
+    const extra = source === 'tencent' ? '&source=tencent' : '';
+    try { const j = await fcJson(`/lyric?id=${encodeURIComponent(nid)}${extra}`); if (j) return { lyric: j.lyric || '', tlyric: j.tlyric || '' }; } catch {}
+    if (source !== 'netease') return null;
     try { const j = await gdJson(`types=lyric&source=netease&id=${encodeURIComponent(nid)}`); if (j) return j; } catch {}
     return null;
   }
@@ -237,11 +243,12 @@
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st || !st.nid) return null;
-    const hit = urlCache.get(String(st.nid));
+    const cacheKey = (st.type || 'netease') + ':' + st.nid;
+    const hit = urlCache.get(cacheKey);
     if (hit && Date.now() - hit.at < URL_TTL) return hit.url;
-    const url = await resolveAudioUrl(st.nid, 320);
+    const url = await resolveAudioUrl(st.nid, 320, st.type);
     if (!url) throw new Error('取不到音频地址');
-    urlCache.set(String(st.nid), { url, at: Date.now() }); saveUrlCache();
+    urlCache.set(cacheKey, { url, at: Date.now() }); saveUrlCache();
     return url;
   }
 
@@ -260,7 +267,8 @@
       setState(eager ? '缓冲中…' : '已就绪，点播放');
     };
     const nid = (S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null;
-    const hit = nid ? urlCache.get(String(nid)) : null;
+    const srcType = (S.audio[track.id] && S.audio[track.id].type) || (track.audio && track.audio.type) || 'netease';
+    const hit = nid ? urlCache.get(srcType + ':' + nid) : null;
     if (track.audioOss) { attach(track.audioOss); return; }
     if (hit && Date.now() - hit.at < URL_TTL) { stationNid = nid; if (eager) attach(hit.url); else setState('已就绪，点播放'); return; }
     if (!nid) { setState('还没有音频'); return; }
@@ -696,6 +704,7 @@
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push('有声'); else tags.push('无音源');
     if (isFav(t.id)) tags.push('♥ 收藏');
     if (isSing(t.id)) tags.push('会唱');
+    if (t.imp && t.audio && t.audio.type === 'tencent') tags.push('QQ音乐');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
     if (brN) tags.push(`标日 ${brN}`);
@@ -931,7 +940,7 @@
     return {
       id: rec.id, imp: true, addedAt: Number(rec.at) || 0, title: rec.title, artist: rec.artist, album: rec.album,
       base: '', coverUrl: rec.cover || '', plName: rec.plName || '', plId: rec.plId || '',
-      audio: { type: 'netease', nid: rec.nid }, timing: 'netease',
+      audio: { type: rec.src || 'netease', nid: rec.nid }, timing: rec.src || 'netease',
       lineCount: lines.filter((l) => l.text.trim()).length,
       vocabIds: [...ids].map((w) => VBY.get(w)).filter(Boolean).map((v) => v.id), lines,
     };
@@ -1019,7 +1028,8 @@
   }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
   /** 逐首导入（首次导入和「重试失败」都走这里） */
-  async function importTracks(list, plName, pid, onStep) {
+  async function importTracks(list, plName, pid, onStep, src) {
+    const source = src || 'netease';
     const ok = [], fail = [], skip = [];
     let done = 0, quota = false;
     const report = (title, mark, kind) => { done++; if (onStep) onStep(done, list.length, title, mark, kind); };
@@ -1035,7 +1045,7 @@
       let lines = [], why = '';
       try {
         // 歌词和音频地址并行取，快一点
-        const [ly, url] = await Promise.all([resolveLyric(nid), resolveAudioUrl(nid, 320)]);
+        const [ly, url] = await Promise.all([resolveLyric(nid, source), resolveAudioUrl(nid, 320, source)]);
         if (!ly) why = '取不到歌词';
         else {
           lines = parseLrc(ly.lyric, ly.tlyric);
@@ -1052,7 +1062,7 @@
       if (why) { fail.push({ nid, title, why, tr }); report(title, why, 'fail'); return; }
       let segs = null;                       // 服务端 kuromoji 分词（失败就退回前端贪心匹配）
       try { segs = (await segmentLines(lines.map((l) => l.text))).map(segsCompact); } catch {}
-      S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, segs, plId: pid, plName: plName || '', at: Date.now() };
+      S.imp['i' + nid] = { id: 'i' + nid, nid, src: source, title, artist, album, cover, lines, segs, plId: pid, plName: plName || '', at: Date.now() };
       try { save(); } catch { delete S.imp['i' + nid]; quota = true; return; }
       ok.push({ nid, title });
       report(title, '', 'ok');
@@ -1072,13 +1082,13 @@
     const all = (pl.tracks || []).filter((x) => x && x.id);
     if (!all.length) return { error: '这张歌单里没有歌' };
     const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all;
-    const res = await importTracks(list, name || pl.name || '', pid, onStep);
-    return Object.assign(res, { plName: name || pl.name || '', total: all.length, done: list.length, pid, kind: 'playlist' });
+    const res = await importTracks(list, name || pl.name || '', pid, onStep, 'netease');
+    return Object.assign(res, { plName: name || pl.name || '', total: all.length, done: list.length, pid, kind: 'playlist', src: 'netease' });
   }
   /** 统一入口：歌单 / 专辑 / 单曲（含手机 163cn.tv 短链、分享文案、裸 ID） */
   async function importFrom(input, limit, onStep) {
     const text = String(input || '').trim();
-    if (!text) return { error: '粘网易云链接 / 分享文案 / ID' };
+    if (!text) return { error: '粘分享链接 / 文案 / ID（网易云或 QQ音乐）' };
     let meta = null, why = '';
     try { meta = await apiResolve(text); } catch (e) { why = (e && e.message) || '解析失败'; }
     if (!meta) {
@@ -1086,14 +1096,17 @@
       if (!pid) return { error: why };
       meta = { type: 'playlist', id: pid, name: '' };
     }
-    if (meta.type === 'playlist') return importPlaylistById(meta.id, meta.name, limit, onStep);
+    const source = meta.src || 'netease';
+    if (meta.type === 'playlist' && source === 'netease') return importPlaylistById(meta.id, meta.name, limit, onStep);
     const tracks = (meta.tracks || []).filter((x) => x && x.id);
-    const kind = meta.type === 'album' ? '专辑' : '单曲';
+    const kind = meta.type === 'playlist' ? '歌单' : meta.type === 'album' ? '专辑' : '单曲';
     if (!tracks.length) return { error: `这个${kind}里读不到歌` };
     const list = Number(limit) > 0 ? tracks.slice(0, Number(limit)) : tracks;
-    const pid = (meta.type === 'album' ? 'al' : 'sg') + meta.id;
-    const res = await importTracks(list, meta.name || '', pid, onStep);
-    return Object.assign(res, { plName: meta.name || '', total: tracks.length, done: list.length, pid, kind: meta.type });
+    const pid = source === 'tencent'
+      ? 'tx' + (meta.type === 'playlist' ? 'pl' : meta.type === 'album' ? 'al' : 'sg') + ':' + meta.id
+      : (meta.type === 'album' ? 'al' : 'sg') + meta.id;
+    const res = await importTracks(list, meta.name || '', pid, onStep, source);
+    return Object.assign(res, { plName: meta.name || '', total: tracks.length, done: list.length, pid, kind: meta.type, src: source });
   }
   /** 老记录补分词：以前导入的歌没有 segs（只有前端贪心匹配），后台慢慢补上服务端的 */
   let segBackfilling = false;
@@ -1418,9 +1431,17 @@
   // ── 歌单定期体检：一天查一次有没有新歌；也可以手动点 ──
   const PL_CHECK_EVERY = 24 * 3600 * 1000;
   let plChecking = false;
+  /** 记录里的 plId → { src, kind, id }（兼容老数据：纯数字=网易云歌单；al/sg=网易云专辑/单曲）*/
+  function plInfoOf(id) {
+    const s0 = String(id || '');
+    let m;
+    if ((m = s0.match(/^tx(pl|al|sg):(.+)$/))) return { src: 'tencent', kind: m[1], id: m[2] };
+    if ((m = s0.match(/^(al|sg)(.+)$/))) return { src: 'netease', kind: m[1], id: m[2] };
+    return { src: 'netease', kind: 'pl', id: s0 };
+  }
   async function checkPlaylists(opts = {}) {
     if (plChecking) { if (!opts.silent) toast('正在检查中…'); return; }
-    const pls = impPlaylists().filter((p) => /^\d+$/.test(String(p.id)));
+    const pls = impPlaylists().filter((p) => plInfoOf(p.id).kind === 'pl');
     if (!pls.length) { if (!opts.silent) toast('还没有导入过歌单'); return; }
     plChecking = true;
     const lines = [];
@@ -1431,9 +1452,18 @@
     try {
       await ensureReadings().catch(() => {});
       for (const pl of pls) {
-        let data = null;
-        try { data = await gdJson('?types=playlist&id=' + pl.id); } catch { bad++; lines.push(`《${pl.name}》：接口没读到，跳过`); continue; }
-        const tracks = (data && data.playlist && data.playlist.tracks) || [];
+        const info = plInfoOf(pl.id);
+        let tracks = null;
+        try {
+          if (info.src === 'tencent') {
+            const meta = await apiResolve('https://y.qq.com/n/ryqq/playlist/' + info.id);
+            tracks = (meta && meta.tracks) || [];
+          } else {
+            const data = await gdJson('?types=playlist&id=' + pl.id);
+            tracks = (data && data.playlist && data.playlist.tracks) || [];
+          }
+        } catch { bad++; lines.push(`《${pl.name}》：接口没读到，跳过`); continue; }
+        tracks = tracks || [];
         if (!tracks.length) { bad++; lines.push(`《${pl.name}》：读不到曲目，跳过`); continue; }
         const haveNid = new Set(Object.values(S.imp || {}).map((r) => String(r.nid)));
         const builtin = new Set(IDX.tracks.filter((t) => !t.imp && t.audio && t.audio.nid).map((t) => String(t.audio.nid)));
@@ -1448,7 +1478,7 @@
         lines.push(`《${pl.name}》：线上 ${tracks.length} 首 · 库里 ${mine.length} 首 · 新增 ${missing.length} 首${gone ? ` · 歌单已移除 ${gone} 首（库里保留）` : ''}`);
         missingTotal += missing.length;
         if (missing.length) {
-          const res = await importTracks(missing, pl.name, pl.id, null);
+          const res = await importTracks(missing, pl.name, pl.id, null, info.src);
           added += res.ok.length;
           if (res.fail.length) lines.push(`　其中 ${res.fail.length} 首没进来（没歌词／取不到音频）`);
         }
@@ -1483,12 +1513,12 @@
       if (kind === 'fail') impState.fails.push({ title, mark });
       if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
       if (stat) stat.textContent = `重试 ${n}/${total}…`;
-    });
+    }, ctx.src);
     importing = false;
     if ($('plgo')) $('plgo').disabled = false;
     for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
     indexLibrary();
-    impState.ctx = res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: ctx.plName, pid: ctx.pid } : null;
+    impState.ctx = res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: ctx.plName, pid: ctx.pid, src: ctx.src } : null;
     const bits = [`这次补上 ${res.ok.length} 首`];
     if (res.drop || res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`还差 ${res.fail.length} 首`);
@@ -1549,7 +1579,7 @@
     if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
     impState.msg = `${res.plName || ''} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
-    impState.ctx = res.fail && res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: res.plName, pid: res.pid } : null;
+    impState.ctx = res.fail && res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: res.plName, pid: res.pid, src: res.src || 'netease' } : null;
     renderSongs();
     if ($('plstat')) $('plstat').textContent = impState.msg;
     if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
@@ -1630,7 +1660,7 @@
       <details class="impbox" ${impState.fails.length || impState.msg || impState.open || !IDX.tracks.length ? 'open' : ''}>
         <summary>导入网易云</summary>
         <div class="row" style="margin-top:10px">
-          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单 / 专辑 / 单曲链接或分享文案">
+          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单 / 专辑 / 单曲链接（网易云 / QQ音乐）">
           <button class="toolbtn on" id="plgo">${importing ? '导入中…' : '导入'}</button>
         </div>
         <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || '')}</div>
@@ -1696,15 +1726,17 @@
   const b64u = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const unb64u = (str) => decodeURIComponent(escape(atob(String(str).replace(/-/g, '+').replace(/_/g, '/'))));
   function shareSources() {
-    const pl = new Set(), al = new Set(), sg = new Set();
+    const seen = new Set(), items = [];
     for (const r of Object.values(S.imp || {})) {
-      const pid = String((r && r.plId) || '');
-      if (/^\d+$/.test(pid)) pl.add(pid);
-      else if (/^al\d+$/.test(pid)) al.add(pid.slice(2));
-      else if (/^sg\d+$/.test(pid)) sg.add(pid.slice(2));
-      else if (r && r.nid) sg.add(String(r.nid));
+      if (!r) continue;
+      const info = plInfoOf(r.plId);
+      if (!info.id) continue;
+      const key = info.src + '|' + info.kind + '|' + info.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ s: info.src, k: info.kind, i: String(info.id) });
     }
-    return { v: 1, pl: [...pl], al: [...al], sg: [...sg] };
+    return { v: 2, items };
   }
   const shareCode = () => 'TL1.' + b64u(JSON.stringify(shareSources()));
   async function importShareCode(code, onStep) {
@@ -1712,9 +1744,16 @@
     let src = null;
     try { src = JSON.parse(unb64u(raw)); } catch { return { error: '分享码读不出来' }; }
     const jobs = [];
-    for (const id of src.pl || []) jobs.push(() => importPlaylistById(String(id), '', 0, onStep));
-    for (const id of src.al || []) jobs.push(() => importFrom('https://music.163.com/album?id=' + id, 0, onStep));
-    for (const id of src.sg || []) jobs.push(() => importFrom('https://music.163.com/song?id=' + id, 0, onStep));
+    const linkOf = (s0, k, i) => (s0 === 'tencent'
+      ? 'https://y.qq.com/n/ryqq/' + (k === 'al' ? 'albumDetail/' : k === 'sg' ? 'songDetail/' : 'playlist/') + i
+      : 'https://music.163.com/' + (k === 'al' ? 'album' : k === 'sg' ? 'song' : 'playlist') + '?id=' + i);
+    if (src.v === 2) {
+      for (const it of src.items || []) jobs.push(() => importFrom(linkOf(it.s, it.k, it.i), 0, onStep));
+    } else {
+      for (const id of src.pl || []) jobs.push(() => importPlaylistById(String(id), '', 0, onStep));
+      for (const id of src.al || []) jobs.push(() => importFrom('https://music.163.com/album?id=' + id, 0, onStep));
+      for (const id of src.sg || []) jobs.push(() => importFrom('https://music.163.com/song?id=' + id, 0, onStep));
+    }
     if (!jobs.length) return { error: '分享码里没有歌单 / 专辑 / 单曲' };
     let ok = 0, skip = 0, fail = 0;
     for (const run of jobs) {

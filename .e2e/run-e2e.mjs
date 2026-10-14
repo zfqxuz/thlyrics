@@ -122,16 +122,26 @@ const apiStub = (route) => {
     return send(200, { ok: true, segs });
   }
   if (path === '/audio') {                   // 自己的后端：可播地址（前端优先走它，失败了才回落公共接口）
-    const id = new URL(req.url()).searchParams.get('id') || '';
+    const u = new URL(req.url());
+    const id = u.searchParams.get('id') || '', src = u.searchParams.get('source') || 'netease';
+    if (src === 'tencent') return send(200, { ok: true, url: 'https://aqqmusic.tc.qq.com/e2e-qq.m4a', br: 128000, size: 3 });
     if (id === '888888888') return send(404, { error: '这首歌没有可播地址（可能要会员或已下架）' });
     return send(200, { ok: true, url: 'https://m8.music.126.net/e2e-stub.mp3', br: 320, size: 3 });
   }
   if (path === '/lyric') {
-    const id = new URL(req.url()).searchParams.get('id') || '';
+    const u = new URL(req.url());
+    const id = u.searchParams.get('id') || '', src = u.searchParams.get('source') || 'netease';
+    if (src === 'tencent') return send(200, { ok: true, lyric: E2E_LYRIC.lyric, tlyric: E2E_LYRIC.tlyric });
     return send(200, { ok: true, lyric: id === '999999999' ? '纯音乐，请欣赏\n' : E2E_LYRIC.lyric, tlyric: E2E_LYRIC.tlyric });
   }
   if (path === '/resolve') {                 // 短链 / 歌单 / 专辑 / 单曲解析（公开接口）
     const raw = new URL(req.url()).searchParams.get('q') || '';
+    if (/y\.qq\.com|c6\.y\.qq\.com/.test(raw)) {     // QQ 音乐
+      const t = (id, name, al) => ({ id, name, ar: [{ name: 'QQ 歌手' }], al: { name: al, picUrl: E2E_COVER } });
+      if (/songDetail/.test(raw)) return send(200, { ok: true, src: 'tencent', type: 'song', id: 'E2EQQ0000001', name: 'QQ 单曲', cover: E2E_COVER, tracks: [t('E2EQQ0000001', 'QQ 单曲', 'QQ 专辑')] });
+      if (/albumDetail/.test(raw)) return send(200, { ok: true, src: 'tencent', type: 'album', id: 'E2EQQALBUM1', name: 'QQ 专辑', cover: E2E_COVER, tracks: [t('E2EQQ0000002', 'QQ 专辑第一首', 'QQ 专辑'), t('E2EQQ0000003', 'QQ 专辑第二首', 'QQ 专辑')] });
+      return send(200, { ok: true, src: 'tencent', type: 'playlist', id: '900001', name: 'QQ 歌单', cover: E2E_COVER, total: 1, tracks: [t('E2EQQ0000004', 'QQ 歌单曲', 'QQ 专辑')] });
+    }
     if (/no-id/.test(raw)) return send(400, { error: '链接里没有歌曲 / 专辑 / 歌单 ID' });
     if (!/https?:\/\//.test(raw) && !/^\d{5,}$/.test(raw)) return send(400, { error: '没识别出链接，粘网易云分享链接或 ID' });
     if (/album/.test(raw)) return send(200, E2E_ALBUM);
@@ -201,6 +211,7 @@ const baseRoute = (route) => {
     if (id === '888888888') return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });   // 取不到音频 = 真失败
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
+  if (/aqqmusic\.tc\.qq\.com/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mp4', body: 'ID3' });
   if (/music\.126\.net\/e2e-cover/.test(u)) return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
   return route.continue();
@@ -630,6 +641,29 @@ await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null
 await page.waitForTimeout(500);
 check('单曲导入：分享文案里也能认出来', /入库 1 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 50));
 check('专辑/单曲进来的歌也在「我导入的」里', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 4);
+
+// QQ 音乐：单曲（分享文案）+ 专辑
+await page.locator('#plinput').fill('分享单曲：QQ 单曲 https://y.qq.com/n/ryqq/songDetail/E2EQQ0000001');
+await page.locator('#plgo').click();
+await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 60000 });
+await page.waitForTimeout(500);
+check('QQ音乐单曲：分享文案能认出来', /入库 1 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 46));
+await page.locator('#plinput').fill('https://y.qq.com/n/ryqq/albumDetail/E2EQQALBUM1');
+await page.locator('#plgo').click();
+await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 60000 });
+await page.waitForTimeout(500);
+check('QQ音乐专辑：整张进库', /入库 2 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 46));
+const qqTag = await page.evaluate(() => {
+  const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}');
+  const recs = Object.values(j.imp || {});
+  return { tencent: recs.filter((r) => r.src === 'tencent').length, netease: recs.filter((r) => (r.src || 'netease') === 'netease').length,
+    plId: (recs.find((r) => r.src === 'tencent') || {}).plId || '' };
+});
+check('QQ 曲目记了平台（src=tencent，plId 带 tx 前缀）', qqTag.tencent === 3 && qqTag.netease === 4 && /^tx/.test(qqTag.plId), JSON.stringify(qqTag));
+await page.locator('#view-songs .chip[data-f="imp"]').click();
+await page.waitForTimeout(400);
+const tagTxt = await page.evaluate(() => [...document.querySelectorAll('#list .track .l3')].map((e) => e.textContent).join(' | '));
+check('列表里标出「QQ音乐」', /QQ音乐/.test(tagTxt), tagTxt.slice(0, 60));
 await shot('09-import', true);
 
 // 点开一首导入的歌：该自动起播，迷你条上该有专辑小图
@@ -652,7 +686,7 @@ await page.goto(BASE + '?org=1#/songs', { waitUntil: 'load' });
 await page.waitForSelector('#list .track', { timeout: 15000 });
 await page.waitForTimeout(500);
 const firstTitle = await page.evaluate(() => (document.querySelector('#list .track .l1') || {}).textContent || '');
-check('曲库默认按入库时间（新→旧）', /E2E 单曲/.test(firstTitle), '第一首：' + firstTitle.trim());
+check('曲库默认按入库时间（新→旧）', /QQ 专辑第二首/.test(firstTitle), '第一首（最后导入的那首）：' + firstTitle.trim());
 const titlesOf = () => page.evaluate(() => [...document.querySelectorAll('#list .track .l1')].map((e) => e.textContent.trim()));
 const byTitleAsc = await page.evaluate(() => { const t0 = [...document.querySelectorAll('#list .track .l1')].map((e) => e.textContent.trim()); return t0; });
 await page.locator('#tsort').selectOption('az');

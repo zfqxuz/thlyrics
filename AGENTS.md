@@ -471,3 +471,27 @@
   "同曲同词其它位置不动"、"键里带曲目+行+词位"、自由输入、刷新后仍在（并随账号同步）。
   headless 播不出声 → 用 `Object.defineProperty(a,'paused',...)` + 钩 play/pause 调用来验续播。
 - E2E 155/155。
+
+### 兼容 QQ 音乐：单曲 / 专辑 / 歌单（2026-10-15，已上线）
+
+用户问：「能不能兼容 qq 音乐单曲专辑和歌单？」
+
+- **发现**：第三方中继 `music-api.gdstudio.xyz` **不支持 QQ 源**（`source=tencent` 直接报
+  "Value of `source` is not supported"），所以 QQ 只能走自建后端。
+- 后端（`ops/fc/index.js`）新增：
+  - `/api/resolve`：认 `y.qq.com`（`/n/ryqq/songDetail/<mid>`、`albumDetail/<mid>`、`playlist/<disstid>`、
+    老版 `/n/yqq/xxx/<mid>.html`）与手机分享短链（`c6.y.qq.com/base/fcgi-bin/u?__=`、`url.cn`）→ 跟 302 → 解析；
+    接口用 `c.y.qq.com` 的 `fcg_play_single_song` / `fcg_v8_album_info_cp` / `fcg_v8_playlist_cp`（Referer: y.qq.com）。
+  - `/api/audio?source=tencent&id=<songmid>`：`u.y.qq.com/cgi-bin/musicu.fcg` 的 `vkey.GetVkeyServer`
+    → `sip[0] + midurlinfo[0].purl`，**http 要改成 https**；`purl` 为空 = 会员/下架 → 404（前端会提示"可能要会员"）。
+    ⚠️ `/api/audio` 的 id 校验**不能再用纯数字**（`numId()` 会把 songmid 洗成数字），按 source 分支。
+  - `/api/lyric?source=tencent&id=`：`c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?...&nobase64=1`
+    （Referer 要 `y.qq.com/portal/player.html`），`trans` 当翻译。
+- 前端：导入记录加 `src: 'netease'|'tencent'`；`resolveAudioUrl/resolveLyric(id, src)` 按平台走
+  （tencent 只走后端；netease 后端优先、第三方回落）；`urlCache` 键加平台前缀；
+  `plId` 用 `txpl:/txal:/txsg:` 前缀区分平台与种类（老的纯数字/`al`/`sg` 仍是网易云），
+  `plInfoOf()` 统一解析；歌单体检对 QQ 歌单改用 `/api/resolve` 重新拉曲目表；列表里 QQ 曲目标「QQ音乐」；
+  分享码升到 **v2**（`{v:2, items:[{s,k,i}]}`，兼容读 v1）。
+- QQ 与网易云的 id 类型不同：网易云是纯数字，QQ 是 14 位字母数字 songmid —— 凡是要"数字 id"的地方都要判平台。
+- 测试：E2E 加了 QQ 单曲/专辑/平台标记用例；`.e2e/import-real.mjs` 用**真·免费 Touhou 曲**
+  （GET IN THE RING「Thank you for dears.」`00113JQa3vgrwr`）验真机取流（`aqqmusic.tc.qq.com`）。

@@ -6,9 +6,9 @@
  *
  * 路由：
  *   GET  /api/health
- *   GET  /api/resolve   ?q=<链接/分享文案/数字ID>  网易云歌曲/专辑/歌单解析（含 163cn.tv 手机短链）
- *   GET  /api/audio     ?id=<歌曲id>&br=320        取可播地址（https，带 expi）
- *   GET  /api/lyric     ?id=<歌曲id>               取歌词 + 中文翻译
+ *   GET  /api/resolve   ?q=<链接/分享文案/ID>      歌曲/专辑/歌单解析：网易云（含 163cn.tv 短链）+ QQ音乐（y.qq.com / c6.y.qq.com 短链）
+ *   GET  /api/audio     ?id=<歌曲id>&br=320&source=  取可播地址（netease / tencent）
+ *   GET  /api/lyric     ?id=<歌曲id>&source=         取歌词 + 中文翻译
  *   POST /api/segment   {lines:[...]}               kuromoji 分词（词性/读音/辞书形）
  *   POST /api/register  {name, pass}
  *   POST /api/login     {name, pass}
@@ -239,21 +239,32 @@ function httpGet(url, headers, timeout) {
   });
 }
 
-/** 从一段分享文案里认出「类型 + ID」；认不出类型但带链接时，返回 url 交给 follow 解析 */
+/** 从一段分享文案里认出「平台 + 类型 + ID」；认不出类型但带链接时，返回 url 交给 follow 解析 */
 function shareHit(text) {
   const s = String(text || '');
   const url = (s.match(/https?:\/\/[^\s"'<>，,、）)】]+/) || [])[0] || '';
   const scan = url || s;
+  if (/y\.qq\.com|c\.y\.qq\.com|i\.y\.qq\.com|u\.y\.qq\.com|url\.cn|c6\.y\.qq\.com/i.test(scan)) {
+    const qq = [
+      [/songDetail\/([A-Za-z0-9]{10,})/i, 'song'], [/albumDetail\/([A-Za-z0-9]{10,})/i, 'album'], [/playlist\/(\d{5,})/i, 'playlist'],
+      [/\/song\/([A-Za-z0-9]{10,})\.html/i, 'song'], [/\/album\/([A-Za-z0-9]{10,})\.html/i, 'album'], [/\/playlist\/(\d{5,})\.html/i, 'playlist'],
+      [/songmid=([A-Za-z0-9]{10,})/i, 'song'], [/albummid=([A-Za-z0-9]{10,})/i, 'album'], [/disstid=(\d{5,})/i, 'playlist'],
+    ];
+    for (const [re, type] of qq) { const m = scan.match(re); if (m) return { src: 'tencent', type, id: m[1] }; }
+    return { src: 'tencent', type: '', id: '', url };
+  }
   const pats = [
     [/playlist[^\d]{0,24}(\d{5,})/i, 'playlist'],
     [/album[^\d]{0,24}(\d{5,})/i, 'album'],
     [/song[^\d]{0,24}(\d{5,})/i, 'song'],
     [/program[^\d]{0,24}(\d{5,})/i, 'program'],
   ];
-  for (const [re, type] of pats) { const m = scan.match(re); if (m) return { type, id: m[1] }; }
+  for (const [re, type] of pats) { const m = scan.match(re); if (m) return { src: 'netease', type, id: m[1] }; }
   const bare = s.trim().match(/^(\d{5,})$/);
-  if (bare) return { type: 'playlist', id: bare[1] };
-  return url ? { type: '', id: '', url } : null;
+  if (bare) return { src: 'netease', type: 'playlist', id: bare[1] };
+  const bareQq = s.trim().match(/^([A-Za-z0-9]{12,16})$/);
+  if (bareQq) return { src: 'tencent', type: 'song', id: bareQq[1] };
+  return url ? { src: '', type: '', id: '', url } : null;
 }
 
 /** 跟进 302（163cn.tv 这类手机短链），最多 6 跳；顺便在响应体里兜底找链接 */
@@ -306,6 +317,69 @@ async function ensureTokenizer() {
 
 /** 片假名 → 平假名（读音显示用） */
 const toHira = (s) => String(s || '').replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
+// ─────────── QQ 音乐 ───────────
+const QQ_HEADERS = { 'User-Agent': NET_UA, Referer: 'https://y.qq.com/' };
+const QQ_LYRIC_HEADERS = { 'User-Agent': NET_UA, Referer: 'https://y.qq.com/portal/player.html' };
+
+async function qqJson(url, headers) {
+  const r = await httpGet(url, headers || QQ_HEADERS, 12000);
+  if (r.status !== 200) throw new Error('HTTP ' + r.status);
+  try { return JSON.parse(r.body); } catch { throw new Error('返回不是 JSON'); }
+}
+const qqCover = (albm) => (albm ? `https://y.qq.com/music/photo_new/T002R300x300M000${albm}.jpg` : '');
+const qqTrack = (x) => ({
+  id: x.songmid || x.mid, name: x.songname || x.name || '',
+  ar: (x.singer || x.singers || []).map((a) => ({ name: a && (a.name || a.title) })).filter((a) => a.name),
+  al: { name: x.albumname || (x.album && (x.album.name || x.album.title)) || '',
+    picUrl: qqCover(x.albummid || (x.album && x.album.mid)) },
+});
+
+const QQ_CACHE = new Map();     // { type:id → meta }，热实例内复用
+async function qqMeta(hit) {
+  const key = 'qq:' + hit.type + ':' + hit.id;
+  const c = QQ_CACHE.get(key);
+  if (c && Date.now() - c.at < 10 * 60 * 1000) return c.v;
+  let out;
+  if (hit.type === 'song') {
+    const j = await qqJson(`https://c.y.qq.com/v8/fcg-bin/fcg_play_single_song.fcg?songmid=${encodeURIComponent(hit.id)}&platform=yqq&format=json`);
+    const t = qqTrack((j.data || [])[0] || {});
+    if (!t.id) throw new Error('这首歌读不到');
+    out = { type: 'song', id: t.id, name: t.name, cover: t.al.picUrl, tracks: [t] };
+  } else if (hit.type === 'album') {
+    const j = await qqJson(`https://c.y.qq.com/v8/fcg-bin/fcg_v8_album_info_cp.fcg?albummid=${encodeURIComponent(hit.id)}&format=json&newsong=1&platform=yqq`);
+    const d = j.data || {};
+    const tracks = (d.list || []).map(qqTrack).filter((t) => t.id);
+    if (!tracks.length) throw new Error('这张专辑里读不到歌');
+    out = { type: 'album', id: hit.id, name: d.albumname || d.name || '', cover: qqCover(d.albummid || hit.id), tracks };
+  } else {
+    const j = await qqJson(`https://c.y.qq.com/v8/fcg-bin/fcg_v8_playlist_cp.fcg?id=${encodeURIComponent(hit.id)}&format=json&newsong=1&platform=yqq`);
+    const d = ((j.data || {}).cdlist || [])[0] || {};
+    const tracks = (d.songlist || []).map(qqTrack).filter((t) => t.id);
+    if (!tracks.length) throw new Error('这张歌单里读不到歌');
+    out = { type: 'playlist', id: String(d.disstid || hit.id), name: d.dissname || '', cover: qqCover(d.album_pic_mid), total: tracks.length, tracks };
+  }
+  if (QQ_CACHE.size > 60) QQ_CACHE.clear();
+  QQ_CACHE.set(key, { at: Date.now(), v: out });
+  return out;
+}
+
+/** QQ 取流：vkey（免费曲给 purl，会员/下架返回空） */
+async function qqAudio(id) {
+  const key = 'qqa:' + id;
+  const c = QQ_CACHE.get(key);
+  if (c && Date.now() - c.at < 3 * 60 * 1000) return c.v;
+  const body = { req_0: { module: 'vkey.GetVkeyServer', method: 'CgiGetVkey',
+    param: { guid: '10000', songmid: [id], songtype: [0], uin: '0', loginflag: 1, platform: '20' } },
+    comm: { uin: 0, format: 'json', ct: 24, cv: 0 } };
+  const j = await qqJson('https://u.y.qq.com/cgi-bin/musicu.fcg?format=json&data=' + encodeURIComponent(JSON.stringify(body)));
+  const d = (j.req_0 && j.req_0.data) || {};
+  const m = (d.midurlinfo || [])[0] || {};
+  const out = m.purl ? { url: String((d.sip || [])[0] + m.purl).replace(/^http:/, 'https:'), br: 128000, size: 0, expi: 600 } : null;
+  if (QQ_CACHE.size > 60) QQ_CACHE.clear();
+  QQ_CACHE.set(key, { at: Date.now(), v: out });
+  return out;
+}
 
 const normTrack = (x) => ({
   id: x.id, name: x.name || '',
@@ -403,17 +477,28 @@ exports.handler = async (event) => {
 
     // 音频直链 / 歌词：走自己的函数，前端不吃第三方限流和跨域（公开接口，不要求登录）
     if (action === '/audio') {
-      const id = numId(q.id);
-      if (!id) return reply(req, 400, { error: 'id 不对' });
+      const src = String(q.source || 'netease');
+      // 网易云是纯数字 id，QQ 是 songmid（字母数字混合），别用同一套校验
+      const id = src === 'tencent' ? String(q.id || '').trim().slice(0, 32) : numId(q.id);
+      if (src === 'tencent' ? !/^[A-Za-z0-9]{10,}$/.test(id) : !id) return reply(req, 400, { error: 'id 不对' });
       const br = Math.min(999, Math.max(64, Number(q.br) || 320));
       try {
-        const a = await netAudio(id, br);
+        const a = src === 'tencent' ? await qqAudio(id) : await netAudio(id, br);
         if (!a) return reply(req, 404, { error: '这首歌没有可播地址（可能要会员或已下架）' });
         return reply(req, 200, Object.assign({ ok: true }, a));
-      } catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
+      } catch (e) { return reply(req, 502, { error: (src === 'tencent' ? 'QQ音乐' : '网易云') + '读不到：' + String((e && e.message) || e) }); }
     }
 
     if (action === '/lyric') {
+      const src = String(q.source || 'netease');
+      if (src === 'tencent') {
+        const id = String(q.id || '').trim().slice(0, 32);
+        if (!/^[A-Za-z0-9]{10,}$/.test(id)) return reply(req, 400, { error: 'id 不对' });
+        try {
+          const j = await qqJson(`https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${encodeURIComponent(id)}&format=json&nobase64=1&g_tk=5381`, QQ_LYRIC_HEADERS);
+          return reply(req, 200, { ok: true, lyric: j.lyric || '', tlyric: j.trans || '' });
+        } catch (e) { return reply(req, 502, { error: 'QQ音乐读不到：' + String((e && e.message) || e) }); }
+      }
       const id = numId(q.id);
       if (!id) return reply(req, 400, { error: 'id 不对' });
       try {
@@ -434,8 +519,9 @@ exports.handler = async (event) => {
       }
       if (!hit || !hit.type) return reply(req, 400, { error: '链接里没有歌曲 / 专辑 / 歌单 ID' });
       if (hit.type === 'program') return reply(req, 400, { error: '电台节目暂不支持' });
-      try { return reply(req, 200, Object.assign({ ok: true }, await neteaseMeta(hit))); }
-      catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
+      const src = hit.src || 'netease';
+      try { return reply(req, 200, Object.assign({ ok: true, src }, await (src === 'tencent' ? qqMeta : neteaseMeta)(hit))); }
+      catch (e) { return reply(req, 502, { error: (src === 'tencent' ? 'QQ音乐' : '网易云') + '读不到：' + String((e && e.message) || e) }); }
     }
 
     if (action === '/register' && method === 'POST') {

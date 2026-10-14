@@ -78,6 +78,27 @@ await page.waitForTimeout(2500);
 const deckN = await page.locator('#deck .word').count();
 const stat = ((await page.locator('#headstat').textContent()) || '').trim();
 check('学词页的词来自导入曲库', deckN > 0 && /首/.test(stat), `${deckN} 张词卡 · 头部「${stat}」`);
+// ── QQ 音乐：单曲（免费曲）导入 + 取流 ──
+const qqStat = await imp('分享单曲：Thank you for dears. https://y.qq.com/n/ryqq/songDetail/00113JQa3vgrwr');
+check('真·QQ音乐单曲导入', /入库 1 首/.test(qqStat), qqStat.slice(0, 50));
+const qqInfo = await page.evaluate(() => {
+  const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}');
+  const rec = Object.values(j.imp || {}).find((r) => r.src === 'tencent');
+  return rec ? { src: rec.src, nid: rec.nid, plId: rec.plId, title: rec.title } : null;
+});
+check('QQ 曲目记了平台与 songmid', !!qqInfo && qqInfo.src === 'tencent' && /^tx/.test(qqInfo.plId), JSON.stringify(qqInfo));
+await page.goto(BASE + '?qq=1#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(1200);
+const qqOpened = await page.evaluate(async () => {
+  const el = [...document.querySelectorAll('#list .track')].find((x) => /Thank you for dears/.test(x.textContent));
+  if (!el) return null;
+  el.click();
+  await new Promise((r) => setTimeout(r, 4000));
+  const a = document.querySelector('audio');
+  return { tid: a && a.getAttribute('data-tid'), src: (a && a.src) || '' };
+});
+check('QQ 曲目能取到可播地址（后端 vkey）', !!qqOpened && /^https:\/\//.test(qqOpened.src) && /qq\.com/.test(qqOpened.src), qqOpened ? qqOpened.src.slice(0, 56) : '没找到曲目');
+
 // ── 新一批 UI：我的页 / 黑白开关 / 入库倒序 / 专辑网格 / 收藏会唱 ──
 await page.goto(BASE + '?ui=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#m-push', { timeout: 30000 });
