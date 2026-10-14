@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015l';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015n';
 
 (() => {
   'use strict';
@@ -2559,6 +2559,19 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       box.querySelectorAll('[data-cue]').forEach((el) => (el.onclick = () => { const [tid, li] = el.dataset.cue.split('@'); if (!tid) return; hidePop(); go('#/track/' + tid + '@' + li); }));
     };
     document.addEventListener('click', (e) => { if (!e.target.closest('#pop') && !e.target.closest('.w') && !e.target.closest('[data-known]')) hidePop(); });
+
+    // 抽屉开着时，点外面那一下**只用来关抽屉**，不能穿透到下面的歌词（否则会"顺手跳到那一句"）。
+    // 必须在 click 的**捕获阶段**吞掉：pointerdown 拦不住后续的 click，而 #plyric 的处理函数是 click。
+    // 例外：点在「词」上 = 切到那个词（查词习惯，不吞）
+    document.addEventListener('click', (e) => {
+      const pop = $('pop');
+      if (!pop || !pop.classList.contains('on')) return;
+      if (e.target.closest('#pop')) return;
+      if (e.target.closest('.w')) return;
+      hidePop();
+      e.stopPropagation();
+      e.preventDefault();
+    }, true);
 
     // 底部弹层下拉关闭（内容滚到顶才生效，不然会把正常滚动当成关闭手势）
     (function sheetDrag() {

@@ -1225,6 +1225,20 @@ await page.waitForTimeout(400);
 const afterOutside = await page.evaluate(() => document.getElementById('pop').classList.contains('on'));
 check('点抽屉外的区域 → 收起', afterOutside === false, afterOutside ? '仍开着' : '已收起');
 
+// 抽屉开着时点歌词行：只关抽屉，绝不能"顺手跳句"（用户真机反馈）
+await page.locator('#plyric .w').first().click();
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+await page.evaluate(() => { document.getElementById('minibar').classList.remove('on'); });
+const lineTap = await page.evaluate(async () => {
+  const b = document.querySelector('#plyric .lblock[data-i]');
+  if (!b) return { none: true };
+  b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 400));
+  return { on: document.getElementById('pop').classList.contains('on'), minibar: document.getElementById('minibar').classList.contains('on') };
+});
+check('抽屉开着时点歌词行 → 只关抽屉，不跳句（不触发播放）', lineTap.on === false && lineTap.minibar === false,
+  `抽屉开=${lineTap.on} · 播放被触发=${lineTap.minibar}`);
+
 // 退出 → 回到闸门（本机记录保留）
 await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#acc-out', { timeout: 15000 });
