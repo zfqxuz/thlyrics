@@ -5,6 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
+  const DATA_V = '20261014o';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -66,7 +67,7 @@
   (function loadUrlCache() { try { const o = JSON.parse(localStorage.getItem(UC_KEY) || '{}'); for (const k of Object.keys(o)) if (o[k] && o[k].url) urlCache.set(k, o[k]); } catch {} })();
   const saveUrlCache = () => { try { const o = {}; for (const [k, v] of urlCache) if (Date.now() - v.at < URL_TTL) o[k] = v; localStorage.setItem(UC_KEY, JSON.stringify(o)); } catch {} };
 
-  let stationNid = null, seekTime = null, prepToken = 0, posSavedAt = 0;
+  let stationNid = null, seekTime = null, prepToken = 0, posSavedAt = 0, healing = false;
   const setNow = (t) => { const el = $('p-now'); if (el) el.textContent = t; };
   const setState = (t) => { const el = $('p-state'); if (el) el.textContent = t || ''; };
   function setLoad(on, text) {
@@ -156,7 +157,23 @@
     audio.addEventListener('playing', () => { setLoad(false); $('minibar').classList.add('on'); });
     audio.addEventListener('play', () => { $('playbtn').textContent = '❚❚'; $('p-play').textContent = '❚❚'; });
     audio.addEventListener('pause', () => { $('playbtn').textContent = '▶'; $('p-play').textContent = '▶'; });
-    audio.addEventListener('error', () => { if (stationNid) urlCache.delete(String(stationNid)); setLoad(false); setState('音频加载失败，点播放重试'); });
+    audio.addEventListener('error', () => {
+      if (stationNid) urlCache.delete(String(stationNid));
+      setLoad(false);
+      // 自愈：地址可能是被删掉/过期的（例如浏览器缓存里的旧 index.json 还指着已经清空的 OSS 音频），
+      // 只要这首歌有网易云 id，就丢掉坏地址、走解析接口重来一次
+      const nid = curTrack && ((S.audio[curTrack.id] && S.audio[curTrack.id].nid) || (curTrack.audio && curTrack.audio.nid));
+      if (curTrack && nid && !healing) {
+        healing = true;
+        if (curTrack.audioOss) delete curTrack.audioOss;      // 旧地址作废
+        urlCache.delete(String(nid));                          // 解析缓存也作废
+        audio.removeAttribute('src');
+        setState('地址失效，正在重新取…');
+        setTimeout(() => { playTrack(curTrack).finally(() => { healing = false; }); }, 300);
+        return;
+      }
+      setState('音频加载失败，点播放重试');
+    });
     // 记住听到哪：每 3 秒落一次，下次进这首歌从这儿继续
     audio.addEventListener('timeupdate', () => {
       if (!curTrack || !(audio.currentTime > 3)) return;
@@ -1769,7 +1786,7 @@
     document.body.classList.toggle('gloss', S.gloss !== false);
     document.body.classList.toggle('ruby', S.ruby !== false);
     let data;
-    try { data = await (await fetch('data/index.json')).json(); }
+    try { data = await (await fetch('data/index.json?v=' + DATA_V, { cache: 'no-cache' })).json(); }
     catch {
       $('view-learn').innerHTML = emptyBox('曲库数据没加载出来', '可能是网络问题，也可能是本地没起服务（node scripts/serve.mjs 8848）。点下面重试一次。', [['e-retry', '重试']]);
       show('view-learn');

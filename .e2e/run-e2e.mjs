@@ -582,6 +582,33 @@ await page.locator('#mb-meta').click();
 await page.waitForTimeout(500);
 check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
 
+// ═══════ 13.4 旧缓存里的音频地址失效 → 自动回落到解析接口 ═══════
+{
+  // 模拟用户浏览器里那份旧 index.json：t1 还写着已经删掉的 OSS 音频地址
+  const idxUrl = '**/data/index.json*';
+  await page.route(idxUrl, async (route) => {
+    const res = await route.fetch();
+    let j = null;
+    try { j = await res.json(); } catch {}
+    if (j && j.tracks) {
+      const t = j.tracks.find((x) => x.id === 't1');
+      if (t) t.audioOss = 'https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/已经删掉的.mp3';
+    }
+    await route.fulfill({ response: res, body: JSON.stringify(j || {}) });
+  });
+  await page.goto(BASE + '?heal=1#/track/t1', { waitUntil: 'load' });
+  await page.waitForTimeout(2500);
+  const healState0 = (await txt('#p-state')) || '';
+  await page.locator('#t-sing').click();
+  await page.waitForTimeout(6000);
+  const healed = await page.evaluate(() => ({ src: (document.querySelector('audio').src || '').slice(0, 60), state: (document.getElementById('p-state') || {}).textContent }));
+  // 桩里给的是假 mp3，解不了码所以状态文字仍会报失败；这里验的是"坏地址被换掉、走了解析接口"
+  check('旧缓存里的死音频地址：自动丢掉坏地址、回落解析接口', /music\.126\.net|blob:/.test(healed.src), `${healed.src} · 状态「${healed.state}」`);
+  await page.unroute(idxUrl);
+  await page.locator('#p-close').click().catch(() => {});
+  await page.waitForTimeout(300);
+}
+
 // ═══════ 13.5 歌单体检（手动按钮；自动那条每天一次，测试里关掉） ═══════
 await page.goto(BASE + '?plchk=1#/songs', { waitUntil: 'load' });
 await page.waitForSelector('.impbox summary', { timeout: 15000 });
@@ -608,6 +635,7 @@ await page.locator('#m-review').click();
 await page.waitForTimeout(800);
 check('生词本有「开始复习」并进入复习页', await page.locator('#view-review').isVisible() && (await page.locator('.revcard .rw').count()) === 1, ((await txt('.revcard .rw')) || '').slice(0, 12));
 const revWord = await txt('.revcard .rw');
+await shot('14-review', true);
 await page.locator('#rev-show').click();
 await page.waitForTimeout(400);
 check('复习卡：点「看释义」才显示释义', (await page.locator('.revcard .rm').count()) === 1 && (await page.locator('#rev-ok').count()) === 1, ((await txt('.revcard .rm')) || '').slice(0, 20));
