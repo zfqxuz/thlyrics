@@ -52,6 +52,16 @@ const E2E_LYRIC = {
     + '[00:04.00] 続\n[00:04.60] け\n[00:05.20] て\n[00:05.80] く\n[00:06.50] 踊る憂鬱と\n',
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
+// 曲库夹具：线上 docs/data/index.json 的曲目是空的（曲库=用户自己导入的），
+// 这套 UI 测试要覆盖完整交互，所以把 data/index.json（源数据）的曲目喂给页面。
+const E2E_FIXTURE = JSON.parse(fs.readFileSync(path.join(HERE, 'fixture-index.json'), 'utf8'));
+const E2E_ALBUM = { ok: true, type: 'album', id: '900001', name: 'E2E 专辑', cover: '', tracks: [
+  { id: 700001, name: '专辑第一首', ar: [{ name: 'E2E 社团' }], al: { name: 'E2E 专辑', picUrl: '' } },
+  { id: 700002, name: '专辑第二首', ar: [{ name: 'E2E 社团' }], al: { name: 'E2E 专辑', picUrl: '' } },
+] };
+const E2E_SONG = { ok: true, type: 'song', id: '900002', name: 'E2E 单曲', cover: '',
+  tracks: [{ id: 700003, name: 'E2E 单曲', ar: [{ name: 'E2E 歌手' }], al: { name: 'E2E 单曲专辑', picUrl: '' } }] };
+
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
 const apiState = { users: {}, seq: 0, calls: [], deleted: [] };
 const apiMerge = (a, b) => {
@@ -87,6 +97,23 @@ const apiStub = (route) => {
   const tok = (req.headers()['authorization'] || '').replace(/^Bearer\s+/i, '');
   const me = Object.values(apiState.users).find((x) => x.token === tok);
   if (path === '/health') return send(200, { ok: true });
+  if (path === '/audio') {                   // 自己的后端：可播地址（前端优先走它，失败了才回落公共接口）
+    const id = new URL(req.url()).searchParams.get('id') || '';
+    if (id === '888888888') return send(404, { error: '这首歌没有可播地址（可能要会员或已下架）' });
+    return send(200, { ok: true, url: 'https://m8.music.126.net/e2e-stub.mp3', br: 320, size: 3 });
+  }
+  if (path === '/lyric') {
+    const id = new URL(req.url()).searchParams.get('id') || '';
+    return send(200, { ok: true, lyric: id === '999999999' ? '纯音乐，请欣赏\n' : E2E_LYRIC.lyric, tlyric: E2E_LYRIC.tlyric });
+  }
+  if (path === '/resolve') {                 // 短链 / 歌单 / 专辑 / 单曲解析（公开接口）
+    const raw = new URL(req.url()).searchParams.get('q') || '';
+    if (/no-id/.test(raw)) return send(400, { error: '链接里没有歌曲 / 专辑 / 歌单 ID' });
+    if (!/https?:\/\//.test(raw) && !/^\d{5,}$/.test(raw)) return send(400, { error: '没识别出链接，粘网易云分享链接或 ID' });
+    if (/album/.test(raw)) return send(200, E2E_ALBUM);
+    if (/song/.test(raw)) return send(200, E2E_SONG);
+    return send(200, { ok: true, type: 'playlist', id: '999000123', name: 'E2E 测试歌单', cover: '', total: 4, tracks: [] });
+  }
   if (path === '/register') {
     const key = String(body.name || '').toLowerCase();
     if (apiState.users[key]) return send(409, { error: '这个用户名已经被用了' });
@@ -137,9 +164,8 @@ const baseRoute = (route) => {
       body: JSON.stringify(id === '999999999' ? { lyric: '纯音乐，请欣赏\n' } : E2E_LYRIC),
     });
   }
-  if (/r\.jina\.ai/.test(u)) {   // 短链解析中转的桩：带 no-id 的返回一个没有歌单 ID 的页面
-    const body = /no-id/.test(u) ? 'Title: 网易云音乐\n\nMarkdown Content:\n# 网易云音乐\n首页' : 'Title: 网易云音乐\n\nMarkdown Content:\n[歌单](https://music.163.com/playlist?id=999000123)\n';
-    return route.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body });
+  if (/\/data\/index\.json/.test(u)) {     // 线上曲目为空，测试用夹具
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(E2E_FIXTURE) });
   }
   if (/gdstudio/.test(u) && /types=url/.test(u)) {
     const id = (u.match(/[?&]id=(\d+)/) || [])[1];
@@ -157,7 +183,9 @@ const errors = [];
 const netReqs = [];
 page.on('response', (r) => { if (/gdstudio|music\.126/.test(r.url())) netReqs.push(r.status() + ' ' + r.url().slice(0, 50)); });
 let expect401 = false;   // 故意用错密码那一步会打一条 401 控制台错误，不算 bug
-page.on('console', (m) => { if (m.type() === 'error' && !(expect401 && /status of 401/.test(m.text()))) errors.push('console: ' + m.text().slice(0, 140)); });
+let expect400 = false;   // 故意喂非法输入那两步：解析接口会回 400，也不算 bug
+let expect404 = false;   // 故意放一首取不到音频的歌：后端会回 404，也不算 bug
+page.on('console', (m) => { if (m.type() !== 'error') return; const t = m.text(); const u = ((m.location() || {}).url) || ''; if (expect401 && /status of 401/.test(t)) return; if (expect400 && /status of 400/.test(t)) return; if (expect404 && /status of 404/.test(t)) return; errors.push('console: ' + t.slice(0, 120) + ' @ ' + u.slice(0, 80)); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message.slice(0, 140)));
 page.on('crash', () => errors.push('渲染进程崩溃'));
 
@@ -184,7 +212,7 @@ await page.waitForTimeout(3000);
 check('注册后放行，进入应用', (await page.locator('#gate').isVisible()) === false, '已进入');
 await page.waitForSelector('#view-home .nowcard', { timeout: 20000 });
 await page.waitForTimeout(400);
-check('默认进首页：一条主路径（搜索 / 挑一首 / 次级入口）', (await page.locator('#view-home').isVisible()) && (await page.locator('#h-q').count()) === 1 && (await page.locator('#h-songs').count()) === 1, ((await txt('#view-home .nowcard .t')) || '').slice(0, 26));
+check('默认进首页：一条主路径（搜索 / 挑一首 / 次级入口）', (await page.locator('#view-home').isVisible()) && (await page.locator('#h-q').count()) === 1 && (await page.locator('#h-songs').count()) === 1, ((await txt('#view-home .nowcard .k')) || '').slice(0, 26));
 check('首页不堆功能：学词/曲库/生词本降级成小入口', (await page.locator('#view-home .btn-main').count()) === 1, (await page.locator('#view-home .herohead .hln button').count()) + ' 个次入口');
 await shot('00-home');
 await page.locator('#h-words').click();
@@ -416,28 +444,33 @@ await shot('08-restored');
 // ═══════ 12 网易云歌单导入（失败逐首报原因） ═══════
 await page.locator('#tab-songs').click();
 await page.waitForTimeout(400);
-check('曲库页有「导入网易云歌单」入口', (await page.locator('.impbox summary').count()) === 1, await txt('.impbox summary'));
+check('曲库页有「导入网易云」入口', (await page.locator('.impbox summary').count()) === 1 && /导入网易云/.test(await txt('.impbox summary')), await txt('.impbox summary'));
 await page.locator('.impbox summary').click();
 await page.waitForTimeout(250);
+expect400 = true;
 await page.locator('#plinput').fill('随便写点什么');
 await page.locator('#plgo').click();
 await page.waitForTimeout(400);
-check('非法输入 → 直接报「没识别出歌单 ID」', /没识别出歌单\s*ID/.test(await txt('#plstat')), (await txt('#plstat')).slice(0, 40));
+check('非法输入 → 直接报错（不空转）', /没识别出链接/.test(await txt('#plstat')), (await txt('#plstat')).slice(0, 40));
 await page.locator('#plinput').fill('https://163cn.tv/no-id-xxxx');
 await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
 const shortFail = await txt('#plstat');
-check('解析不了的短链：说清怎么办（不空转）', /短链里没有歌单\s*ID/.test(shortFail) && /地址栏/.test(shortFail), shortFail.slice(0, 56));
-await page.locator('#plinput').fill('https://163cn.tv/abc123');   // 短链 → 中转解析出 ID
+check('认不出内容的短链：直接报错（不空转）', /链接里没有/.test(shortFail), shortFail.slice(0, 56));
+expect400 = false;
+expect404 = true;       // 桩里有一首"取不到音频"的歌，解析接口会回 404
+await page.locator('#plinput').fill('https://163cn.tv/abc123');   // 短链 → 解析出歌单 ID
 await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
 await page.waitForTimeout(500);
 const impStat = await txt('#plstat');
-check('163cn.tv 短链能自动解析出歌单 ID', /可用 2 首/.test(impStat), impStat.slice(0, 40));
-check('整张歌单一次导完：可用 2 · 跳过 1 · 失败 1', /可用 2 首/.test(impStat) && /跳过 1 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 80));
-check('纯音乐/无歌词只算跳过，不算失败', /纯音乐/.test(impStat), impStat.slice(0, 80));
-const impFails = await page.locator('#pllist').textContent();
-check('真失败逐首给原因', /取不到音频/.test(impFails) && !/纯音乐/.test(impFails), impFails.replace(/\s+/g, ' ').slice(0, 60));
+check('163cn.tv 手机短链能解析（歌单）', /入库 2 首/.test(impStat), impStat.slice(0, 40));
+check('整张歌单一次导完：入库 2 · 跳过 1 · 失败 1', /入库 2 首/.test(impStat) && /跳过 1 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 80));
+const impLog0 = await page.locator('#pllist').textContent();
+check('纯音乐/无歌词只算跳过，不算失败', /纯音乐/.test(impLog0), impLog0.replace(/\s+/g, ' ').slice(0, 60));
+const impLog = await page.locator('#pllist').textContent();
+check('跳过与失败分开列（跳过的不算失败）', /·/.test(impLog) && /✗/.test(impLog) && /取不到音频/.test(impLog), impLog.replace(/\s+/g, ' ').slice(0, 70));
+expect404 = false;
 check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 2);
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(300);
@@ -529,6 +562,20 @@ check('刷新后导入的歌还在', (await page.locator('#list .track').count()
 await page.locator('#list .track [data-del]').first().click();
 await page.waitForTimeout(500);
 check('导入的歌可以删掉', (await page.locator('#list .track').count()) === 1, (await page.locator('#list .track').count()) + ' 首');
+
+// 专辑导入：一条链接进来整张
+await page.locator('#plinput').fill('https://music.163.com/album?id=900001');
+await page.locator('#plgo').click();
+await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 60000 });
+await page.waitForTimeout(500);
+check('专辑导入：整张进库', /入库 2 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 50));
+// 单曲导入
+await page.locator('#plinput').fill('分享单曲: E2E 单曲 https://music.163.com/song?id=900002');
+await page.locator('#plgo').click();
+await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 60000 });
+await page.waitForTimeout(500);
+check('单曲导入：分享文案里也能认出来', /入库 1 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 50));
+check('专辑/单曲进来的歌也在「我导入的」里', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 4);
 await shot('09-import', true);
 
 // ═══════ 13 单词页 → 去这句（要真的换歌、跳句、出声） ═══════
@@ -590,17 +637,15 @@ check('没音频的曲目：播放器给出「绑定音频」入口', await page
 {
   // 模拟用户浏览器里那份旧 index.json：t1 还写着已经删掉的 OSS 音频地址
   const idxUrl = '**/data/index.json*';
-  await page.route(idxUrl, async (route) => {
-    const res = await route.fetch();
-    let j = null;
-    try { j = await res.json(); } catch {}
+await page.route(idxUrl, async (route) => {
+    const j = JSON.parse(JSON.stringify(E2E_FIXTURE));
     if (j && j.tracks) {
       const t = j.tracks.find((x) => x.id === 't1');
       if (t) t.audioOss = 'https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/已经删掉的.mp3';
     }
-    await route.fulfill({ response: res, body: JSON.stringify(j || {}) });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
   });
-  await page.goto(BASE + '?heal=1#/track/t1', { waitUntil: 'load' });
+await page.goto(BASE + '?heal=1#/track/t1', { waitUntil: 'load' });
   await page.waitForTimeout(2500);
   const healState0 = (await txt('#p-state')) || '';
   await page.locator('#t-sing').click();
@@ -628,7 +673,7 @@ check('检查歌单更新：能跑通并报出每张歌单的情况', /线上 \d
 await page.goto(BASE + '?emp=1#/search/zzzzzz', { waitUntil: 'load' });
 await page.waitForTimeout(1200);
 const emptyTxt = (await txt('#view-search')) || '';
-check('搜索没结果时给可执行建议（不是一句"没有内容"）', /没找到/.test(emptyTxt) && /试试/.test(emptyTxt) && (await page.locator('#e-ssongs').count()) === 1, emptyTxt.replace(/\s+/g, ' ').slice(0, 40));
+check('搜索没结果：不是空白，给出路', /没找到/.test(emptyTxt) && (await page.locator('#e-ssongs').count()) === 1, emptyTxt.replace(/\s+/g, ' ').slice(0, 40));
 await page.locator('#e-ssongs').click();
 await page.waitForTimeout(600);
 check('空状态里的按钮能走（去曲库）', await page.locator('#view-songs').isVisible());
@@ -777,6 +822,11 @@ check('管理员：能删 OSS 上的文件（走管理员接口）', !!delKey &&
 await page.locator('#acc-out').click();
 await page.waitForTimeout(1000);
 check('退出登录：回到闸门', (await page.locator('#gate').isVisible()) && (await page.locator('#g-login').count()) === 1, '闸门');
+
+// 线上数据是干净的：曲库只有用户导入的（不带内置曲目），词表/读音表保留做注解
+const shipped = await (await page.request.get(BASE + 'data/index.json')).json();
+check('线上曲库数据不含内置曲目（曲库=自己导入的）', (shipped.tracks || []).length === 0 && (shipped.originals || []).length === 0 && (shipped.vocab || []).length > 1000,
+  `tracks ${(shipped.tracks || []).length} · originals ${(shipped.originals || []).length} · vocab ${(shipped.vocab || []).length}`);
 
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 

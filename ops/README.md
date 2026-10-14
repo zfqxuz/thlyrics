@@ -22,6 +22,9 @@
 | POST | `/api/password` | `{old, new}`，改完返回新 token |
 | GET | `/api/data` | 取记录 |
 | PUT | `/api/data` | `{data}`，**服务端按时间戳逐条合并**后返回全量（多设备不会互相覆盖） |
+| GET | `/api/resolve` | `?q=<链接/分享文案/裸ID>` → `{type: playlist\|album\|song, id, name, cover, tracks[]}`；认网易云链接、**163cn.tv 手机短链**（服务端跟 302） |
+| GET | `/api/audio` | `?id=<歌曲id>&br=320` → `{url, br, size, expi}`（https 直链；无版权/下架 → 404） |
+| GET | `/api/lyric` | `?id=<歌曲id>` → `{lyric, tlyric}` |
 | GET | `/api/admin/files?prefix=` | 管理员：列 OSS 对象（key/size/LastModified），prefix 一般是 `sync/` 或 `audio/` |
 | POST | `/api/admin/delete` | 管理员：`{key}` 删对象（只允许 `sync/` 或 `audio/` 前缀） |
 
@@ -50,8 +53,9 @@ python3 ops/deploy-fc.py        # 把 ops/fc/ 打包上传，并设置环境变�
 
 `docs/app.js`：
 - `API_BASE` 常量 = 上面那个地址；账号态存 `localStorage['thlyrics.account.v1']`
-- 登录后 `syncNow()` 走账号模式（一次 PUT，服务端合并后返回全量），
-  未登录则回落到「公开预签名对象」的老路子
+- 登录后 `syncNow()` 走账号模式（一次 PUT，服务端合并后返回全量）
+- **音频直链 / 歌词优先走 `/api/audio`、`/api/lyric`**，失败才回落到 `music-api.gdstudio.xyz`
+  （第三方会限流、错误响应还不带 CORS 头，之前"导入的歌没音频"多半是它）
 - 界面在「生词本」页顶部：注册并按登录 / 登录 / 退出 / 改密码
 
 ## 音频：现在 OSS 里没有音频

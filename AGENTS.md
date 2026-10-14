@@ -360,3 +360,34 @@
   词卡收成三个主按钮+「更多」、**新增 `#/review` 复习卡**（看词→看释义→记住了/还不熟）、
   音频设置只在生词本/单曲页、字号六档+间距五档 token、320px 窄屏断言、按歌记住播放位置（首页显示"上次听到 1:23"）。
 - 还没做：字体规范彻底化、横屏/软键盘专项、本机 vs 云端说明文案。
+
+### 曲库改成「只放自己导入的」+ 专辑/单曲/163cn 短链 + 后端解析音频（2026-10-14 晚，已上线）
+
+用户要求（原文）：「你可以访问 github，也有我的凭据，为什么你不能动手清除呢？另外必须支持手机从
+163cn 的短链接导入歌单，还要支持单曲导入或者专辑导入。下线本地导入的逻辑。移除页面上一切不必要的
+描述性文案，尤其是那些把用户当傻子的解释性文案。」
+
+- **站上不再带内置曲目**：`node scripts/build-web.mjs --empty-lib` 会把 `docs/data/index.json` 的
+  `tracks`/`originals` 清空，并删掉 `vocab[].examples`（例句改由前端从曲库现算）。
+  `data/index.json`（源数据，44 首）**保留**：词表 1358 词、`data/readings-extra.json` 都要靠它生成，
+  只是不再发到站上。`docs/data/covers/` 已删。
+- **学词/复习/例句全部只看曲库**：前端新增 `LIBW`（曲库词 → 出现次数/出现的歌，`indexLibrary()`）、
+  `libStat()`、`examplesFor()`。导入/删除/云端拉回后都要 `indexLibrary()`；`examplesFor` 优先挑
+  有音频的曲目（避免"去这句"点过去没声音）。曲库空时各页给空状态 + 导入入口。
+- **导入入口统一**：曲库页一个输入框吃下 歌单 / 专辑 / 单曲 / 分享文案 / 裸 ID / 短链。
+  解析走自建后端 `GET /api/resolve`（服务端跟 302 → 解析类型 + 曲目表）；后端不可用时回落
+  「本地认歌单 ID + `types=playlist`」。歌单曲目表仍走 `types=playlist`（一次能拿整张），
+  专辑/单曲用后端返回的曲目表。`S.imp[].plId` 用 `al<id>` / `sg<id>` 区分，歌单体检只跑纯数字 ID 的。
+- **音频/歌词改走后端**：`GET /api/audio?id=&br=`（网易云 `/api/song/enhance/player/url`，
+  **http 直链要改写成 https**，否则 Pages 上被混合内容拦掉）、`GET /api/lyric?id=`。
+  前端 `resolveAudioUrl()` / `resolveLyric()` 都是「后端优先 → 失败回落 gdstudio」。起因：
+  gdstudio 限流时错误响应不带 CORS 头，浏览器直接 fetch 失败 → 用户眼里就是"导入的歌没音频/被跳过"。
+- **本地导入下线**：`#audiofile`/`#audioclear`、IndexedDB 那套（`idb*`、`S.local`）全删了，
+  boot 时 `indexedDB.deleteDatabase('thlyrics')` 清一次旧文件。网易云 ID 绑定（`#nidinput`）保留。
+- **文案**：首页/闸门/生词本/空状态里的解释性长句全删，只留功能性标签与反馈。
+- **测试**：`.e2e/fixture-index.json`（从旧 `docs/data/index.json` 生成，测试夹具，别当成线上数据）
+  由 E2E 用 route 喂给页面，UI 交互照旧测；新增 `/api/resolve|audio|lyric` 桩、专辑/单曲导入、
+  「线上曲库不含内置曲目」断言。E2E 124/124。真机脚本 `.e2e/import-real.mjs <url>`（真专辑/单曲导入 +
+  后端音频解析，走系统代理跑，因为浏览器要出网）。
+- 重建顺序：`node scripts/build-index.mjs --stats` → `node scripts/build-web.mjs --empty-lib`
+  （`--covers` 不用再带，封面已删）。函数：`python3 ops/deploy-fc.py`。

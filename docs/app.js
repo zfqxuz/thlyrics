@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014q';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014r';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -31,11 +31,11 @@
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true };
+  let S = { known: {}, notes: {}, audio: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { try { ACC = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch { ACC = null; } };
   const saveAcc = () => { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch {} };
-  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.autoSync = S.autoSync !== false; }
+  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.autoSync = S.autoSync !== false; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} queueSync(); };
   // 已掌握记的是时间戳：正数=标了，负数=明确取消（云端合并时按时间戳取胜，不会被旧数据顶回来）
@@ -43,11 +43,8 @@
   const meaningOf = (w) => (w && ((S.notes[w.id] && S.notes[w.id].meaning) || w.meaning)) || '';
   const toggleKnown = (w) => { if (!w) return; if (isKnown(w)) S.known[w.id] = -Date.now(); else S.known[w.id] = Date.now(); save(); };
 
-  // ────────────── 本地音频（IndexedDB） ──────────────
-  function idb() { return new Promise((res, rej) => { const r = indexedDB.open(IDB_NAME, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('audio')) r.result.createObjectStore('audio'); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
-  async function idbSet(k, v) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction('audio', 'readwrite'); tx.objectStore('audio').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
-  async function idbGet(k) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction('audio', 'readonly'); const q = tx.objectStore('audio').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
-  async function idbDel(k) { const db = await idb(); return new Promise((res) => { const tx = db.transaction('audio', 'readwrite'); tx.objectStore('audio').delete(k); tx.oncomplete = res; tx.onerror = res; }); }
+  // 旧版本往 IndexedDB 绑过本机音频文件，功能已下线：开机清一次，别留垃圾
+  try { indexedDB.deleteDatabase(IDB_NAME); } catch {}
 
   // ────────────── 语音朗读 ──────────────
   let jaVoice = null;
@@ -81,17 +78,38 @@
   function applySeek() { if (seekTime == null || audio.readyState < 1) return; const t = seekTime; seekTime = null; try { audio.currentTime = t; } catch {} }
   function bufferedAhead(t) { try { for (let i = 0; i < audio.buffered.length; i++) if (t >= audio.buffered.start(i) - .2 && t <= audio.buffered.end(i) + .2) return audio.buffered.end(i) - t; } catch {} return 0; }
 
+  /** 自己的后端接口（音频直链 / 歌词在那边取，不吃第三方限流和跨域） */
+  async function fcJson(path) {
+    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 20000);
+    try {
+      const r = await fetch(API_BASE + path, { signal: ac.signal });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || j.error) throw new Error((j && j.error) || ('HTTP ' + r.status));
+      return j;
+    } finally { clearTimeout(timer); }
+  }
+  /** 可播地址：后端优先，失败回落公共解析接口 */
+  async function resolveAudioUrl(nid, br) {
+    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
+    try { const j = await gdJson(`types=url&source=netease&id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
+    return null;
+  }
+  /** 歌词 + 翻译：同上；接口通了但没歌词（纯音乐）会返回空 lyric，不算失败 */
+  async function resolveLyric(nid) {
+    try { const j = await fcJson(`/lyric?id=${encodeURIComponent(nid)}`); if (j) return { lyric: j.lyric || '', tlyric: j.tlyric || '' }; } catch {}
+    try { const j = await gdJson(`types=lyric&source=netease&id=${encodeURIComponent(nid)}`); if (j) return j; } catch {}
+    return null;
+  }
   async function urlFor(track) {
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st || !st.nid) return null;
     const hit = urlCache.get(String(st.nid));
     if (hit && Date.now() - hit.at < URL_TTL) return hit.url;
-    const r = await fetch(`${GD}?types=url&source=netease&id=${encodeURIComponent(st.nid)}&br=320`);
-    const j = await r.json().catch(() => null);
-    if (!j || !j.url) throw new Error('取不到音频地址');
-    urlCache.set(String(st.nid), { url: j.url, at: Date.now() }); saveUrlCache();
-    return j.url;
+    const url = await resolveAudioUrl(st.nid, 320);
+    if (!url) throw new Error('取不到音频地址');
+    urlCache.set(String(st.nid), { url, at: Date.now() }); saveUrlCache();
+    return url;
   }
 
   /** 进单曲/跟唱页就把音频准备好：有直链的开始缓冲，没有的先解析地址 */
@@ -100,8 +118,6 @@
     const my = ++prepToken;
     if (audio.getAttribute('data-tid') === track.id && audio.src) return;
     const eager = !!S.used;
-    let local = S.local[track.id];
-    if (!local) { try { const b = await idbGet(track.id); if (b) local = URL.createObjectURL(b); } catch {} }
     if (my !== prepToken) return;
     const attach = (url) => {
       if (audio.getAttribute('data-tid') === track.id && audio.src) return;   // 已经挂上这首了
@@ -110,7 +126,6 @@
       audio.src = url; audio.load();
       setState(eager ? '缓冲中…' : '已就绪，点播放');
     };
-    if (local) { attach(local); return; }
     const nid = (S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null;
     const hit = nid ? urlCache.get(String(nid)) : null;
     if (track.audioOss) { attach(track.audioOss); return; }
@@ -132,11 +147,9 @@
       audio.pause();
       setLoad(true, '正在准备音频…');
       try {
-        let local = S.local[track.id];
-        if (!local) { try { const b = await idbGet(track.id); if (b) local = URL.createObjectURL(b); } catch {} }
-        const url = local || await urlFor(track);
+        const url = await urlFor(track);
         if (!url) { setLoad(false); setState(track.audioOss ? '音频地址不可用' : '没有音频'); return; }
-        stationNid = local ? null : ((S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null);
+        stationNid = (S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null;
         audio.setAttribute('data-tid', track.id);
         audio.src = url;
       } catch (e) { setLoad(false); setState('播放失败：' + e.message); return; }
@@ -302,16 +315,18 @@
 
   // ────────────── 数据 ──────────────
   let IDX = null, VOCAB = [], VBY = new Map(), VBYID = new Map(), SURF = new Map(), TRACK = new Map();
+  const LIBW = new Map();          // 曲库里的词 → { n: 出现次数, tracks: Set<trackId> }
   let deckCount = 30, twFilter = 'all', filter = 'all', lastNonSearch = '#/learn';
 
   const levelName = (v) => (v.br ? `标日${v.br.bk} 第${v.br.l}课` : v.jl ? `JLPT N${v.jl}` : '标日未收录');
 
   function wordRow(v) {
+    const st = libStat(v);
     return `<div class="item word" data-id="${v.id}">
       <div class="col">
         <div class="l1">${esc(v.word)}<span class="rd">${esc(v.reading)}</span></div>
         <div class="l2">${esc(meaningOf(v) || '（还没释义）')}</div>
-        <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · ${v.tracks.length} 首歌 / ${v.count} 次</div>
+        <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · ${st ? st.tracks.size : 0} 首歌 / ${st ? st.n : 0} 次</div>
       </div>
       ${dotsHtml(v)}
       <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握">✓</button>
@@ -341,8 +356,38 @@
     : r === 'out' ? !v.br
     : r === 'n45' ? v.jl >= 4
     : r === 'n123' ? (!!v.jl && v.jl <= 3) : true;
+  /** 曲库里的歌 → 词表（学词 / 复习 / 例句都只看曲库里有的歌） */
+  function indexLibrary() {
+    LIBW.clear();
+    for (const t of IDX.tracks) for (const l of t.lines || []) for (const sg of l.segs || []) {
+      if (!sg.w || !sg.b) continue;
+      let e = LIBW.get(sg.b);
+      if (!e) LIBW.set(sg.b, e = { n: 0, tracks: new Set() });
+      e.n++; e.tracks.add(t.id);
+    }
+  }
+  const libStat = (v) => (v ? LIBW.get(v.word) : null);
+  /** 这个词在曲库里的例句（正在听的那首排最前） */
+  function examplesFor(v, max = 6) {
+    const out = [];
+    if (!v) return out;
+    const hit = (t) => {
+      const i = (t.lines || []).findIndex((l) => (l.segs || []).some((sg) => sg.w && sg.b === v.word));
+      return i < 0 ? null : { jp: t.lines[i].text, zh: t.lines[i].zh || '', track: t.title, tid: t.id, li: i };
+    };
+    if (curTrack) { const x = hit(curTrack); if (x) out.push(Object.assign(x, { now: true })); }
+    // 先挑能出声的曲目做例句（点「去这句」才不会点过去没声音）
+    const playable = (t) => !!(t.audioOss || t.audio || S.audio[t.id]);
+    const list = [...IDX.tracks].sort((a, b) => (playable(b) ? 1 : 0) - (playable(a) ? 1 : 0));
+    for (const t of list) {
+      if (out.length >= max) break;
+      const x = hit(t);
+      if (x && !out.some((y) => y.tid === x.tid && y.li === x.li)) out.push(x);
+    }
+    return out;
+  }
   function deckList() {
-    let list = VOCAB.filter((v) => rangeOk(v, S.dRange || 'all') && ((S.dPos || 'all') === 'all' || v.pos === S.dPos));
+    let list = VOCAB.filter((v) => LIBW.has(v.word) && rangeOk(v, S.dRange || 'all') && ((S.dPos || 'all') === 'all' || v.pos === S.dPos));
     if (S.hideKnown !== false) list = list.filter((v) => !isKnown(v));
     const by = S.dSort || 'easy';
     if (by === 'freq') return [...list].sort((a, b) => b.count - a.count || a.diff - b.diff);
@@ -358,8 +403,7 @@
     const withAudio = IDX.tracks.filter((t) => t.audio || t.audioOss).length;
     $('view-home').innerHTML = `
       <div class="herohead">
-        <div class="ht">东方同人曲 学唱机</div>
-        <div class="hs">把喜欢的东方同人曲，变成日语教材。</div>
+        <div class="ht">TH Lyrics</div>
         <div class="homesearch">
           <input id="h-q" placeholder="搜曲名、社团、原曲、词…" autocomplete="off">
           <button id="h-go">搜索</button>
@@ -375,15 +419,17 @@
         <div class="t">${esc(last.title)}</div>
         <div class="a">${esc(last.artist)}${last.base ? ' · 原曲：' + esc(last.base) : ''}${(S.pos || {})[last.id] > 5 ? ` · 上次听到 ${fmt(S.pos[last.id])}` : ''}</div>
         <div class="acts"><button class="btn-main" id="h-continue">继续学唱</button><button class="btn-ghost" id="h-pick">换一首</button></div>
-      </div>` : `<div class="nowcard">
+      </div>` : (IDX.tracks.length ? `<div class="nowcard">
         <div class="k">开始</div>
-        <div class="t">先挑一首你想听的</div>
-        <div class="a">曲库里有 ${withAudio} 首能直接出声；也可以粘自己的网易云歌单进来。</div>
-        <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入歌单</button></div>
-      </div>`}
+        <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入</button></div>
+      </div>` : `<div class="nowcard">
+        <div class="k">曲库是空的</div>
+        <div class="t">导入网易云歌单 / 专辑 / 单曲</div>
+        <div class="acts"><button class="btn-main" id="h-imp">导入</button><button class="btn-ghost" id="h-pick">去曲库</button></div>
+      </div>`)}
       <div class="hair"></div>
-      <div class="sec-sub">今天可以从这几个词开始 · 点一下直接跳到它出现的那句</div>
-      <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">词表还没准备好</span>'}</div>`;
+      <div class="sec-sub">今天学这些</div>
+      <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">导入歌曲后，歌里的词会出现在这里</span>'}</div>`;
     const goHome = (h) => { location.hash = h; };
     $('h-go').onclick = () => { const q = ($('h-q').value || '').trim(); if (q) goHome('#/search/' + encodeURIComponent(q)); };
     $('h-q').onkeydown = (e) => { if (e.key === 'Enter') $('h-go').click(); };
@@ -397,7 +443,7 @@
     $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => {
       // 点一个词 = 去它真正出现的那句（少一跳）
       const v = VBYID.get(Number(el.dataset.w));
-      const ex = v && (v.examples || [])[0];
+      const ex = v && examplesFor(v, 1)[0];
       if (ex && ex.tid) { toast('从这一句开始'); goHome('#/track/' + ex.tid + '@' + (ex.li || 0)); }
       else goHome('#/word/' + el.dataset.w);
     }));
@@ -407,20 +453,25 @@
   // ────────────── 复习（生词本的学习闭环：看词 → 回忆 → 看释义 → 标记） ──────────────
   let revDeck = [], revI = 0, revShown = false, revStat = { ok: 0, again: 0 };
   function startReview(n) {
-    const pool = VOCAB.filter((v) => !isKnown(v) && v.examples && v.examples.length);
+    const pool = VOCAB.filter((v) => !isKnown(v) && LIBW.has(v.word));
     const pick = [];
     const step = Math.max(1, Math.floor(pool.length / (n || 20)));
     for (let i = 0; i < pool.length && pick.length < (n || 20); i += step) pick.push(pool[i]);
-    revDeck = pick.length ? pick : VOCAB.slice(0, 10);
+    revDeck = pick;
     revI = 0; revShown = false; revStat = { ok: 0, again: 0 };
   }
   function renderReview() {
+    if (!LIBW.size) {
+      $('view-review').innerHTML = emptyBox('曲库是空的', '', [['e-rgo', '导入歌曲']]);
+      $('e-rgo').onclick = () => { impState.open = true; go('#/songs'); };
+      return;
+    }
     if (!revDeck.length) startReview(20);
     const v = revDeck[revI];
     if (!v) {
       $('view-review').innerHTML = `<div class="revwrap">
         <div class="sec-head"><div><div class="sec-title">复习完成</div><div class="sec-sub">这轮 ${revDeck.length} 个词 · 记住了 ${revStat.ok} · 还要再看 ${revStat.again}</div></div></div>
-        ${emptyBox('这一轮过完了', '记住的已经进了生词本；"还要再看"的下一轮还会出现。', [])}
+        ${emptyBox('这一轮过完了', '', [])}
         <div class="row" style="justify-content:center;gap:8px">
           <button class="toolbtn" id="rev-again">再来一轮</button>
           <button class="toolbtn" id="rev-mine">回生词本</button>
@@ -429,7 +480,7 @@
       if ($('rev-mine')) $('rev-mine').onclick = () => go('#/mine');
       return;
     }
-    const ex = (v.examples || [])[0];
+    const ex = examplesFor(v, 1)[0];
     $('view-review').innerHTML = `<div class="revwrap">
       <div class="sec-head"><div><div class="sec-title">复习</div><div class="sec-sub">第 ${revI + 1} / ${revDeck.length} 个 · 记住 ${revStat.ok} · 还要再看 ${revStat.again}</div></div></div>
       <div class="revbar"><i style="width:${Math.round(((revI) / revDeck.length) * 100)}%"></i></div>
@@ -438,7 +489,7 @@
         ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(v.romaji || '')}</div>
           <div class="rm">${esc(meaningOf(v) || '（没有释义）')}</div>
           ${ex ? `<div class="rx">${esc(ex.track || '')}<br>${esc(ex.jp)}${ex.zh ? '<br>' + esc(ex.zh) : ''}</div>` : ''}`
-        : '<div class="rr">先自己想一下意思，再点下面的按钮</div>'}
+        : '<div class="rr">？</div>'}
       </div>
       <div class="revacts">
         ${revShown ? `<button id="rev-again2">还不熟</button><button class="k" id="rev-ok">记住了</button>`
@@ -458,14 +509,20 @@
   }
 
   function renderLearn() {
-    const known = VOCAB.filter(isKnown).length;
+    if (!IDX.tracks.length) {
+      $('view-learn').innerHTML = emptyBox('曲库是空的', '', [['e-limp', '导入歌曲']]);
+      $('e-limp').onclick = () => { impState.open = true; go('#/songs'); };
+      return;
+    }
+    const libN = VOCAB.filter((v) => LIBW.has(v.word)).length;
+    const known = VOCAB.filter((v) => LIBW.has(v.word) && isKnown(v)).length;
     const list = deckList();
-    const pct = Math.round((known / VOCAB.length) * 100);
+    const pct = libN ? Math.round((known / libN) * 100) : 0;
     $('view-learn').innerHTML = `
       <div class="sec-head">
         <div>
           <div class="sec-title">今天学哪些词</div>
-          <div class="sec-sub">已掌握 ${known} / ${VOCAB.length} 词 · 这一批还有 ${list.length} 个</div>
+          <div class="sec-sub">已掌握 ${known} / ${libN} 词 · 这一批还有 ${list.length} 个</div>
         </div>
       </div>
       <div class="bar"><i style="width:${pct}%"></i></div>
@@ -485,9 +542,9 @@
         <button class="toolbtn ${S.hideKnown !== false ? 'on' : ''}" id="d-hideknown">隐藏已掌握</button>
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
-      ${list.length === 0 ? '<div class="empty">这个范围里的词都掌握了</div>' : ''}
+      ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里还没有词表收录的词'}</div>` : ''}
       ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个</button></div>` : ''}
-      <div class="hint">点词看读音释义，右侧 ✓ 标已掌握。</div>`;
+`;
     $('d-range').value = S.dRange || 'all';
     $('d-pos').value = S.dPos || 'all';
     $('d-sort').value = S.dSort || 'easy';
@@ -502,7 +559,7 @@
   function trackRow(t) {
     const tags = [];
     if (t.imp) tags.push('导入');
-    if (t.audio || t.audioOss || S.audio[t.id] || S.local[t.id]) tags.push('有声'); else tags.push('无音源');
+    if (t.audio || t.audioOss || S.audio[t.id]) tags.push('有声'); else tags.push('无音源');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
     if (brN) tags.push(`标日 ${brN}`);
@@ -773,24 +830,15 @@
     const m = s.match(/[?&#]id=(\d{3,})/) || s.match(/playlist\/?[^\d]{0,8}(\d{3,})/) || s.match(/^(\d{3,})$/);
     return m ? m[1] : '';
   }
-  /** 把用户粘的东西（数字 / 链接 / 短链 / 整段分享文案）解析成歌单 ID */
-  async function resolvePlaylistId(input) {
-    const s = String(input || '').trim();
-    const direct = plIdOf(s);
-    if (direct) return { id: direct };
-    const url = (s.match(/https?:\/\/[^\s，,、）)]+/) || [])[0];
-    if (!url) return { error: '没识别出歌单 ID' };
-    // 浏览器直连短链/网易云一定会被跨域挡（还会在控制台留红字），所以直接走公共中转
-    // （r.jina.ai）把重定向跟到底，再从页面内容里捞 id
+  /** 交给后端把「短链 / 分享文案 / 链接 / 数字 ID」解析成 歌单·专辑·单曲（含曲目表） */
+  async function apiResolve(text) {
+    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 25000);
     try {
-      const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 30000);
-      const r = await fetch('https://r.jina.ai/' + url, { signal: ac.signal });
-      clearTimeout(timer);
-      const t = (await r.text()).slice(0, 200000);
-      const m = t.match(/playlist\?id=(\d{5,})/) || t.match(/"playlistId"\s*:\s*"(\d{5,})"/) || t.match(/playlist\/(\d{5,})/);
-      if (m) return { id: m[1], short: url };
-    } catch {}
-    return { error: `短链里没有歌单 ID。点开链接，把地址栏里 id= 后面的数字填进来` };
+      const r = await fetch(`${API_BASE}/resolve?q=${encodeURIComponent(text)}`, { signal: ac.signal });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.type) throw new Error((j && j.error) || `解析失败（HTTP ${r.status}）`);
+      return j;
+    } finally { clearTimeout(timer); }
   }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
   /** 逐首导入（首次导入和「重试失败」都走这里） */
@@ -810,17 +858,17 @@
       let lines = [], why = '';
       try {
         // 歌词和音频地址并行取，快一点
-        const [ly, u] = await Promise.all([
-          gdJson(`types=lyric&source=netease&id=${nid}`),
-          gdJson(`types=url&source=netease&id=${nid}&br=320`).catch(() => null),
-        ]);
-        lines = parseLrc(ly && ly.lyric, ly && ly.tlyric);
-        if (lines.length < 3 || lines[lines.length - 1].t <= 0) {   // 纯音乐 / 没有时间轴歌词：跳过，不算失败
-          skip.push({ nid, title });
-          report(title, '跳过（纯音乐／没有歌词）', 'skip');
-          return;
+        const [ly, url] = await Promise.all([resolveLyric(nid), resolveAudioUrl(nid, 320)]);
+        if (!ly) why = '取不到歌词';
+        else {
+          lines = parseLrc(ly.lyric, ly.tlyric);
+          if (lines.length < 3 || lines[lines.length - 1].t <= 0) {   // 纯音乐 / 没有时间轴歌词：跳过，不算失败
+            skip.push({ nid, title });
+            report(title, '跳过（纯音乐／没有歌词）', 'skip');
+            return;
+          }
+          if (!url) why = '取不到音频';
         }
-        if (!u || !u.url) why = '取不到音频';
       } catch (e) {
         why = (e && e.message) || '接口不可用';
       }
@@ -836,24 +884,45 @@
     }));
     return { ok, fail, skip, quota };
   }
-  async function importPlaylist(input, limit, onStep) {
-    const rid = await resolvePlaylistId(input);
-    if (rid.error) return { error: rid.error };
-    const pid = rid.id;
+  /** 歌单：曲目表走解析接口（一次能拿整张） */
+  async function importPlaylistById(pid, name, limit, onStep) {
     let pl = null;
     try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
     catch { return { error: '拉取歌单失败（接口超时或暂时不可用）' }; }
     if (!pl) return { error: '歌单不存在或读不到' };
     const all = (pl.tracks || []).filter((x) => x && x.id);
     if (!all.length) return { error: '这张歌单里没有歌' };
-    const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all;   // 默认整张歌单
-    const res = await importTracks(list, pl.name || '', pid, onStep);
-    return Object.assign(res, { plName: pl.name || '', total: all.length, done: list.length, pid });
+    const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all;
+    const res = await importTracks(list, name || pl.name || '', pid, onStep);
+    return Object.assign(res, { plName: name || pl.name || '', total: all.length, done: list.length, pid, kind: 'playlist' });
+  }
+  /** 统一入口：歌单 / 专辑 / 单曲（含手机 163cn.tv 短链、分享文案、裸 ID） */
+  async function importFrom(input, limit, onStep) {
+    const text = String(input || '').trim();
+    if (!text) return { error: '粘网易云链接 / 分享文案 / ID' };
+    let meta = null, why = '';
+    try { meta = await apiResolve(text); } catch (e) { why = (e && e.message) || '解析失败'; }
+    if (!meta) {
+      const pid = plIdOf(text);                     // 解析接口不可用时，至少还能粘歌单链接 / 数字 ID
+      if (!pid) return { error: why };
+      meta = { type: 'playlist', id: pid, name: '' };
+    }
+    if (meta.type === 'playlist') return importPlaylistById(meta.id, meta.name, limit, onStep);
+    const tracks = (meta.tracks || []).filter((x) => x && x.id);
+    const kind = meta.type === 'album' ? '专辑' : '单曲';
+    if (!tracks.length) return { error: `这个${kind}里读不到歌` };
+    const list = Number(limit) > 0 ? tracks.slice(0, Number(limit)) : tracks;
+    const pid = (meta.type === 'album' ? 'al' : 'sg') + meta.id;
+    const res = await importTracks(list, meta.name || '', pid, onStep);
+    return Object.assign(res, { plName: meta.name || '', total: tracks.length, done: list.length, pid, kind: meta.type });
   }
   /** 导入 + 把新歌并进内存（供 UI 与测试用） */
   async function importInto(input, limit, onStep) {
-    const res = await importPlaylist(input, limit, onStep);
-    if (!res.error) for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+    const res = await importFrom(input, limit, onStep);
+    if (!res.error) {
+      for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+      indexLibrary();
+    }
     return res;
   }
   window.__tlImport = (input, limit) => importInto(input, limit);
@@ -924,7 +993,11 @@
       if (!rec || !rec.id || TRACK.has(rec.id)) continue;
       const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(t.id, t); added = true;
     }
-    if (added) { if (location.hash.startsWith('#/songs')) renderSongs(); if (location.hash.startsWith('#/mine')) renderMine(); }
+    if (added) {
+      indexLibrary();
+      if (location.hash.startsWith('#/songs')) renderSongs();
+      if (location.hash.startsWith('#/mine')) renderMine();
+    }
     return added;
   }
 
@@ -970,22 +1043,18 @@
   function syncMsgHtml() {
     const logged = !!(ACC && ACC.token);
     const who = logged ? '账号 ' + esc(ACC.name) : '未登录';
-    if (!logged) return '未登录：登录后记录才会跟着账号走';
-    if (S.autoSync === false) return '云端：自动同步已关（点「自动同步：关」可打开）· ' + who;
+    if (!logged) return '未登录';
+    if (S.autoSync === false) return '云端：自动同步已关 · ' + who;
     if (syncBusy) return '云端：同步中… · ' + who;
     if (syncErr) return '云端：上次同步失败（' + esc(syncErr) + '），有改动会自动重试 · ' + who;
-    const tail = logged
-      ? '　·　换设备登录同一个账号就全回来了（清掉浏览器数据也不怕）'
-      : '　·　未登录：记录只在这台浏览器和你自己的 OSS 里，登录后跟着账号走';
-    if (S.syncAt) return '云端：已自动同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who + tail;
+    if (S.syncAt) return '云端：已自动同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who;
     return '云端：等着第一次同步… · ' + who;
   }
 
   // ────────────── 账号（注册 / 登录 / 退出 / 改密码） ──────────────
   function accHtml() {
     if (ACC && ACC.token) {
-      return `<div class="accbox on"><div class="col"><div class="l1">已登录：${esc(ACC.name)}</div>
-        <div class="l2">标词 / 改释义 / 导入都会存到你的账号，换设备登录同一个账号就有</div></div>
+      return `<div class="accbox on"><div class="col"><div class="l1">已登录：${esc(ACC.name)}</div></div>
         <div class="row"><button class="toolbtn" id="acc-out">退出</button></div></div>
         <div class="row" id="acc-pwrow" style="display:none;margin-top:8px">
           <input class="sel" id="acc-old" type="password" placeholder="原密码" style="flex:1;min-width:110px;height:38px">
@@ -994,8 +1063,7 @@
         </div>
         <div class="row" style="margin-top:8px"><button class="toolbtn" id="acc-pw">改密码</button></div>`;
     }
-    return `<div class="accbox"><div class="col"><div class="l1">登录后记录跟着账号走</div>
-      <div class="l2">登录后记录跟着账号走：换手机、清掉浏览器数据，登录一下全回来。</div></div>
+    return `<div class="accbox"><div class="col"><div class="l1">登录 / 注册</div></div>
       <div class="row" style="margin-top:8px">
         <input class="sel" id="acc-name" placeholder="用户名" style="flex:1;min-width:100px;height:38px" autocomplete="username">
         <input class="sel" id="acc-pass" type="password" placeholder="密码（≥6 位）" style="flex:1;min-width:100px;height:38px" autocomplete="current-password">
@@ -1014,14 +1082,13 @@
     const total = adminFiles ? adminFiles.reduce((n, f) => n + f.size, 0) : null;
     return `<div class="accbox on" id="adminbox">
       <div class="col"><div class="l1">管理员模式</div>
-      <div class="l2">你能直接看和删 OSS 上存的文件。账号数据在 sync/users/…（一个人一个目录）；音频若有会放在 audio/（按歌曲 id 命名，同一首歌只会有一份）${total != null ? `。<br>当前 ${esc(adminPrefix)}：${adminFiles.length} 个文件 · ${fmtSize(total)}` : ''}</div></div>
+      <div class="l2">${total != null ? `${esc(adminPrefix)}：${adminFiles.length} 个文件 · ${fmtSize(total)}` : 'sync/users/ 账号数据 · audio/ 音频'}</div></div>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="adm-list">${adminFiles ? '刷新列表' : '查看 OSS 文件'}</button>
         <button class="toolbtn ${adminPrefix === 'sync/' ? 'on' : ''}" id="adm-sync">账号数据</button>
         <button class="toolbtn ${adminPrefix === 'audio/' ? 'on' : ''}" id="adm-audio">音频</button>
       </div>
       ${adminFiles ? (adminFiles.length ? `<div class="list" style="margin-top:8px">${adminFiles.map((f) => `<div class="item"><div class="col"><div class="l1" style="font-size:12px;word-break:break-all;font-weight:400">${esc(f.key)}</div><div class="l2">${fmtSize(f.size)} · ${esc(String(f.at || '').slice(0, 16).replace('T', ' '))}</div></div><button class="toolbtn" data-admdel="${esc(f.key)}">删除</button></div>`).join('')}</div>` : '<div class="meta" style="margin-top:8px">这个前缀下没有文件</div>') : ''}
-      <div class="meta" style="margin-top:8px">⚠️ 删掉某个账号的 account.json，那个人下次登录会提示「用户名或密码不对」；删 data.json 只是清空他的记录。</div>
     </div>`;
   }
   async function loadAdminFiles(prefix) {
@@ -1056,13 +1123,11 @@
     g.hidden = false;
     document.body.classList.add('gated');
     g.innerHTML = `<div class="gatecard">
-      <div class="gtitle">东方同人曲 学唱机</div>
-      <div class="gsub">登录后开始：进度 / 自定义释义 / 导入的歌单都跟着账号走，换设备登录一下也在。</div>
+      <div class="gtitle">TH Lyrics</div>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
       <input class="sel" id="g-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
       <div class="row"><button class="btn-primary" id="g-login">登录</button><button class="toolbtn" id="g-reg">注册新账号</button></div>
       <div class="gmsg" id="g-msg">${esc(msg || '')}</div>
-      <div class="gsub">没有账号就点「注册新账号」，起个名字设个密码就行（只存用户名和密码哈希）。</div>
     </div>`;
     $('g-login').onclick = () => authFrom('login', 'g-name', 'g-pass', afterLogin);
     $('g-reg').onclick = () => authFrom('reg', 'g-name', 'g-pass', afterLogin);
@@ -1187,18 +1252,21 @@
     const ctx = impState.ctx;
     if (!ctx || !ctx.list.length || importing) return;
     importing = true;
-    impState.fails = []; impState.failsRaw = [];
+    impState.fails = []; impState.failsRaw = []; impState.skips = [];
     const stat = $('plstat');
     if ($('plgo')) $('plgo').disabled = true;
     if ($('pllist')) $('pllist').innerHTML = '';
     if (stat) stat.textContent = `重试 ${ctx.list.length} 首…`;
     const res = await importTracks(ctx.list, ctx.plName, ctx.pid, (n, total, title, mark, kind) => {
-      if (kind === 'fail') { impState.fails.push({ title, mark }); if ($('pllist')) $('pllist').innerHTML = impRowsHtml(); }
+      if (kind === 'skip') impState.skips.push({ title, mark });
+      if (kind === 'fail') impState.fails.push({ title, mark });
+      if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
       if (stat) stat.textContent = `重试 ${n}/${total}…`;
     });
     importing = false;
     if ($('plgo')) $('plgo').disabled = false;
     for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+    indexLibrary();
     impState.ctx = res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: ctx.plName, pid: ctx.pid } : null;
     const bits = [`这次补上 ${res.ok.length} 首`];
     if (res.drop || res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
@@ -1225,36 +1293,41 @@
     const i = IDX.tracks.findIndex((t) => t.id === id);
     if (i >= 0) IDX.tracks.splice(i, 1);
     TRACK.delete(id);
+    indexLibrary();
     if (curTrack && curTrack.id === id) { audio.pause(); audio.removeAttribute('src'); curTrack = null; }
     renderSongs();
   }
   function impRowsHtml() {
-    if (!impState.fails.length) return '';
-    return `<div class="implog">${impState.fails.map((x) => `<div class="improw bad">✗ <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`
-      + `<div class="row" style="margin-top:8px"><button class="toolbtn" id="plretry">重试失败的 ${impState.fails.length} 首</button></div>`;
+    const rows = impState.skips.map((x) => `<div class="improw">· <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`)
+      .concat(impState.fails.map((x) => `<div class="improw bad">✗ <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`));
+    if (!rows.length) return '';
+    return `<div class="implog">${rows.join('')}</div>`
+      + (impState.fails.length ? `<div class="row" style="margin-top:8px"><button class="toolbtn" id="plretry">重试失败的 ${impState.fails.length} 首</button></div>` : '');
   }
-  const impState = { fails: [], failsRaw: [], ctx: null, msg: '', open: false };
+  const impState = { fails: [], failsRaw: [], skips: [], ctx: null, msg: '', open: false };
   async function startImport() {
     if (importing) return;
     const input = $('plinput') ? $('plinput').value : '';
     const stat = $('plstat');
-    impState.fails = []; impState.msg = '';
+    impState.fails = []; impState.skips = []; impState.msg = '';
     importing = true;
     if ($('plgo')) $('plgo').disabled = true;      // 先锁住按钮：中间还有可能要等读音表
     if ($('pllist')) $('pllist').innerHTML = '';
-    if (stat) stat.textContent = '正在读取歌单…';
+    if (stat) stat.textContent = '解析中…';
     await ensureReadings();
     const res = await importInto(input, 0, (n, total, title, mark, kind) => {
-      if (kind === 'fail') { impState.fails.push({ title, mark }); if ($('pllist')) $('pllist').innerHTML = impRowsHtml(); }
+      if (kind === 'skip') impState.skips.push({ title, mark });
+      if (kind === 'fail') impState.fails.push({ title, mark });
+      if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
       if (stat) stat.textContent = `正在导入 ${n}/${total}…`;
     });
     importing = false;
     if ($('plgo')) $('plgo').disabled = false;
     if (res.error) { impState.msg = res.error; if (stat) stat.textContent = res.error; return; }
-    const bits = [`可用 ${res.ok.length} 首`];
-    if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首（纯音乐／没有歌词／曲库已有）`);
+    const bits = [`入库 ${res.ok.length} 首`];
+    if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
-    impState.msg = `${res.plName} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
+    impState.msg = `${res.plName || ''} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
     impState.ctx = res.fail && res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: res.plName, pid: res.pid } : null;
     renderSongs();
     if ($('plstat')) $('plstat').textContent = impState.msg;
@@ -1281,7 +1354,7 @@
   function renderSongs() {
     const nq = norm(songQ.trim());
     const list = IDX.tracks.filter((t) => {
-      if (filter === 'audio' && !(t.audioOss || t.audio || S.audio[t.id] || S.local[t.id])) return false;
+      if (filter === 'audio' && !(t.audioOss || t.audio || S.audio[t.id])) return false;
       if (filter === 'imp' && !t.imp) return false;
       if (filter === 'zh' && !t.lines.some((l) => l.zh)) return false;
       if (filter === 'known') {
@@ -1310,23 +1383,23 @@
         <button class="chip ${filter === 'imp' ? 'on' : ''}" data-f="imp">我导入的</button>
         <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">跳过已掌握</button>
       </div>
-      <details class="impbox" ${impState.fails.length || impState.msg || impState.open ? 'open' : ''}>
-        <summary>导入网易云歌单</summary>
+      <details class="impbox" ${impState.fails.length || impState.msg || impState.open || !IDX.tracks.length ? 'open' : ''}>
+        <summary>导入网易云</summary>
         <div class="row" style="margin-top:10px">
-          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单链接 / 数字 ID / 分享文案">
+          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单 / 专辑 / 单曲链接或分享文案">
           <button class="toolbtn on" id="plgo">${importing ? '导入中…' : '导入'}</button>
         </div>
-        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || '粘歌单链接或数字 ID')}</div>
+        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || '')}</div>
         <div id="pllist">${impRowsHtml()}</div>
         ${impPlaylists().length ? `<div class="meta" style="margin-top:10px">已导入：${impPlaylists().map((p) => `${esc(p.name)}（${p.n} 首）`).join('、')}</div>` : ''}
         <div class="row" style="margin-top:10px">
           <button class="toolbtn" id="plchk" ${plChecking ? 'disabled' : ''}>检查歌单更新${plChecking ? '（进行中）' : ''}</button>
-          <span class="meta" style="align-self:center">上次检查：${S.plCheckAt ? new Date(S.plCheckAt).toLocaleString('zh-CN', { hour12: false }).slice(5) : '还没检查过'}（每 24 小时自动查一次）</span>
+          <span class="meta" style="align-self:center">上次检查：${S.plCheckAt ? new Date(S.plCheckAt).toLocaleString('zh-CN', { hour12: false }).slice(5) : '还没检查过'}</span>
         </div>
       </details>
       ${songView === 'list'
-        ? `<div class="list" id="list">${list.map(trackRow).join('') || emptyBox(songQ ? `没有匹配「${songQ}」的曲目` : '这个筛选下没有曲目', '换个关键词，或者把筛选清掉；也可以把自己的网易云歌单导进来。', [['e-pick', '清空搜索与筛选'], ['e-imp', '导入歌单']])}</div>`
-        : (groupsHtml(list) || emptyBox('这个筛选下没有曲目', '把筛选清掉试试。', [['e-pick', '清空搜索与筛选']]))}`;
+        ? `<div class="list" id="list">${list.map(trackRow).join('') || emptyBox(songQ ? `没有匹配「${songQ}」的曲目` : (IDX.tracks.length ? '这个筛选下没有曲目' : '曲库是空的'), '', IDX.tracks.length ? [['e-pick', '清空搜索与筛选']] : [['e-imp', '导入']])}</div>`
+        : (groupsHtml(list) || emptyBox('这个筛选下没有曲目', '', [['e-pick', '清空搜索与筛选']]))}`;
     impState.open = false;
     $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
     $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; renderSongs(); }));
@@ -1360,9 +1433,9 @@
       <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
       ${adminHtml()}
       <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : ''}</div>
-      ${knownList.length ? '' : emptyBox('还没有标过词', '去学词页，每张词卡右上角的 ✓ 就是"已掌握"；在跟唱页点词也能标。', [['e-mlearn', '去学词'], ['e-mreview', '随便练几个']])}
+      ${knownList.length ? '' : emptyBox('还没有标过词', '', [['e-mlearn', '去学词'], ['e-mreview', '复习']])}
       <div class="hair"></div>
-      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有改过释义。点词卡或跟唱页里的词，就能改。</div>'}
+      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有改过释义</div>'}
       <div class="row" style="margin-top:18px">
         <button class="toolbtn" id="m-export">导出到文件</button>
         <button class="toolbtn" id="m-import">从文件导入</button>
@@ -1372,12 +1445,12 @@
         <button class="toolbtn" id="m-review">开始复习</button>
         <button class="toolbtn" id="m-clear">清空进度</button>
       </div>
-      <div class="meta" style="margin-top:10px;color:var(--ink2)">云端存的是你自己的记录（进度 / 自定义释义 / 导入的歌单），放在你自己的 OSS 里，不经过第三方。本机绑定的音频文件（大）不同步。</div>`;
+`;
     $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
     const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
     if (accReg) accReg.onclick = () => doAuth('reg');
     if (accLogin) accLogin.onclick = () => doAuth('login');
-    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录（本机记录还在，再登回来即可）'); showGate('已退出登录。本机记录还在，登录即可继续。'); };
+    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录'); showGate(''); };
     if ($('e-mlearn')) $('e-mlearn').onclick = () => go('#/learn');
     if ($('e-mreview')) $('e-mreview').onclick = () => go('#/review');
     if ($('adm-list')) $('adm-list').onclick = () => loadAdminFiles();
@@ -1393,7 +1466,7 @@
       S.autoSync = S.autoSync === false;
       applying = true; save(); applying = false;
       renderMine();
-      if (S.autoSync === false) toast('自动同步已关（改动只留在本机，可随时手动同步）');
+      if (S.autoSync === false) toast('自动同步已关');
       else { toast('自动同步已开'); syncNow({ auto: true }); }
     };
     $('m-export').onclick = () => {
@@ -1418,16 +1491,7 @@
     const at = order.findIndex((x) => x.id === v.id);
     const prev = at > 0 ? order[at - 1] : null, next = at >= 0 && at < order.length - 1 ? order[at + 1] : null;
     const forms = Object.entries(v.forms || {}).filter(([f]) => f !== v.word).slice(0, 8);
-    // 当前正在听的这首（一般是导入的歌）里如果也有这个词，把那一句排到最前面 ——
-    // 内置曲库里只有 10 来首有音频，光看内置例句的话「去这句」经常点过去没声音
-    const localEx = (() => {
-      if (!curTrack) return null;
-      const i = curTrack.lines.findIndex((l) => (l.segs || []).some((sg) => sg.w && sg.b === v.word));
-      if (i < 0) return null;
-      const l = curTrack.lines[i];
-      return { jp: l.text, zh: l.zh || '', track: curTrack.title, tid: curTrack.id, li: i, now: true };
-    })();
-    const exs = [localEx, ...(v.examples || [])].filter(Boolean).slice(0, 6);
+    const exs = examplesFor(v, 6);
     $('view-word').innerHTML = `
       <div class="row" style="margin-bottom:14px">
         <button class="toolbtn" id="w-back">← 返回</button>
@@ -1453,8 +1517,8 @@
       <div class="list">${exs.length ? exs.map((ex) => `<div class="item" style="align-items:flex-start">
         <div class="col"><div class="l1" style="font-weight:400;font-size:14.5px;white-space:normal">${esc(ex.jp)}</div>
         ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${esc(ex.zh)}</div>` : ''}
-        <div class="l3">${ex.now ? '正在听：' : ''}${esc(ex.track || '')}${(() => { const t = TRACK.get(ex.tid); return (t && (t.audioOss || t.audio || S.audio[t.id] || S.local[t.id])) ? '' : ' · 无音频'; })()}</div></div>
-        ${ex.tid ? `<button class="toolbtn" data-goto="${ex.tid}@${ex.li}">去这句</button>` : ''}</div>`).join('') : '<div class="meta">词表里没给这个词配例句</div>'}</div>`;
+        <div class="l3">${ex.now ? '正在听：' : ''}${esc(ex.track || '')}${(() => { const t = TRACK.get(ex.tid); return (t && (t.audioOss || t.audio || S.audio[t.id])) ? '' : ' · 无音频'; })()}</div></div>
+        ${ex.tid ? `<button class="toolbtn" data-goto="${ex.tid}@${ex.li}">去这句</button>` : ''}</div>`).join('') : '<div class="meta">曲库里还没有这个词的例句</div>'}</div>`;
     $('w-back').onclick = () => history.length > 1 ? history.back() : go('#/learn');
     $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.goWord)));
     $('w-play').onclick = () => speak(v.word);
@@ -1472,7 +1536,7 @@
   // ────────────── 检索 ──────────────
   function searchAll(q) {
     const nq = norm(q);
-    const words = VOCAB.map((v) => {
+    const words = VOCAB.filter((v) => LIBW.has(v.word)).map((v) => {
       const forms = Object.keys(v.forms || {});
       let sc = 99;
       if (v.word === q) sc = 0; else if (v.reading === q) sc = 1; else if (forms.includes(q)) sc = 2;
@@ -1482,7 +1546,7 @@
       return sc < 99 ? { v, sc } : null;
     }).filter(Boolean).sort((a, b) => a.sc - b.sc || a.v.diff - b.v.diff).slice(0, 40).map((x) => x.v);
     const tracks = IDX.tracks.filter((t) => norm(t.title + ' ' + t.artist + ' ' + t.album + ' ' + t.base).includes(nq));
-    const originals = IDX.originals.filter((o) => norm(o.name).includes(nq)).slice(0, 12);
+    const originals = IDX.originals.filter((o) => (o.tracks || []).some((id) => TRACK.has(id)) && norm(o.name).includes(nq)).slice(0, 12);
     return { words, tracks, originals };
   }
   function showSearch(q) {
@@ -1495,8 +1559,8 @@
       ${r.originals.length ? `<div class="srhead">原曲 <b>${r.originals.length}</b></div><div class="chips">${r.originals.map((o) => `<span class="chip" data-base="${esc(o.name)}">${esc(o.name)} · ${o.tracks.length}</span>`).join('')}</div>` : ''}
       ${!r.words.length && !r.tracks.length && !r.originals.length ? (() => {
         const hot = [...new Set(IDX.tracks.map((t) => t.artist).filter(Boolean))].slice(0, 6);
-        return emptyBox(`没找到「${q.trim()}」`, '可以试试：社团名、原曲名、假名写法、或者中文释义。搜「东方」「幽閉」这类词也行。', [['e-sc', '清空搜索'], ['e-ssongs', '去曲库翻']]) +
-          `<div class="sec-sub" style="margin-top:18px">试试这些社团</div><div class="chips">${hot.map((a) => `<span class="chip" data-artist="${esc(a)}">${esc(a)}</span>`).join('')}</div>`;
+        return emptyBox(`没找到「${q.trim()}」`, '', [['e-sc', '清空搜索'], ['e-ssongs', '去曲库']]) +
+          `<div class="sec-sub" style="margin-top:18px">社团</div><div class="chips">${hot.map((a) => `<span class="chip" data-artist="${esc(a)}">${esc(a)}</span>`).join('')}</div>`;
       })() : ''}`;
     wireWords($('view-search'));
     $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
@@ -1549,7 +1613,7 @@
   }
   function renderLyrics(host, t) {
     if (!t || !t.lines || !t.lines.length) {
-      host.innerHTML = emptyBox('这首歌还没有歌词', '换一首，或者去曲库粘一个带时间轴歌词的网易云歌单。', [['e-noly', '去曲库']]);
+      host.innerHTML = emptyBox('这首歌还没有歌词', '', [['e-noly', '去曲库']]);
       const b = host.querySelector('#e-noly');
       if (b) b.onclick = () => { $('player').classList.remove('on'); go('#/songs'); };
       return;
@@ -1684,7 +1748,7 @@
     $('minibar').classList.add('on');
     $('srcinfo').textContent = describeSource(t);
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
-    if ($('p-nosrc')) $('p-nosrc').hidden = !!(t.audioOss || t.audio || S.audio[t.id] || S.local[t.id]);
+    if ($('p-nosrc')) $('p-nosrc').hidden = !!(t.audioOss || t.audio || S.audio[t.id]);
     activeLine = -1; loopLine = null;
     $('m-all').classList.toggle('on', mode === 'all');
     $('m-loop').classList.toggle('on', mode === 'loop');
@@ -1697,7 +1761,6 @@
     }
   }
   function describeSource(t) {
-    if (S.local[t.id]) return '音频：本地文件';
     if (t.audioOss) return `音频：阿里云 OSS`;
     const s = S.audio[t.id] || t.audio;
     if (s && s.nid) return `音频：网易云${t.netease && t.netease.agreeRate != null ? ` · 歌词一致 ${Math.round(t.netease.agreeRate * 100)}%` : ''}`;
@@ -1730,7 +1793,7 @@
       $('p-word').textContent = fallback || '';
       $('p-reading').textContent = rd ? '（' + rd + '）' : '';
       $('p-romaji').textContent = (seg && seg.y) || '';
-      $('p-meaning').textContent = rd ? '词表里没有这个词（读音在上面）' : '词表里没有这个词，也没查到读音';
+      $('p-meaning').textContent = rd ? '词表未收录' : '词表未收录，也没查到读音';
       $('p-ex').textContent = ''; $('p-meta').textContent = '';
       $('p-known').style.display = 'none'; $('p-goto').style.display = 'none';
       $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none'; $('p-edit').style.display = 'none';
@@ -1740,15 +1803,16 @@
     popWord = w;
     ['p-known', 'p-goto', 'p-detail', 'p-lines', 'p-edit'].forEach(on);
     if ($('p-morebox')) $('p-morebox').hidden = true;
-    const exG = (w.examples || [])[0];
+    const exG = examplesFor(w, 1)[0];
     if ($('p-goto')) $('p-goto').style.display = exG && exG.tid ? '' : 'none';
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
-    const ex = (w.examples || [])[0];
+    const ex = exG;
     $('p-ex').textContent = ex ? `例句（${ex.track}）：${ex.jp}${ex.zh ? ' → ' + ex.zh : ''}` : '';
-    $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), `全库 ${w.tracks.length} 首 / ${w.count} 次`].join(' · ');
+    const st = libStat(w);
+    $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), st ? `${st.tracks.size} 首歌 / ${st.n} 次` : ''].filter(Boolean).join(' · ');
     $('p-known').textContent = isKnown(w) ? '取消已掌握' : '标为已掌握';
     $('p-editrow').style.display = 'none';
     $('pop').classList.add('on');
@@ -1794,7 +1858,7 @@
     let data;
     try { data = await (await fetch('data/index.json?v=' + DATA_V, { cache: 'no-cache' })).json(); }
     catch {
-      $('view-learn').innerHTML = emptyBox('曲库数据没加载出来', '可能是网络问题，也可能是本地没起服务（node scripts/serve.mjs 8848）。点下面重试一次。', [['e-retry', '重试']]);
+      $('view-learn').innerHTML = emptyBox('数据没加载出来', '', [['e-retry', '重试']]);
       show('view-learn');
       if ($('tabs')) $('tabs').hidden = false;
       if ($('e-retry')) $('e-retry').onclick = () => location.reload();
@@ -1813,8 +1877,8 @@
       if (!rec || !rec.id || TRACK.has(rec.id)) continue;
       const t = impTrack(rec); data.tracks.push(t); TRACK.set(t.id, t);
     }
-    const s = data.stats || {};
-    const hs = $('headstat'); if (hs) hs.textContent = `${IDX.tracks.length} 首 · ${s.vocab} 词`;
+    indexLibrary();
+    const hs = $('headstat'); if (hs) hs.textContent = `${IDX.tracks.length} 首 · ${LIBW.size} 词`;
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     if ($('brand')) $('brand').onclick = () => go('#/home');
@@ -1870,8 +1934,8 @@
     $('p-more').onclick = () => { const b = $('p-morebox'); if (b) b.hidden = !b.hidden; };
     $('p-goto').onclick = () => {
       if (!popWord) return;
-      const ex = (popWord.examples || [])[0];
-      if (!ex || !ex.tid) { toast('这个词还没配例句'); return; }
+      const ex = examplesFor(popWord, 1)[0];
+      if (!ex || !ex.tid) { toast('曲库里还没有这个词的例句'); return; }
       $('pop').classList.remove('on');
       go('#/track/' + ex.tid + '@' + ex.li);
     };
@@ -1881,7 +1945,7 @@
       if (!box) return;
       if (box.dataset.on === '1') { box.innerHTML = ''; box.dataset.on = '0'; return; }
       const here = curTrack ? curTrack.lines.filter((l) => (l.segs || []).some((s) => s.w && s.b === popWord.word)).slice(0, 3) : [];
-      const others = (popWord.examples || []).slice(0, 5);
+      const others = examplesFor(popWord, 5).filter((x) => !x.now);
       box.dataset.on = '1';
       const row = (jp, zh, meta, cue) => `<div class="item" style="cursor:default">
         <div class="col"><div class="l1" style="font-size:var(--fs-sub);font-weight:400;white-space:normal">${esc(jp)}</div>
@@ -1890,7 +1954,7 @@
       box.innerHTML =
         (here.length ? `<div class="mt">正在听的这首里</div><div class="list">${here.map((l) => row(l.text, l.zh, '', curTrack.id + '@' + curLines.indexOf(l))).join('')}</div>` : '')
         + (others.length ? `<div class="mt">其它曲目里</div><div class="list">${others.map((ex) => row(ex.jp, ex.zh, ex.track, ex.tid ? ex.tid + '@' + (ex.li || 0) : '')).join('')}</div>` : '')
-        + ((!here.length && !others.length) ? '<div class="mt">这个词还没配例句</div>' : '');
+        + ((!here.length && !others.length) ? '<div class="mt">曲库里还没有这个词的例句</div>' : '');
       box.querySelectorAll('[data-cue]').forEach((el) => (el.onclick = () => { const [tid, li] = el.dataset.cue.split('@'); if (!tid) return; hidePop(); go('#/track/' + tid + '@' + li); }));
     };
     document.addEventListener('click', (e) => { if (!e.target.closest('#pop') && !e.target.closest('.w') && !e.target.closest('[data-known]')) hidePop(); });
@@ -1912,16 +1976,9 @@
       if (!curTrack) return;
       const m = $('nidinput').value.trim().match(/(\d{3,})/);
       if (!m) { alert('没识别出歌曲 ID'); return; }
-      S.audio[curTrack.id] = { nid: m[1] }; if (S.local) delete S.local[curTrack.id];
+      S.audio[curTrack.id] = { nid: m[1] };
       save(); $('srcinfo').textContent = describeSource(curTrack); toast('已绑定');
     };
-    $('audiofile').onchange = (e) => {
-      const f = e.target.files[0]; if (!f || !curTrack) return;
-      if (f.size > 60 * 1024 * 1024) { alert('文件太大（≤60MB）'); return; }
-      idbSet(curTrack.id, f).then(() => { delete S.local[curTrack.id]; save(); $('srcinfo').textContent = describeSource(curTrack); toast('本地音频已绑到这首，下次点开就出声'); }).catch(() => toast('保存失败：浏览器没让存，换个文件再试'));
-    };
-    $('audioclear').onclick = async () => { if (!curTrack) return; delete S.local[curTrack.id]; save(); try { await idbDel(curTrack.id); } catch {} $('srcinfo').textContent = describeSource(curTrack); };
-
     function togglePlay() {
       if (!curTrack) return;
       if (audio.getAttribute('data-tid') !== curTrack.id || !audio.src) { playTrack(curTrack); return; }

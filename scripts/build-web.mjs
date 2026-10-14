@@ -24,6 +24,7 @@ const AUDIO_DIR = path.join(DATA, 'audio');
 
 const args = process.argv.slice(2);
 const WANT_COVERS = args.includes('--covers');
+const EMPTY_LIB = args.includes('--empty-lib');   // 站上不带内置曲目：曲库只放用户自己导入的歌
 const argOf = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const FORCE_COVER = args.includes('--force-covers');
 
@@ -256,6 +257,19 @@ async function main() {
   }
   fs.writeFileSync(path.join(WEB_DATA, 'readings.json'), JSON.stringify(rd), 'utf8');
   console.log(`读音兜底表：${Object.keys(rd).length} 条（语料 ${extraN} + 内置曲目）→ docs/data/readings.json`);
+
+  // 站上不发内置曲目：曲库 = 用户导入的歌；词表/读音表留着做注解，例句由前端从曲库现算
+  if (EMPTY_LIB) {
+    const n = idx.tracks.length;
+    idx.tracks = [];
+    idx.originals = [];
+    for (const v of idx.vocab) delete v.examples;       // 例句指向已下线的内置曲目，前端改成从曲库现算
+    idx.stats.tracks = 0;
+    idx.stats.tracksWithTiming = 0;
+    idx.stats.withOss = 0;
+    fs.writeFileSync(path.join(WEB_DATA, 'index.json'), JSON.stringify(idx), 'utf8');
+    console.log(`--empty-lib：站上不带内置曲目（去掉 ${n} 首 + 例句），词表 ${idx.vocab.length} 个保留做注解`);
+  }
 
   const s = idx.stats;
   console.log(`曲目 ${s.tracks} · 并入网易云 ${s.withNetease} · 有时间轴 ${s.tracksWithTiming} · 行级译文 ${s.withTranslations} 行`);

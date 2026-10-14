@@ -6,6 +6,9 @@
  *
  * 路由：
  *   GET  /api/health
+ *   GET  /api/resolve   ?q=<链接/分享文案/数字ID>  网易云歌曲/专辑/歌单解析（含 163cn.tv 手机短链）
+ *   GET  /api/audio     ?id=<歌曲id>&br=320        取可播地址（https，带 expi）
+ *   GET  /api/lyric     ?id=<歌曲id>               取歌词 + 中文翻译
  *   POST /api/register  {name, pass}
  *   POST /api/login     {name, pass}
  *   GET  /api/me
@@ -182,6 +185,126 @@ function reply(event, statusCode, obj) {
 }
 const userOf = (event) => verifyToken(((event.headers && (event.headers.Authorization || event.headers.authorization)) || '').replace(/^Bearer\s+/i, ''));
 
+
+// ─────────── 网易云解析（歌单 / 专辑 / 单曲，含 163cn.tv 手机短链） ───────────
+const NET_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+const NET_HEADERS = {
+  'User-Agent': NET_UA, Referer: 'https://music.163.com/', Cookie: 'os=pc; appver=2.9.7;',
+  Accept: 'application/json, text/plain, */*',
+};
+
+function httpGet(url, headers, timeout) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({
+      host: u.hostname, path: u.pathname + u.search, method: 'GET',
+      headers: headers || {}, timeout: timeout || 12000,
+    }, (res) => {
+      const buf = [];
+      res.on('data', (d) => buf.push(d));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, location: res.headers.location,
+        body: Buffer.concat(buf).toString('utf8') }));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('上游超时')));
+    req.end();
+  });
+}
+
+/** 从一段分享文案里认出「类型 + ID」；认不出类型但带链接时，返回 url 交给 follow 解析 */
+function shareHit(text) {
+  const s = String(text || '');
+  const url = (s.match(/https?:\/\/[^\s"'<>，,、）)】]+/) || [])[0] || '';
+  const scan = url || s;
+  const pats = [
+    [/playlist[^\d]{0,24}(\d{5,})/i, 'playlist'],
+    [/album[^\d]{0,24}(\d{5,})/i, 'album'],
+    [/song[^\d]{0,24}(\d{5,})/i, 'song'],
+    [/program[^\d]{0,24}(\d{5,})/i, 'program'],
+  ];
+  for (const [re, type] of pats) { const m = scan.match(re); if (m) return { type, id: m[1] }; }
+  const bare = s.trim().match(/^(\d{5,})$/);
+  if (bare) return { type: 'playlist', id: bare[1] };
+  return url ? { type: '', id: '', url } : null;
+}
+
+/** 跟进 302（163cn.tv 这类手机短链），最多 6 跳；顺便在响应体里兜底找链接 */
+async function followShort(url) {
+  let cur = url, body = '';
+  for (let i = 0; i < 6; i++) {
+    const r = await httpGet(cur, { 'User-Agent': NET_UA, Accept: 'text/html,*/*' }, 10000);
+    if (r.status >= 300 && r.status < 400 && r.location) {
+      cur = new URL(r.location, cur).href;
+      const hit = shareHit(cur);
+      if (hit && hit.type) return hit;
+      if (/music\.163\.com/.test(cur) === false) continue;
+      continue;
+    }
+    body = r.body || '';
+    break;
+  }
+  for (const src of [cur, body]) {
+    const hit = shareHit(src);
+    if (hit && hit.type) return hit;
+    const m = String(src).match(/https?:\/\/music\.163\.com\/[^\s"'<>\\]+/);
+    if (m) { const h2 = shareHit(m[0]); if (h2 && h2.type) return h2; }
+  }
+  return null;
+}
+
+const normTrack = (x) => ({
+  id: x.id, name: x.name || '',
+  ar: (x.ar || x.artists || []).map((a) => ({ name: a && a.name })).filter((a) => a.name),
+  al: { name: ((x.al || x.album || {}).name) || '', picUrl: ((x.al || x.album || {}).picUrl) || '' },
+});
+
+async function netJson(url) {
+  const r = await httpGet(url, NET_HEADERS, 12000);
+  if (r.status !== 200) throw new Error('HTTP ' + r.status);
+  try { return JSON.parse(r.body); } catch { throw new Error('返回不是 JSON'); }
+}
+
+const RESOLVE_CACHE = new Map();   // 热实例内缓存，避免重复打网易云
+const AUDIO_CACHE = new Map();     // 直链有效期约 20 分钟，缓存 8 分钟足够
+const numId = (v) => { const s = String(v == null ? '' : v).replace(/\D/g, ''); return /^\d{3,}$/.test(s) ? s : ''; };
+
+async function netAudio(id, br) {
+  const k = id + ':' + br;
+  const c = AUDIO_CACHE.get(k);
+  if (c && Date.now() - c.at < 8 * 60 * 1000) return c.v;
+  const j = await netJson(`https://music.163.com/api/song/enhance/player/url?id=${id}&ids=%5B${id}%5D&br=${br * 1000}`);
+  const d = (j.data || [])[0] || {};
+  const out = d.url ? { url: String(d.url).replace(/^http:/, 'https:'), br: d.br, size: d.size, expi: d.expi } : null;
+  if (AUDIO_CACHE.size > 200) AUDIO_CACHE.clear();
+  AUDIO_CACHE.set(k, { at: Date.now(), v: out });
+  return out;
+}
+async function neteaseMeta(hit) {
+  const key = hit.type + ':' + hit.id;
+  const c = RESOLVE_CACHE.get(key);
+  if (c && Date.now() - c.at < 10 * 60 * 1000) return c.v;
+  let out;
+  if (hit.type === 'playlist') {
+    const j = await netJson('https://music.163.com/api/v6/playlist/detail?id=' + hit.id);
+    const p = j.playlist || {};
+    out = { type: 'playlist', id: String(hit.id), name: p.name || '', cover: p.coverImgUrl || '',
+      total: (p.trackIds || []).length, tracks: [] };      // 曲目表由前端走解析接口拿（那边一次能拿整张）
+  } else if (hit.type === 'album') {
+    const j = await netJson('https://music.163.com/api/v1/album/' + hit.id);
+    const a = j.album || {};
+    out = { type: 'album', id: String(hit.id), name: a.name || '', cover: a.picUrl || '',
+      tracks: (j.songs || []).map(normTrack) };
+  } else {
+    const j = await netJson('https://music.163.com/api/song/detail/?ids=%5B' + hit.id + '%5D');
+    const tracks = (j.songs || []).map(normTrack);
+    if (!tracks.length) throw new Error('这首歌读不到');
+    out = { type: 'song', id: String(hit.id), name: tracks[0].name, cover: tracks[0].al.picUrl, tracks };
+  }
+  if (RESOLVE_CACHE.size > 80) RESOLVE_CACHE.clear();
+  RESOLVE_CACHE.set(key, { at: Date.now(), v: out });
+  return out;
+}
+
 exports.handler = async (event) => {
   let req = event;
   if (Buffer.isBuffer(event)) { try { req = JSON.parse(event.toString('utf8')); } catch { req = {}; } }
@@ -204,6 +327,44 @@ exports.handler = async (event) => {
 
     if (action === '/health' || path === '/' || path === '/health') {
       return reply(req, 200, { ok: true, service: 'thlyrics-auth', version: 1, time: new Date().toISOString() });
+    }
+
+
+    // 音频直链 / 歌词：走自己的函数，前端不吃第三方限流和跨域（公开接口，不要求登录）
+    if (action === '/audio') {
+      const id = numId(q.id);
+      if (!id) return reply(req, 400, { error: 'id 不对' });
+      const br = Math.min(999, Math.max(64, Number(q.br) || 320));
+      try {
+        const a = await netAudio(id, br);
+        if (!a) return reply(req, 404, { error: '这首歌没有可播地址（可能要会员或已下架）' });
+        return reply(req, 200, Object.assign({ ok: true }, a));
+      } catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
+    }
+
+    if (action === '/lyric') {
+      const id = numId(q.id);
+      if (!id) return reply(req, 400, { error: 'id 不对' });
+      try {
+        const j = await netJson(`https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`);
+        return reply(req, 200, { ok: true, lyric: (j.lrc && j.lrc.lyric) || '', tlyric: (j.tlyric && j.tlyric.lyric) || '' });
+      } catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
+    }
+
+    // 网易云解析：短链 / 歌单 / 专辑 / 单曲（公开接口，不要求登录）
+    if (action === '/resolve') {
+      const text = String(q.q || q.text || '').slice(0, 800);
+      if (!text) return reply(req, 400, { error: '缺 q 参数' });
+      let hit = shareHit(text);
+      if (!hit) return reply(req, 400, { error: '没识别出链接，粘网易云分享链接或 ID' });
+      if (!hit.type) {
+        try { hit = await followShort(hit.url); }
+        catch (e) { return reply(req, 502, { error: '短链打不开：' + String((e && e.message) || e) }); }
+      }
+      if (!hit || !hit.type) return reply(req, 400, { error: '链接里没有歌曲 / 专辑 / 歌单 ID' });
+      if (hit.type === 'program') return reply(req, 400, { error: '电台节目暂不支持' });
+      try { return reply(req, 200, Object.assign({ ok: true }, await neteaseMeta(hit))); }
+      catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
     }
 
     if (action === '/register' && method === 'POST') {
