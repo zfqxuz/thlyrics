@@ -34,6 +34,10 @@ await page.waitForTimeout(1500);
 check('曲库空 + 导入面板自动展开', (await page.locator('#list .track').count()) === 0 && (await page.locator('.impbox').getAttribute('open')) !== null, ((await page.locator('.impbox summary').textContent()) || '').trim());
 
 const imp = async (q) => {
+  await page.goto(BASE + '?imp=' + Date.now() + '#/songs', { waitUntil: 'load' });   // 每次都从曲库页的导入面板走
+  await page.waitForTimeout(1200);
+  const opened = await page.locator('.impbox').evaluate((el) => el.open).catch(() => false);
+  if (!opened) { await page.locator('.impbox summary').click(); await page.waitForTimeout(300); }
   await page.locator('#plinput').fill(q);
   await page.locator('#plgo').click();
   await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 300000 });
