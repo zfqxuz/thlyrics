@@ -975,6 +975,23 @@ for (const [name, hash] of [['首页', '#/home'], ['曲库', '#/songs'], ['生�
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   check(`320px 窄屏不横向溢出：${name}`, over <= 1, `溢出 ${over}px`);
 }
+// 专辑视图：320px 下两列必须真各占一半（长专辑名不能把网格撑爆 —— 修过一次）
+await page.goto(BASE + '?alb=320#/songs', { waitUntil: 'load' });
+await page.waitForSelector('#list .track', { timeout: 15000 });
+await page.locator('#view-songs .segtext button[data-v="album"]').click();
+await page.waitForTimeout(600);
+const al320 = await page.evaluate(() => {
+  const g = document.querySelector('.albumgrid');
+  const cards = [...g.querySelectorAll('.albumcard')];
+  const half = g.getBoundingClientRect().width / 2;
+  const c0 = cards[0] ? cards[0].getBoundingClientRect() : { width: 0, right: 0 };
+  return { over: document.documentElement.scrollWidth - window.innerWidth, n: cards.length,
+    cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, cardW: Math.round(c0.width), half: Math.round(half),
+    right: Math.round(c0.right), win: window.innerWidth };
+});
+check('320px 专辑网格：两列各占一半、不溢出',
+  al320.cols === 2 && al320.n > 0 && al320.cardW <= al320.half + 1 && al320.right <= al320.win && al320.over <= 1,
+  `列宽 ${al320.cardW}（半宽 ${al320.half}）· 右边界 ${al320.right}/${al320.win} · 溢出 ${al320.over}`);
 await page.setViewportSize({ width: 400, height: 850 });
 
 // 继续学习：记住听到哪，首页显示出来

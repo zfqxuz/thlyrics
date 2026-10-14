@@ -306,14 +306,18 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
 .foot{font-size:10.5px;color:var(--ink3);text-align:center;margin-top:22px;line-height:1.9}
 
 /* ── 专辑：两列网格（封面 + 专辑名） ── */
-.albumgrid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-top:var(--sp-3)}
-.albumcard{cursor:pointer}
-.albumcard .cov{aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center}
+/* 专辑：两列网格。⚠️ 必须 minmax(0,1fr) + min-width:0：.nm 是 nowrap，
+   默认的 1fr(=minmax(auto,1fr)) 会按"整条专辑名"算最小宽度，
+   320px 屏上第一列会被撑到 500px+（踩过，别再改回 1fr 1fr）。 */
+.albumgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3);margin-top:var(--sp-3)}
+.albumcard{cursor:pointer;min-width:0}
+.albumcard .cov{aspect-ratio:1/1;width:100%;max-width:100%;border-radius:14px;overflow:hidden;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center}
 .albumcard .cov img{width:100%;height:100%;object-fit:cover;display:block}
 .albumcard .cov .ph{font-size:22px;color:var(--ink3)}
 .albumcard .nm{font-size:var(--fs-sub);font-weight:600;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .albumcard .mt{font-size:var(--fs-meta);color:var(--ink3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .albumcard:active .cov{transform:scale(.98)}
+@media (max-width:360px){ .albumgrid{gap:10px} .albumcard .nm{font-size:12.5px} }
 
 /* ── 头像 / 头像下拉菜单 / 黑白开关 ── */
 .avwrap{position:relative}
@@ -496,6 +500,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js?v=20261014y"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script src="app.js?v=20261014z"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
