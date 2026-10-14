@@ -510,3 +510,20 @@
   ⚠️ QQ 会员曲是硬边界（没有账号凭据拿不到地址），别再试图用公共中继兜底（i-meto/qjqq/injahow 对 QQ 全是坏的）。
 - E2E 跟着改：桩里新增一首"取不到歌词"（777777777，两个源都 502）保证失败+重试路径仍被测；
   没音源的那首断言"照样入库 + 列表标无音源"。分享码那条改成轮询等待（源多了，1.5s 不够）。
+
+### 罗马音编辑器：真暂停 + 手机键盘（2026-10-15）
+
+用户反馈：「编辑罗马音时没有暂停播放」「手机端键盘会把下方抽屉盖住」。
+
+- **暂停**：以前是"只在 `!audio.paused` 时暂停"，现在**无条件 `audio.pause()`**（没在播也无害），
+  并把编辑器里的提示写成「已暂停播放，改完自动继续」/「播放本来就是停着的，改完不会自己响」，
+  用户一眼知道发生了什么；`romaWasPlaying` 仍决定保存后要不要续播。
+  （本地用**真能解码的 WAV** 复现过：paused false → true → false；headless shell 解不了 mp3，
+  所以 E2E 里用 `.e2e/test-tone.wav` 路由桩换源，别再退回"假装 paused"的钩子。）
+- **键盘遮挡**：`setupKeyboardAwareSheet()` —— 监听 `visualViewport` 的 resize/scroll，
+  键盘高度 = `innerHeight - vv.height - vv.offsetTop`，抽屉 `#pop` 用这个值抬 `bottom`，
+  同时把 `maxHeight` 收到可视高度，并把聚焦的 INPUT/TEXTAREA `scrollIntoView({block:'center'})`；
+  键盘收起自动复位。测试钩子 `window.__kb(gap)` 可模拟任意键盘高度。
+- 罗马音输入框补了 `autocapitalize/autocorrect/spellcheck=off`、`enterkeyhint=done`、`inputmode=latin`
+  （手机键盘不再自动大写/纠错）。
+- E2E 164/164。
