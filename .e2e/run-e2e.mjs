@@ -73,10 +73,16 @@ const E2E_SEG = {
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
 const apiState = { users: {}, seq: 0, calls: [], deleted: [] };
 const apiMerge = (a, b) => {
-  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, a || {});
-  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, b || {});
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, clearedAt: 0 }, b || {});
   const n = (v) => Number(v) || 0;
-  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del) };
+  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del), fav: {}, sing: {} };
+  for (const kind of ['fav', 'sing']) {
+    for (const k of new Set([...Object.keys(A[kind]), ...Object.keys(B[kind])])) {
+      const x = n(A[kind][k]), y = n(B[kind][k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
+      if (v) out[kind][k] = v;
+    }
+  }
   for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
     const x = n(A.known[k]), y = n(B.known[k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
     if (v && Math.abs(v) > out.clearedAt) out.known[k] = v;
