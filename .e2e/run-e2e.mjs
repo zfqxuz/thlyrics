@@ -716,6 +716,15 @@ const avOk = await page.evaluate(() => ({
 }));
 check('换头像：canvas 压缩后上传、顶栏与我的页都用图片', avOk.img && avOk.store === 'data:image/j' && avOk.card, JSON.stringify(avOk));
 
+// 检索页也能直接切排序
+await page.goto(BASE + '?org=3#/search/E2E', { waitUntil: 'load' });
+await page.waitForTimeout(900);
+const ssortN = await page.locator('#ssort').count();
+await page.locator('#ssort').selectOption('azd').catch(() => {});
+await page.waitForTimeout(400);
+const ssortVal = await page.evaluate(() => (document.getElementById('ssort') || {}).value);
+check('检索结果页能直接切排序', ssortN === 1 && ssortVal === 'azd', `控件 ${ssortN} 个 · 选中 ${ssortVal}`);
+
 // 分享码：生成 + 导入（对方再导一遍 = 全部跳过，不重复入库）
 await page.locator('#tab-me').click();
 await page.waitForTimeout(500);
@@ -875,7 +884,7 @@ if (await page.locator('#pop.on').count()) {
 
 // 手机窄屏：不横向溢出
 await page.setViewportSize({ width: 320, height: 720 });
-for (const [name, hash] of [['首页', '#/home'], ['曲库', '#/songs'], ['生词本', '#/mine'], ['学词', '#/learn']]) {
+for (const [name, hash] of [['首页', '#/home'], ['曲库', '#/songs'], ['生词本', '#/mine'], ['学词', '#/learn'], ['我的', '#/me'], ['管理员', '#/admin']]) {
   await page.goto(BASE + '?w=320' + hash, { waitUntil: 'load' });
   await page.waitForTimeout(700);
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

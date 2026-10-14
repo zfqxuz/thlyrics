@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014u';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014v';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -1883,7 +1883,10 @@
     if (!q.trim()) { go(lastNonSearch); return; }
     const r = searchAll(q.trim());
     $('view-search').innerHTML = `
-      <div class="sec-head"><div><div class="sec-title">搜索「${esc(q)}」</div><div class="sec-sub">词 ${r.words.length} · 曲目 ${r.tracks.length} · 原曲 ${r.originals.length}</div></div></div>
+      <div class="sec-head">
+        <div><div class="sec-title">搜索「${esc(q)}」</div><div class="sec-sub">词 ${r.words.length} · 曲目 ${r.tracks.length} · 原曲 ${r.originals.length}</div></div>
+        ${r.tracks.length ? `<select class="sel" id="ssort" style="height:32px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>` : ''}
+      </div>
       ${r.tracks.length ? `<div class="srhead">曲目 <b>${r.tracks.length}</b></div><div class="list">${r.tracks.map(trackRow).join('')}</div>` : ''}
       ${r.words.length ? `<div class="srhead">词 <b>${r.words.length}</b></div><div class="list">${r.words.map(wordRow).join('')}</div>` : ''}
       ${r.originals.length ? `<div class="srhead">原曲 <b>${r.originals.length}</b></div><div class="chips">${r.originals.map((o) => `<span class="chip" data-base="${esc(o.name)}">${esc(o.name)} · ${o.tracks.length}</span>`).join('')}</div>` : ''}
@@ -1892,6 +1895,7 @@
         return emptyBox(`没找到「${q.trim()}」`, '', [['e-sc', '清空搜索'], ['e-ssongs', '去曲库']]) +
           `<div class="sec-sub" style="margin-top:18px">社团</div><div class="chips">${hot.map((a) => `<span class="chip" data-artist="${esc(a)}">${esc(a)}</span>`).join('')}</div>`;
       })() : ''}`;
+    if ($('ssort')) $('ssort').onchange = (e) => { S.tSort = e.target.value; save(); showSearch(q); };
     wireWords($('view-search'));
     $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
       if (e.target.closest('[data-del]')) return;
