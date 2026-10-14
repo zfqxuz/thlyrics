@@ -12,7 +12,9 @@
     "meanings": "node scripts/fetch-meanings.mjs",
     "build": "node scripts/build-web.mjs",
     "all": "node scripts/build-index.mjs && node scripts/fetch-netease.mjs --lyrics && node scripts/build-web.mjs",
-    "serve": "node scripts/serve.mjs 8848"
+    "serve": "node scripts/serve.mjs 8848",
+    "check": "node scripts/check-layers.mjs",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "kuromoji": "^0.1.2"

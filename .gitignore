@@ -7,3 +7,16 @@ data/netease-lyrics/
 .DS_Store
 *.log
 __pycache__/
+
+# 临时/生成的图片（QQ 登录二维码快照、对齐检查截图）
+qr-qq-login.png
+align-check-*.png
+
+# 原生壳（app/）：Capacitor + Gradle 的产物
+app/node_modules/
+app/android/.gradle/
+app/android/build/
+app/android/app/build/
+app/android/local.properties
+app/android/.idea/
+app/ios/App/Pods/

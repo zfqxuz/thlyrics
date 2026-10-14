@@ -1,12 +1,10 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl } from './platform/index.js?v=20261015d';
+
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const LS_KEY = 'thlyrics.tool.v1';
-  const IDB_NAME = 'thlyrics';
-  const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261015c';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
-  const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
   // ────────────── 工具 ──────────────
@@ -40,12 +38,12 @@
   let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, rate: 1, ruby: true, gloss: false, zh: true,
     mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
-  const loadAcc = () => { try { ACC = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch { ACC = null; } };
-  const saveAcc = () => { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch {} };
-  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {};
+  const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
+  const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
+  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {};
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new'; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
-  const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} queueSync(); };
+  const save = () => { kvSetJson(LS_KEY, S); queueSync(); };
 
   // ── 主题：深色 / 暖白（白天）/ 跟随系统 ──
   const THEMES = [['dark', '深色'], ['warm', '暖白'], ['auto', '跟随系统']];
@@ -177,7 +175,7 @@
   const toggleKnown = (w) => { if (!w) return; if (isKnown(w)) S.known[w.id] = -Date.now(); else S.known[w.id] = Date.now(); save(); };
 
   // 旧版本往 IndexedDB 绑过本机音频文件，功能已下线：开机清一次，别留垃圾
-  try { indexedDB.deleteDatabase(IDB_NAME); } catch {}
+  dropLegacyDB('thlyrics');
 
   // ────────────── 语音朗读 ──────────────
   let jaVoice = null;
@@ -186,16 +184,15 @@
   function speak(t) { if (!('speechSynthesis' in window) || !t) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; if (jaVoice) u.voice = jaVoice; u.rate = .9; speechSynthesis.speak(u); }
 
   // ────────────── 音频 ──────────────
-  const audio = new Audio();
-  audio.preload = 'auto'; audio.setAttribute('playsinline', ''); audio.id = 'audio';
+  const audio = createAudioEl();
   const mountAudio = () => { if (document.body && !audio.isConnected) document.body.appendChild(audio); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAudio); else mountAudio();
 
   const urlCache = new Map();
   const URL_TTL = 18 * 60 * 1000;
   const UC_KEY = 'thlyrics.urlcache.v1';
-  (function loadUrlCache() { try { const o = JSON.parse(localStorage.getItem(UC_KEY) || '{}'); for (const k of Object.keys(o)) if (o[k] && o[k].url) urlCache.set(k, o[k]); } catch {} })();
-  const saveUrlCache = () => { try { const o = {}; for (const [k, v] of urlCache) if (Date.now() - v.at < URL_TTL) o[k] = v; localStorage.setItem(UC_KEY, JSON.stringify(o)); } catch {} };
+  (function loadUrlCache() { const o = kvGetJson(UC_KEY, {}); for (const k of Object.keys(o)) if (o[k] && o[k].url) urlCache.set(k, o[k]); })();
+  const saveUrlCache = () => { const o = {}; for (const [k, v] of urlCache) if (Date.now() - v.at < URL_TTL) o[k] = v; kvSetJson(UC_KEY, o); };
 
   let stationNid = null, seekTime = null, prepToken = 0, posSavedAt = 0, healing = false;
   const setNow = (t) => { const el = $('p-now'); if (el) el.textContent = t; };
@@ -211,16 +208,7 @@
   function applySeek() { if (seekTime == null || audio.readyState < 1) return; const t = seekTime; seekTime = null; try { audio.currentTime = t; } catch {} }
   function bufferedAhead(t) { try { for (let i = 0; i < audio.buffered.length; i++) if (t >= audio.buffered.start(i) - .2 && t <= audio.buffered.end(i) + .2) return audio.buffered.end(i) - t; } catch {} return 0; }
 
-  /** 自己的后端接口（音频直链 / 歌词在那边取，不吃第三方限流和跨域） */
-  async function fcJson(path) {
-    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 20000);
-    try {
-      const r = await fetch(API_BASE + path, { signal: ac.signal });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j || j.error) throw new Error((j && j.error) || ('HTTP ' + r.status));
-      return j;
-    } finally { clearTimeout(timer); }
-  }
+  // fcJson / gdJson / apiCall 等网络调用已搬到 platform/net.js
   /** 可播地址：netease 走后端再回落公共接口；tencent(QQ音乐) 只走后端（公共中继没有 QQ 源）*/
   async function resolveAudioUrl(nid, br, src) {
     const source = src || 'netease';
@@ -813,7 +801,7 @@
   /** 读音兜底表（~400KB）只拉一次；导入前必须确保它已经就绪，否则新歌的第一个字就查不到读音 */
   function ensureReadings() {
     if (!readingsReady) {
-      readingsReady = fetch('data/readings.json').then((r) => r.json()).then(buildReadings).catch(() => {});
+      readingsReady = getJson(dataUrl('readings.json')).then(buildReadings).catch(() => {});
     }
     return readingsReady;
   }
@@ -887,12 +875,8 @@
   }
   /** 服务端分词（kuromoji）：一次一首歌的所有行 */
   async function segmentLines(lines) {
-    const r = await fetch(`${API_BASE}/segment`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ lines }),
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j || !j.segs) throw new Error((j && j.error) || '分词失败');
+    const j = await apiJson('/segment', { method: 'POST', body: { lines }, timeout: 60000 });
+    if (!j.segs) throw new Error('分词失败');
     return j.segs;
   }
   /** 服务端 token → 紧凑存储 [表面形, 读音, 词性码, 词表命中词]（读音能被前端还原成罗马音） */
@@ -993,23 +977,6 @@
     return out;
   }
 
-  // 这个中转站偶尔会抽风（限流 / 少 CORS 头），所以网络层失败重试两次
-  async function gdJson(q, tries = 3) {
-    let lastErr = null;
-    for (let i = 0; i < tries; i++) {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 20000);
-      try {
-        const r = await fetch(`${GD}?${q}`, { signal: ac.signal });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return await r.json();
-      } catch (e) {
-        lastErr = (e && e.name === 'AbortError') ? new Error('接口超时') : new Error('接口暂时不可用（可能被限流）');
-        if (i < tries - 1) await new Promise((r2) => setTimeout(r2, 600 * (i + 1)));
-      } finally { clearTimeout(timer); }
-    }
-    throw lastErr;
-  }
   /** 从链接/分享文案里抠歌单 ID */
   function plIdOf(input) {
     const s = String(input || '').trim();
@@ -1018,13 +985,14 @@
   }
   /** 交给后端把「短链 / 分享文案 / 链接 / 数字 ID」解析成 歌单·专辑·单曲（含曲目表） */
   async function apiResolve(text) {
-    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 25000);
     try {
-      const r = await fetch(`${API_BASE}/resolve?q=${encodeURIComponent(text)}`, { signal: ac.signal });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j || !j.type) throw new Error((j && j.error) || `解析失败（HTTP ${r.status}）`);
+      const j = await apiJson(`/resolve?q=${encodeURIComponent(text)}`, { timeout: 25000 });
+      if (!j.type) throw new Error('解析失败');
       return j;
-    } finally { clearTimeout(timer); }
+    } catch (e) {
+      const m = (e && e.message) || '';
+      throw new Error(/^HTTP /.test(m) ? `解析失败（${m}）` : m);
+    }
   }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
   /** 逐首导入（首次导入和「重试失败」都走这里） */
@@ -1154,24 +1122,13 @@
   const SYNC_DEBOUNCE = 1800;
   const DEV_KEY = 'thlyrics.dev.v1';
   var syncCfg = null, syncTimer = null, syncBusy = false, syncQueued = false, syncErr = '', applying = false;
-  const devId = (() => { try { let d = localStorage.getItem(DEV_KEY); if (!d) { d = Math.random().toString(36).slice(2, 10); localStorage.setItem(DEV_KEY, d); } return d; } catch { return 'x'; } })();
+  const devId = (() => { let d = kvGet(DEV_KEY); if (!d) { d = Math.random().toString(36).slice(2, 10); kvSet(DEV_KEY, d); } return d || 'x'; })();
   const n0 = (v) => (Number(v) || 0);
   const knownCount = () => (VOCAB || []).filter((v) => n0(S.known[v.id]) > 0).length;
   const hashStr = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return String(h); };
 
-  /** 账号 API（函数计算）：带 token 的 JSON 调用 */
-  async function apiCall(path, opts = {}) {
-    const headers = { 'content-type': 'application/json' };
-    if (ACC && ACC.token) headers.authorization = 'Bearer ' + ACC.token;
-    const r = await fetch(API_BASE + path, {
-      method: opts.method || 'GET', headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-    });
-    let j = null;
-    try { j = await r.json(); } catch {}
-    if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
-    return j || {};
-  }
+  /** 账号 API（函数计算）：带 token 的 JSON 调用（实现在 platform/net.js） */
+  const apiCall = (path, opts = {}) => netApiCall(path, Object.assign({}, opts, { token: ACC && ACC.token }));
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
@@ -2338,7 +2295,7 @@
     document.body.classList.toggle('gloss', S.gloss !== false);
     document.body.classList.toggle('ruby', S.ruby !== false);
     let data;
-    try { data = await (await fetch('data/index.json?v=' + DATA_V, { cache: 'no-cache' })).json(); }
+    try { data = await getJson(dataUrl('index.json'), { cache: 'no-cache' }); }
     catch {
       $('view-learn').innerHTML = emptyBox('数据没加载出来', '', [['e-retry', '重试']]);
       show('view-learn');
