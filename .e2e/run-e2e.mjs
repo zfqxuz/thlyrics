@@ -351,6 +351,23 @@ check('导入曲目能进跟唱页（歌词块 + 逐词罗马音）', impPly.blo
 check('导入曲目逐词罗马音覆盖 ≥90%', impPly.pct >= 90, impPly.pct + '%（词表 + 读音兜底表）');
 const stampLeak = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock .line')].filter((e) => /^\[\d+:\d+/.test(e.textContent)).length);
 check('歌词行不带时间戳残留（空时间戳行不再吃掉下一行）', stampLeak === 0, stampLeak + ' 行');
+// 同一句里，有读音的词、没读音的词、标点，日文那一行必须在同一高度上（否则就是"一上一下"）
+const align = await page.evaluate(() => {
+  const spreads = [];
+  for (const line of document.querySelectorAll('#plyric .line')) {
+    const kids = [...line.children];
+    if (kids.length < 4) continue;
+    const tops = kids.map((sp) => {
+      const node = [...sp.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!node) return null;
+      const rg = document.createRange(); rg.selectNodeContents(node);
+      return rg.getBoundingClientRect().top;
+    }).filter((x) => x != null);
+    if (tops.length > 1) spreads.push(Math.max(...tops) - Math.min(...tops));
+  }
+  return { lines: spreads.length, max: Math.round(Math.max(...spreads) * 10) / 10 };
+});
+check('同一句内日文行严格对齐（有/无罗马音、标点都一样）', align.max <= 1, `${align.lines} 句 · 最大偏差 ${align.max}px`);
 await page.locator('#p-close').click();
 await page.waitForTimeout(300);
 await page.goto(BASE + '#/songs');

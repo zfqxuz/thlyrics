@@ -923,7 +923,18 @@
       if (l.segs && l.segs.length) {
         for (const sg of l.segs) {
           if (!sg.s) continue;
-          if (!sg.k) { line.appendChild(document.createTextNode(sg.s)); if (sg.s.trim()) flat.push(sg.s); continue; }
+          if (!sg.k) {
+            // 标点/英文这类纯文本也要占住「罗马音那一行」，否则它们会浮在词的上面
+            const sp = document.createElement('span');
+            sp.className = 'w k-plain';
+            sp.dataset.plain = '1';
+            sp.dataset.s = sg.s;
+            if (ruby) { const ri = document.createElement('i'); ri.className = 'r'; sp.appendChild(ri); }
+            sp.appendChild(document.createTextNode(sg.s));
+            line.appendChild(sp);
+            if (sg.s.trim()) flat.push(sg.s);
+            continue;
+          }
           const sym = sg.k === 'sym';
           const w = sym ? null : ((sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null);
           const span = document.createElement('span');

@@ -126,7 +126,7 @@ main{padding:10px 16px 132px}
 /* 逐词罗马音（跟唱用）：罗马音在词上方，中文在词下方，日语居中 */
 body.ruby .line .w{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;
   text-align:center;max-width:9.5em;margin:0 1px;line-height:1.35}
-body.ruby .line .r{display:block;font-size:9.5px;line-height:1.25;color:var(--ink3);
+body.ruby .line .r{display:block;min-height:1.25em;font-size:9.5px;line-height:1.25;color:var(--ink3);
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:400;white-space:nowrap}
 body.gloss .line .w{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;text-align:center;max-width:9.5em}
 body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--ink3);font-weight:400;white-space:normal;padding:0 2px}
@@ -327,6 +327,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=20261014b"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
