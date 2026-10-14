@@ -22,7 +22,7 @@
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: true, zh: true, mode: 'all' };
+  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all' };
   function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; }
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
   const isKnown = (w) => !!(w && S.known[w.id]);
@@ -119,7 +119,7 @@
         let local = S.local[track.id];
         if (!local) { try { const b = await idbGet(track.id); if (b) local = URL.createObjectURL(b); } catch {} }
         const url = local || await urlFor(track);
-        if (!url) { setLoad(false); setState(track.audioOss ? '音频地址不可用' : '还没绑定音频（页面下方「音频来源与设置」可粘网易云链接）'); return; }
+        if (!url) { setLoad(false); setState(track.audioOss ? '音频地址不可用' : '没有音频'); return; }
         stationNid = local ? null : ((S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null);
         audio.setAttribute('data-tid', track.id);
         audio.src = url;
@@ -196,11 +196,15 @@
     const pl = $('plyric'); if (pl) pl.classList.toggle('has-active', on >= 0);
     if (!scroll) return;
     const el = document.querySelector('#plyric .lblock.playing');
-    if (!el) return;
-    const box = el.parentElement;
-    if (!box) return;
+    const box = $('plyric');
+    if (!el || !box) return;
+    if (box.scrollHeight <= box.clientHeight + 4) return;
     const r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
-    if (r.top < br.top + 40 || r.bottom > br.bottom - 40) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const top = r.top - br.top, bottom = r.bottom - br.top, H = br.height;
+    // 只在当前句跑出中间安全带时滚，而且只滚歌词容器本身（用 scrollIntoView 会把整页一起滚）
+    if (top < H * .30 || bottom > H * .62) {
+      box.scrollTo({ top: Math.max(0, box.scrollTop + top - H * .42), behavior: 'smooth' });
+    }
   }
   function frame() {
     raf = requestAnimationFrame(frame);
@@ -247,7 +251,7 @@
     if (t != null) jump(t);
     highlight(true);
     if (curTrack) playTrack(curTrack, { at: t });   // 整首模式：从这句继续往下播
-    toast('从这句继续播 · 双击 = 单句循环');
+    toast('双击＝单句循环');
   }
   let toastTimer = null;
   function toast(msg) {
@@ -318,7 +322,7 @@
         </div>
       </div>
       <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="row" style="margin-top:14px">
+      <div class="filtrow">
         <select class="sel" id="d-range">
           <option value="all">全部范围</option><option value="c1">标日初级上（1-24课）</option>
           <option value="c2">标日初级下（25-48课）</option><option value="c3">标日中级</option>
@@ -335,8 +339,8 @@
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
       ${list.length === 0 ? '<div class="empty">这个范围里的词都掌握了</div>' : ''}
-      ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个（还有 ${list.length - deckCount}）</button></div>` : ''}
-      <div class="hint">点词看读音释义，右侧 ✓ 标已掌握。练一句比背十个词有用：词条里点「去这句」直接进入那句循环。</div>`;
+      ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个</button></div>` : ''}
+      <div class="hint">点词看读音释义，右侧 ✓ 标已掌握。</div>`;
     $('d-range').value = S.dRange || 'all';
     $('d-pos').value = S.dPos || 'all';
     $('d-sort').value = S.dSort || 'easy';
@@ -350,19 +354,19 @@
 
   function trackRow(t) {
     const tags = [];
-    if (t.imp) tags.push('导入' + (t.plName ? '·' + t.plName : ''));
-    if (t.audioOss) tags.push('自建音频');
+    if (t.imp) tags.push('导入');
+    if (t.audioOss) tags.push('阿里云');
     else if (t.audio || S.audio[t.id] || S.local[t.id]) tags.push('音频');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
-    if (brN) tags.push(`标日词 ${brN}`);
+    if (brN) tags.push(`标日 ${brN}`);
     return `<div class="item track" data-id="${t.id}">
       ${t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
         : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(t.coverUrl)}" alt="">` : '<div class="cover"></div>')}
       <div class="col">
         <div class="l1">${esc(t.title)}</div>
         <div class="l2">${esc(t.artist)}</div>
-        <div class="l3">${esc(t.album)} · ${t.lineCount} 行 · ${(t.vocabIds || []).length} 词${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
+        <div class="l3">${esc(t.album)} · ${t.lineCount} 行${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
       ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">✕</button>` : '<span class="mini">›</span>'}
     </div>`;
@@ -372,7 +376,6 @@
   // 收进来的歌存在本机 localStorage：歌词只有「时间轴 + 原文 + 译文」，
   // 分词用现有词表（1358 词 + 活用形）做最长匹配，所以导入的曲目同样有
   // 词性配色 / 逐词罗马音 / 释义 / 点词弹层 / 单句循环，和内置曲目一致。
-  const IMP_LIMIT = 60;
   // 假名 → 罗马音（scripts/kana-romaji.mjs 的精简移植；导入曲目里没进词表的部分靠它给读音）
   const DIGRAPHS = {
     'きゃ': 'kya', 'きゅ': 'kyu', 'きょ': 'kyo', 'きぇ': 'kye',
@@ -567,7 +570,7 @@
     const direct = plIdOf(s);
     if (direct) return { id: direct };
     const url = (s.match(/https?:\/\/[^\s，,、）)]+/) || [])[0];
-    if (!url) return { error: '没识别出歌单 ID：粘「歌单链接」或直接填数字 ID' };
+    if (!url) return { error: '没识别出歌单 ID' };
     // 浏览器直连短链/网易云一定会被跨域挡（还会在控制台留红字），所以直接走公共中转
     // （r.jina.ai）把重定向跟到底，再从页面内容里捞 id
     try {
@@ -578,54 +581,60 @@
       const m = t.match(/playlist\?id=(\d{5,})/) || t.match(/"playlistId"\s*:\s*"(\d{5,})"/) || t.match(/playlist\/(\d{5,})/);
       if (m) return { id: m[1], short: url };
     } catch {}
-    return { error: `这条短链里没有歌单 ID（${url.slice(0, 46)}…），自动解析也没成功。两个办法：① 点开它，在浏览器地址栏里找 id= 后面那串数字，直接填数字；② 把链接发我，我解析给你` };
+    return { error: `短链里没有歌单 ID。点开链接，把地址栏里 id= 后面的数字填进来` };
   }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
   async function importPlaylist(input, limit, onStep) {
     const rid = await resolvePlaylistId(input);
     if (rid.error) return { error: rid.error };
     const pid = rid.id;
-    if (rid.short && onStep) onStep(0, 0, '短链已解析', '歌单 ID ' + pid);
     let pl = null;
     try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
-    catch (e) { return { error: '拉取歌单失败：' + (e.name === 'AbortError' ? '超时' : e.message) }; }
-    if (!pl) return { error: '歌单不存在或读不到（私密歌单不行）' };
+    catch { return { error: '拉取歌单失败（接口超时或暂时不可用）' }; }
+    if (!pl) return { error: '歌单不存在或读不到' };
     const all = (pl.tracks || []).filter((x) => x && x.id);
     if (!all.length) return { error: '这张歌单里没有歌' };
-    const cap = Math.max(1, Math.min(Number(limit) || IMP_LIMIT, all.length));
-    const list = all.slice(0, cap);
-    const ok = [], fail = [];
-    const report = (title, mark) => { if (onStep) onStep(ok.length + fail.length, list.length, title, mark); };
+    const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all;   // 默认整张歌单
+    const ok = [], fail = [], skip = [];
+    let done = 0, quota = false;
+    const report = (title, mark, kind) => { done++; if (onStep) onStep(done, list.length, title, mark, kind); };
     const one = async (tr) => {
       const nid = String(tr.id);
       const title = String(tr.name || '').trim() || ('歌曲 ' + nid);
       const artist = ((tr.ar || tr.artists || []).map((a) => a && a.name).filter(Boolean)).join(' / ');
       const album = (tr.al && tr.al.name) || '';
       const cover = (tr.al && tr.al.picUrl) || '';
-      if (S.imp['i' + nid]) { ok.push({ nid, title, skip: true }); report(title, '已在库里'); return; }
+      if (S.imp['i' + nid]) { skip.push({ nid, title }); report(title, '已在库里', 'skip'); return; }
       const builtin = IDX.tracks.find((t) => !t.imp && ((t.audio && String(t.audio.nid) === nid) || norm(t.title) === norm(title)));
-      if (builtin) { ok.push({ nid, title, skip: true }); report(title, `内置曲库已有《${builtin.title}》`); return; }
+      if (builtin) { skip.push({ nid, title }); report(title, '曲库已有', 'skip'); return; }
+      let lines = [], why = '';
       try {
-        const ly = await gdJson(`types=lyric&source=netease&id=${nid}`);
-        const lines = parseLrc(ly && ly.lyric, ly && ly.tlyric);
-        if (lines.length < 3 || lines[lines.length - 1].t <= 0) throw new Error('没有带时间轴的歌词');
-        const u = await gdJson(`types=url&source=netease&id=${nid}&br=320`);
-        if (!u || !u.url) throw new Error('取不到音频（可能下架／VIP／地区限定）');
-        S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, plId: pid, plName: pl.name || '', at: Date.now() };
-        save();
-        ok.push({ nid, title });
-        report(title, '导入成功');
+        // 歌词和音频地址并行取，快一点
+        const [ly, u] = await Promise.all([
+          gdJson(`types=lyric&source=netease&id=${nid}`),
+          gdJson(`types=url&source=netease&id=${nid}&br=320`).catch(() => null),
+        ]);
+        lines = parseLrc(ly && ly.lyric, ly && ly.tlyric);
+        if (lines.length < 3 || lines[lines.length - 1].t <= 0) {   // 纯音乐 / 没有时间轴歌词：跳过，不算失败
+          skip.push({ nid, title });
+          report(title, '跳过（纯音乐／没有歌词）', 'skip');
+          return;
+        }
+        if (!u || !u.url) why = '取不到音频';
       } catch (e) {
-        const why = e.name === 'AbortError' ? '接口超时' : (e.message || '导入失败');
-        fail.push({ nid, title, why });
-        report(title, '导入失败：' + why);
+        why = (e && e.message) || '接口不可用';
       }
+      if (why) { fail.push({ nid, title, why }); report(title, why, 'fail'); return; }
+      S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, plId: pid, plName: pl.name || '', at: Date.now() };
+      try { save(); } catch { delete S.imp['i' + nid]; quota = true; return; }
+      ok.push({ nid, title });
+      report(title, '', 'ok');
     };
     const queue = [...list];
-    await Promise.all([0, 1, 2].map(async () => {
-      while (queue.length) { const tr = queue.shift(); await one(tr); }
+    await Promise.all([0, 1, 2, 3].map(async () => {
+      while (queue.length && !quota) { const tr = queue.shift(); await one(tr); }
     }));
-    return { ok, fail, plName: pl.name || '', total: all.length, done: list.length };
+    return { ok, fail, skip, quota, plName: pl.name || '', total: all.length, done: list.length };
   }
   /** 导入 + 把新歌并进内存（供 UI 与测试用） */
   async function importInto(input, limit, onStep) {
@@ -647,7 +656,7 @@
   function delImpTrack(id) {
     const rec = S.imp[id];
     if (!rec) return;
-    if (!confirm(`删除导入的《${rec.title}》？`)) return;
+    if (!confirm(`删除《${rec.title}》？`)) return;
     delete S.imp[id]; save();
     const i = IDX.tracks.findIndex((t) => t.id === id);
     if (i >= 0) IDX.tracks.splice(i, 1);
@@ -656,41 +665,35 @@
     renderSongs();
   }
   function impRowsHtml() {
-    const log = impState.log;
-    if (!log.length) return '';
-    const head = impState.done ? '' : `<div class="meta">正在导入 ${log.length}/${impState.total} …</div>`;
-    return `<div class="implog">${head}${log.map((x) => `<div class="improw ${x.ok ? 'ok' : 'bad'}">${x.ok ? '✓' : '✗'} <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`;
+    if (!impState.fails.length) return '';
+    return `<div class="implog">${impState.fails.map((x) => `<div class="improw bad">✗ <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`;
   }
-  const impState = { log: [], total: 0, done: false, msg: '' };
-  async function startImport(limit) {
+  const impState = { fails: [], msg: '' };
+  async function startImport() {
     if (importing) return;
-    const box = $('plinput');
-    const input = box ? box.value : '';
+    const input = $('plinput') ? $('plinput').value : '';
     const stat = $('plstat');
-    impState.log = []; impState.total = 0; impState.done = false;
+    impState.fails = []; impState.msg = '';
     importing = true;
-    if (stat) stat.textContent = '正在拉取歌单…';
+    if (stat) stat.textContent = '正在读取歌单…';
     if ($('plgo')) $('plgo').disabled = true;
-    const res = await importInto(input, limit, (n, total, title, mark) => {
-      impState.total = total;
-      impState.log.push({ title, mark, ok: /成功|已在库里/.test(mark) });
-      if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
-      if (stat) stat.textContent = `正在导入 ${n}/${total} …`;
+    if ($('pllist')) $('pllist').innerHTML = '';
+    const res = await importInto(input, 0, (n, total, title, mark, kind) => {
+      if (kind === 'fail') { impState.fails.push({ title, mark }); if ($('pllist')) $('pllist').innerHTML = impRowsHtml(); }
+      if (stat) stat.textContent = `正在导入 ${n}/${total}…`;
     });
     importing = false;
     if ($('plgo')) $('plgo').disabled = false;
-    impState.done = true;
-    if (res.error) { impState.msg = res.error; if (stat) stat.textContent = res.error; if ($('pllist')) $('pllist').innerHTML = ''; return; }
-    // 新导入的进内存
-    for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
-    impState.msg = `歌单《${res.plName}》共 ${res.total} 首，本次处理 ${res.done} 首：成功 ${res.ok.length} 首，失败 ${res.fail.length} 首`;
-    if (res.total > res.done) impState.msg += `（这张歌单还有 ${res.total - res.done} 首没导，一次最多 ${limit || IMP_LIMIT} 首）`;
-    const head = `${impState.msg}`;
+    if (res.error) { impState.msg = res.error; if (stat) stat.textContent = res.error; return; }
+    const bits = [`可用 ${res.ok.length} 首`];
+    if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首（纯音乐／没有歌词／曲库已有）`);
+    if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
+    impState.msg = `${res.plName} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
     renderSongs();
-    if ($('plstat')) $('plstat').textContent = head;
+    if ($('plstat')) $('plstat').textContent = impState.msg;
     if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
-    if (res.ok.length) toast(`导入完成：${res.ok.length} 首成功${res.fail.length ? `，${res.fail.length} 首失败` : ''}`);
-    else toast(`导入失败：${res.fail[0] ? res.fail[0].why : '没有可导入的歌'}`);
+    if (res.ok.length) toast(`导入完成：${res.ok.length} 首`);
+    else toast('没有可导入的歌');
   }
 
   function renderSongs() {
@@ -705,21 +708,21 @@
       return true;
     });
     $('view-songs').innerHTML = `
-      <div class="sec-head"><div><div class="sec-title">曲库</div><div class="sec-sub">共 ${IDX.tracks.length} 首 · 当前显示 ${list.length} 首</div></div></div>
+      <div class="sec-head"><div><div class="sec-title">曲库</div><div class="sec-sub">${IDX.tracks.length} 首 · 显示 ${list.length} 首</div></div></div>
       <div class="chips">
         <button class="chip ${filter === 'all' ? 'on' : ''}" data-f="all">全部</button>
         <button class="chip ${filter === 'audio' ? 'on' : ''}" data-f="audio">有音频</button>
         <button class="chip ${filter === 'zh' ? 'on' : ''}" data-f="zh">有中文</button>
         <button class="chip ${filter === 'imp' ? 'on' : ''}" data-f="imp">我导入的</button>
-        <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">隐藏已掌握词多的</button>
+        <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">跳过已掌握</button>
       </div>
-      <details class="impbox" ${impState.log.length || impState.msg ? 'open' : ''}>
+      <details class="impbox" ${impState.fails.length || impState.msg ? 'open' : ''}>
         <summary>导入网易云歌单</summary>
         <div class="row" style="margin-top:10px">
           <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单链接 / 数字 ID / 分享文案">
           <button class="toolbtn on" id="plgo">${importing ? '导入中…' : '导入'}</button>
         </div>
-        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || `把歌单里的歌收进来：有带时间轴的歌词 + 能取到音频的才收，取不到的逐首报原因。一次最多 ${IMP_LIMIT} 首，词性/罗马音/释义会用现有词表自动对齐。短链（163cn.tv/…）会自动尝试解析。`)}</div>
+        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || '粘歌单链接或数字 ID')}</div>
         <div id="pllist">${impRowsHtml()}</div>
         ${impPlaylists().length ? `<div class="meta" style="margin-top:10px">已导入：${impPlaylists().map((p) => `${esc(p.name)}（${p.n} 首）`).join('、')}</div>` : ''}
       </details>
@@ -759,7 +762,7 @@
       inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, local: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); renderMine(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
-    $('m-clear').onclick = () => { if (!confirm('清空本机的学习进度？')) return; S.known = {}; S.notes = {}; save(); renderMine(); };
+    $('m-clear').onclick = () => { if (!confirm('清空本机进度？')) return; S.known = {}; S.notes = {}; save(); renderMine(); };
   }
 
   // ────────────── 词条详情 ──────────────
@@ -787,10 +790,10 @@
         <button class="toolbtn" id="w-edit">改释义</button>
       </div>
       <div class="row" id="w-editrow" style="display:none;margin-top:10px">
-        <input class="sel" id="w-editinput" style="flex:1;min-width:160px;height:38px" value="${esc(meaningOf(v))}" placeholder="写你自己的释义，回车保存">
+        <input class="sel" id="w-editinput" style="flex:1;min-width:160px;height:38px" value="${esc(meaningOf(v))}" placeholder="释义（回车保存）">
         <button class="toolbtn" id="w-save">保存</button>
       </div>
-      ${forms.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">歌词里出现过的形态</div><div class="chips">${forms.map(([f, o]) => `<span class="chip">${esc(f)}${o.readingHira ? '（' + esc(o.readingHira) + '）' : ''}</span>`).join('')}</div>` : ''}
+      ${forms.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">词形</div><div class="chips">${forms.map(([f, o]) => `<span class="chip">${esc(f)}${o.readingHira ? '（' + esc(o.readingHira) + '）' : ''}</span>`).join('')}</div>` : ''}
       <div class="hair"></div>
       <div class="sec-sub" style="margin-bottom:6px">它出现在这些句子里</div>
       <div class="list">${exs.length ? exs.map((ex) => `<div class="item" style="align-items:flex-start">
@@ -861,7 +864,7 @@
     if (twFilter === 'br') list = all.filter((x) => x.v.br);
     else if (twFilter === 'out') list = all.filter((x) => !x.v.br);
     else if (twFilter !== 'all') list = all.filter((x) => x.v.pos === twFilter);
-    $('twhead').textContent = `这首歌的词汇（${list.length}/${all.length} 个 · 按标日课次+难度排）`;
+    $('twhead').textContent = `本曲词汇 ${list.length} 个`;
     const firstLine = (v) => curTrack.lines.findIndex((l) => (l.segs || []).some((sg) => sg.w && sg.b === v.word));
     host.innerHTML = list.length ? list.map(({ v, n }) => {
       const li = firstLine(v);
@@ -935,7 +938,7 @@
       if (!b) return;
       const i = Number(b.dataset.i);
       const now = Date.now();
-      if (now - lastTap < 360 && lastTapIdx === i) { lastTap = 0; setLoop(i); toast('单句循环 开'); return; }   // 双击 → 切到单句循环
+      if (now - lastTap < 360 && lastTapIdx === i) { lastTap = 0; setLoop(i); toast('单句循环'); return; }   // 双击 → 切到单句循环
       lastTap = now; lastTapIdx = i;
       playFrom(i);
     });
@@ -968,7 +971,7 @@
         <div class="col">
           <div class="l1" style="font-size:17px">${esc(t.title)}</div>
           <div class="l2">${esc(t.artist)} · ${esc(t.album)}</div>
-          <div class="l3">${t.imp ? `来自歌单：${esc(t.plName || '导入')} · 网易云 ${esc(String(t.audio.nid))}` : `原曲：${esc(t.base)}`} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''}${t.imp ? '' : ` · 已掌握 ${knownN}/${(t.vocabIds || []).length}`}</div>
+          <div class="l3">${t.imp ? `来自歌单：${esc(t.plName || '导入')}` : `原曲：${esc(t.base)}`} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''}</div>
         </div>
       </div>
       <div class="row" style="margin:2px 0 10px">
@@ -1003,11 +1006,11 @@
     if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
   }
   function describeSource(t) {
-    if (S.local[t.id]) return '当前用本地音频文件（只存在这个浏览器里）';
-    if (t.audioOss) return `当前音频：自建对象存储直链（进页面就预缓冲，不走第三方解析）`;
+    if (S.local[t.id]) return '音频：本地文件';
+    if (t.audioOss) return `音频：阿里云 OSS`;
     const s = S.audio[t.id] || t.audio;
-    if (s && s.nid) return `当前音频：网易云 ${s.nid}${t.netease && t.netease.agreeRate != null ? `（歌词一致度 ${Math.round(t.netease.agreeRate * 100)}%）` : ''}`;
-    return '这首还没有音频。可以粘一个网易云链接，或换有音频的曲目。';
+    if (s && s.nid) return `音频：网易云${t.netease && t.netease.agreeRate != null ? ` · 歌词一致 ${Math.round(t.netease.agreeRate * 100)}%` : ''}`;
+    return '没有音频';
   }
   function applyDisplay() {
     document.body.classList.toggle('gloss', S.gloss !== false);
@@ -1031,7 +1034,7 @@
     const on = (id) => { const el = $(id); if (el) el.style.display = ''; };
     if (!w) {
       $('p-word').textContent = fallback || ''; $('p-reading').textContent = ''; $('p-romaji').textContent = '';
-      $('p-meaning').textContent = '这个词不在词表里（助词或活用碎片），先听个音吧';
+      $('p-meaning').textContent = '词表未收录';
       $('p-ex').textContent = ''; $('p-meta').textContent = '';
       $('p-known').style.display = 'none'; $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none'; $('p-edit').style.display = 'none';
       $('pop').classList.add('on'); return;
@@ -1041,7 +1044,7 @@
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = w.romaji || '';
-    $('p-meaning').textContent = meaningOf(w) || '（还没有释义，点「改释义」自己写一个）';
+    $('p-meaning').textContent = meaningOf(w) || '没有释义';
     const ex = (w.examples || [])[0];
     $('p-ex').textContent = ex ? `例句（${ex.track}）：${ex.jp}${ex.zh ? ' → ' + ex.zh : ''}` : '';
     $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), `全库 ${w.tracks.length} 首 / ${w.count} 次`].join(' · ');
@@ -1093,7 +1096,7 @@
       const t = impTrack(rec); data.tracks.push(t); TRACK.set(t.id, t);
     }
     const s = data.stats || {};
-    $('headstat').textContent = `${IDX.tracks.length} 首 · ${s.vocab} 词 · 有音频 ${IDX.tracks.filter((t) => t.audioOss || t.audio).length} 首`;
+    const hs = $('headstat'); if (hs) hs.textContent = `${IDX.tracks.length} 首 · ${s.vocab} 词`;
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     $('tab-learn').onclick = () => go('#/learn');
@@ -1114,7 +1117,7 @@
     bindAudio();
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();
-    $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('已切回整首播放'); };
+    $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('整首播放'); };
     $('p-close').onclick = () => $('player').classList.remove('on');
     $('p-play').onclick = () => togglePlay();
     $('p-prev').onclick = () => step(-1);
@@ -1164,12 +1167,12 @@
       const m = $('nidinput').value.trim().match(/(\d{3,})/);
       if (!m) { alert('没识别出歌曲 ID'); return; }
       S.audio[curTrack.id] = { nid: m[1] }; if (S.local) delete S.local[curTrack.id];
-      save(); $('srcinfo').textContent = describeSource(curTrack); toast('已绑定，点播放试试');
+      save(); $('srcinfo').textContent = describeSource(curTrack); toast('已绑定');
     };
     $('audiofile').onchange = (e) => {
       const f = e.target.files[0]; if (!f || !curTrack) return;
-      if (f.size > 60 * 1024 * 1024) { alert('文件太大（建议 60MB 以内）'); return; }
-      idbSet(curTrack.id, f).then(() => { delete S.local[curTrack.id]; save(); $('srcinfo').textContent = describeSource(curTrack); alert('已存进这个浏览器'); }).catch(() => alert('保存失败'));
+      if (f.size > 60 * 1024 * 1024) { alert('文件太大（≤60MB）'); return; }
+      idbSet(curTrack.id, f).then(() => { delete S.local[curTrack.id]; save(); $('srcinfo').textContent = describeSource(curTrack); alert('已保存'); }).catch(() => alert('保存失败'));
     };
     $('audioclear').onclick = async () => { if (!curTrack) return; delete S.local[curTrack.id]; save(); try { await idbDel(curTrack.id); } catch {} $('srcinfo').textContent = describeSource(curTrack); };
 

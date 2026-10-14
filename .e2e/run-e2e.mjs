@@ -41,7 +41,8 @@ const E2E_PLAYLIST = {
   playlist: { id: 999000123, name: 'E2E 测试歌单', tracks: [
     { id: 737955, name: 'Thank you for dears.', ar: [{ name: 'GET IN THE RING' }], al: { name: 'E2E', picUrl: '' } },
     { id: 22645196, name: 'Bad Apple!!', ar: [{ name: 'のみこ' }], al: { name: 'E2E', picUrl: '' } },
-    { id: 999999999, name: '这首歌没有歌词', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
+    { id: 888888888, name: '这首取不到音频', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
+    { id: 999999999, name: '这首是纯音乐', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
   ] },
 };
 const E2E_LYRIC = {
@@ -57,7 +58,7 @@ const baseRoute = (route) => {
     const id = (u.match(/[?&]id=(\d+)/) || [])[1];
     return route.fulfill({
       status: 200, contentType: 'application/json',
-      body: JSON.stringify(id === '999999999' ? {} : E2E_LYRIC),
+      body: JSON.stringify(id === '999999999' ? { lyric: '纯音乐，请欣赏\n' } : E2E_LYRIC),
     });
   }
   if (/r\.jina\.ai/.test(u)) {   // 短链解析中转的桩：带 no-id 的返回一个没有歌单 ID 的页面
@@ -65,6 +66,8 @@ const baseRoute = (route) => {
     return route.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body });
   }
   if (/gdstudio/.test(u) && /types=url/.test(u)) {
+    const id = (u.match(/[?&]id=(\d+)/) || [])[1];
+    if (id === '888888888') return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });   // 取不到音频 = 真失败
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
@@ -189,10 +192,12 @@ const rom = await page.evaluate(() => {
 });
 check('罗马音改成逐词对齐（不再整行一串）', rom.ratio > 60 && rom.spaced, rom.ratio + '% 词带罗马音 · ' + rom.sample.slice(0, 3).join(' '));
 check('词级中文（实词下挂释义）', await page.locator('#plyric .g').count() > 5, (await page.locator('#plyric .g').count()) + ' 个');
+const g0 = await page.evaluate(() => document.body.classList.contains('gloss'));
 await page.locator('#b-gloss').click();
 await page.waitForTimeout(250);
-check('词义可一键收起', await page.evaluate(() => !document.body.classList.contains('gloss')));
-await page.locator('#b-gloss').click();
+const g1 = await page.evaluate(() => document.body.classList.contains('gloss'));
+check('词义开关能切换（默认关：跟唱时只有当前句干净）', g0 !== g1, `默认 ${g0} → 点一下 ${g1}`);
+if (g1) await page.locator('#b-gloss').click();
 await page.waitForTimeout(250);
 await shot('05-lyric', true);
 
@@ -321,9 +326,11 @@ await page.locator('#plgo').click();
 await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
 await page.waitForTimeout(500);
 const impStat = await txt('#plstat');
-check('163cn.tv 短链能自动解析出歌单 ID', /成功 2 首/.test(impStat), impStat.slice(0, 40));
-check('导入汇总：成功 2 首、失败 1 首', /成功 2 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 70));
-check('失败逐首给原因（不阻塞其它）', /没有带时间轴的歌词/.test(await page.locator('#pllist').textContent()));
+check('163cn.tv 短链能自动解析出歌单 ID', /可用 2 首/.test(impStat), impStat.slice(0, 40));
+check('整张歌单一次导完：可用 2 · 跳过 1 · 失败 1', /可用 2 首/.test(impStat) && /跳过 1 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 80));
+check('纯音乐/无歌词只算跳过，不算失败', /纯音乐/.test(impStat), impStat.slice(0, 80));
+const impFails = await page.locator('#pllist').textContent();
+check('真失败逐首给原因', /取不到音频/.test(impFails) && !/纯音乐/.test(impFails), impFails.replace(/\s+/g, ' ').slice(0, 60));
 check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 2);
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(300);

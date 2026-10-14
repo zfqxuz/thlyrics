@@ -58,7 +58,7 @@ main{padding:10px 16px 132px}
 
 /* ── 行（列表统一形态：左内容右操作，靠分隔线分群，不用卡片边框） ── */
 .list{display:flex;flex-direction:column}
-.item{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s}
+.item{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s}
 .item:last-child{border-bottom:0}
 .item:active{background:rgba(255,255,255,.03)}
 .col{flex:1;min-width:0}
@@ -94,8 +94,10 @@ main{padding:10px 16px 132px}
 
 /* ── chips ── */
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 4px}
-.chip{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
-  color:var(--ink2);font-size:12.5px;display:inline-flex;align-items:center}
+.filtrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.filtrow>*{flex:1 1 44%}
+.chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink2);font-size:12px;display:inline-flex;align-items:center}
 .chip.on{background:var(--accent-soft);border-color:rgba(255,95,69,.45);color:#ffb9ad}
 .sel{height:34px;padding:0 10px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-size:12.5px}
 .toolbtn{height:34px;padding:0 12px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-size:12.5px}
@@ -103,15 +105,15 @@ main{padding:10px 16px 132px}
 .btn-primary{height:40px;padding:0 16px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;font-size:14px}
 
 /* ── 歌词：一句一块，三层排版绑死在块里 ── */
-.lblock{padding:11px 12px 12px;border-radius:13px;margin-bottom:2px;cursor:pointer;position:relative;transition:background .18s}
+.lblock{padding:8px 11px 9px;border-radius:13px;margin-bottom:2px;cursor:pointer;position:relative;transition:background .18s}
 .lblock:active{background:rgba(255,255,255,.03)}
 .lblock.playing{background:var(--accent-soft)}
 .lblock.playing::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--accent)}
-.line{font-size:17.5px;line-height:1.75;letter-spacing:.005em}
+.line{font-size:17px;line-height:1.7;letter-spacing:.005em}
 .line.en{color:var(--ink2);font-size:15px}
-.romaji{font-size:11.5px;color:var(--ink3);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;padding-left:11px;border-left:2px solid rgba(255,255,255,.09)}
-.lblock .zh{font-size:12.5px;color:var(--ink2);margin-top:4px;padding-left:11px;border-left:2px solid rgba(255,95,69,.35)}
-.space{height:14px}
+.romaji{font-size:11.5px;color:var(--ink3);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px}
+.lblock .zh{font-size:12.5px;color:var(--ink2);margin-top:3px;padding-left:10px;border-left:2px solid rgba(255,95,69,.28)}
+.space{height:10px}
 .line .w{cursor:pointer;border-radius:4px;padding:0 1px;transition:background .12s}
 .line .w:active{background:rgba(255,255,255,.09)}
 .line .w.k-n{color:var(--p-n)} .line .w.k-v{color:var(--p-v)} .line .w.k-a{color:var(--p-a)}
@@ -176,9 +178,9 @@ body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--i
 
 /* 跟唱聚焦：有当前句时才把其他句压暗，否则整屏都清楚 */
 #plyric .lblock{transition:opacity .25s}
-#plyric.has-active .lblock{opacity:.34}
+#plyric.has-active .lblock{opacity:.26}
 #plyric.has-active .lblock.playing{opacity:1}
-#plyric.has-active .lblock.playing .line{font-size:20px;font-weight:600}
+#plyric.has-active .lblock.playing .line{font-weight:600;letter-spacing:.01em}
 
 /* ── 底部弹层（词条 / 设置） ── */
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;transform:translateY(110%);transition:transform .26s cubic-bezier(.2,.8,.2,1);
@@ -207,7 +209,7 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
 </head>
 <body>
 <div class="topbar">
-  <div class="brand">东方同人曲 学唱机 <small id="headstat">载入中…</small></div>
+  <div class="brand">东方同人曲 学唱机</div>
   <button class="iconbtn" id="btn-search" title="搜索">搜</button>
 </div>
 
