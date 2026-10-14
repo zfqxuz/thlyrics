@@ -445,6 +445,7 @@
     return out;
   }
   let DICT = null, DICT_MAX = 1, importing = false;
+  let RDL = new Map(), RDL_MAX = 1;   // 读音兜底表（内置曲目里出现过的词 → 罗马音/读音/词性）
   const SEG = ('Segmenter' in Intl) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
   function buildDict() {
     DICT = new Map();
@@ -458,6 +459,13 @@
     DICT_MAX = Math.min(DICT_MAX, 8);
   }
   const jpText = (s) => /[\u3041-\u30ff\u4e00-\u9fff]/.test(String(s || ''));
+  function buildReadings(map) {
+    RDL = new Map();
+    for (const [k, v] of Object.entries(map || {})) RDL.set(k, v);
+    RDL_MAX = 1;
+    for (const k of RDL.keys()) if (k.length > RDL_MAX) RDL_MAX = k.length;
+    RDL_MAX = Math.min(RDL_MAX, 10);
+  }
   /** 用词表给一句话分词（最长匹配）；命中的词带上词性/罗马音，没命中的按普通文本 */
   function segsFor(text) {
     const out = [];
@@ -492,9 +500,20 @@
         const e = DICT.get(text.substr(i, n));
         if (e) { hit = e; len = n; break; }
       }
+      if (!hit && RDL.size) {                       // 词表没有 → 读音兜底表（带词性/罗马音，但没有释义）
+        for (let n = Math.min(RDL_MAX, text.length - i); n >= 1; n--) {
+          const v = RDL.get(text.substr(i, n));
+          if (v) { hit = { rd: v }; len = n; break; }
+        }
+      }
       if (!hit) { plain += text[i]; i++; continue; }
       flush();
       const surf = text.substr(i, len);
+      if (hit.rd) {
+        out.push({ s: surf, k: hit.rd[2] || 'oth', y: hit.rd[0], r: hit.rd[1] || '' });
+        i += len;
+        continue;
+      }
       const f = hit.v.forms && hit.v.forms[hit.form];
       out.push({
         s: surf, k: posKind(hit.v), w: true, b: hit.v.word,
@@ -527,8 +546,13 @@
   const LRC_META = /^\s*(作词|作曲|编曲|制作人|混音|母带|吉他|贝斯|鼓|录音|和声|歌词来源|校对|翻译|调校|曲绘|PV|原曲|社团|专辑|演唱|Vocals|Lyrics|Composer|Arranger|Album|Producer)\s*[:：]/i;
   /** LRC → 行数组（只保留唱出来的行；翻译按时间就近配对） */
   function parseLrc(lyric, tlyric) {
-    const rows = (txt) => [...String(txt || '').matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]\s*(.*)/g)]
-      .map((m) => ({ t: Number(m[1]) * 60 + Number(String(m[2]).replace(':', '.')), text: m[3].trim() }));
+    // 注意：[\d] 后面只能用 [ \t]*，用 \s* 会把换行也吃进去 —— 空时间戳行（[00:26.000]）
+    // 会把下一行的内容连时间戳一起吸上来（时间轴也跟着错）
+    const rows = (txt) => [...String(txt || '').matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\][ \t]*(.*)/g)]
+      .map((m) => ({
+        t: Number(m[1]) * 60 + Number(String(m[2]).replace(':', '.')),
+        text: m[3].replace(/^(\s*\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\])+\s*/, '').trim(),
+      }));
     const trs = rows(tlyric).filter((r) => r.text).map((r) => ({ t: r.t, text: r.text, used: false }));
     const out = [];
     for (const r of rows(lyric)) {
@@ -904,10 +928,14 @@
           const w = sym ? null : ((sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null);
           const span = document.createElement('span');
           span.className = 'w k-' + sg.k + (w && isKnown(w) ? ' known' : '');
+          const y = sg.y || '';
           span.dataset.s = sg.s;
+          if (sg.r) span.dataset.r = sg.r;
+          if (y) span.dataset.y = y;
           if (sym) span.dataset.plain = '1';
           if (sg.w && sg.b) span.dataset.w = sg.b;
-          const y = sg.y || '';
+          // 罗马音那一行必须每块都占位（没有读音也留空行），否则同一句里
+          // 有读音的词会被顶下去、没读音的浮在上面 —— 看起来就是「歌词一上一下」
           if (ruby) { const ri = document.createElement('i'); ri.className = 'r'; ri.textContent = y; span.appendChild(ri); }
           span.appendChild(document.createTextNode(sg.s));
           const g = meaningOf(w);
@@ -933,7 +961,11 @@
     host.dataset.bound = '1';
     host.addEventListener('click', (e) => {
       const wEl = e.target.closest('.w');
-      if (wEl && !wEl.dataset.plain) { const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null; showPop(w, wEl.dataset.s); return; }
+      if (wEl && !wEl.dataset.plain) {
+        const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
+        showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '' });
+        return;
+      }
       const b = e.target.closest('.lblock[data-i]');
       if (!b) return;
       const i = Number(b.dataset.i);
@@ -1029,12 +1061,15 @@
 
   // ────────────── 词条弹层 ──────────────
   let popWord = null, popFallback = null;
-  function showPop(w, fallback) {
+  function showPop(w, fallback, seg) {
     popFallback = fallback || null;
     const on = (id) => { const el = $(id); if (el) el.style.display = ''; };
     if (!w) {
-      $('p-word').textContent = fallback || ''; $('p-reading').textContent = ''; $('p-romaji').textContent = '';
-      $('p-meaning').textContent = '词表未收录';
+      const rd = (seg && seg.r) ? norm(seg.r) : '';
+      $('p-word').textContent = fallback || '';
+      $('p-reading').textContent = rd ? '（' + rd + '）' : '';
+      $('p-romaji').textContent = (seg && seg.y) || '';
+      $('p-meaning').textContent = rd ? '词表里没有这个词（读音在上面）' : '词表里没有这个词，也没查到读音';
       $('p-ex').textContent = ''; $('p-meta').textContent = '';
       $('p-known').style.display = 'none'; $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none'; $('p-edit').style.display = 'none';
       $('pop').classList.add('on'); return;
@@ -1086,6 +1121,7 @@
     try { data = await (await fetch('data/index.json')).json(); }
     catch { $('view-learn').innerHTML = '<div class="empty">载入 data/index.json 失败。本地请先起服务：node scripts/serve.mjs 8848</div>'; show('view-learn'); return; }
     IDX = data; VOCAB = data.vocab;
+    fetch('data/readings.json').then((r) => r.json()).then(buildReadings).catch(() => {});
     VBY = new Map(VOCAB.map((w) => [w.word, w]));
     VBYID = new Map(VOCAB.map((w) => [w.id, w]));
     for (const w of VOCAB) { SURF.set(w.word, w); for (const f of Object.keys(w.forms || {})) if (!SURF.has(f)) SURF.set(f, w); }

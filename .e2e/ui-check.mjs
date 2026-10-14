@@ -1,0 +1,38 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs'; import path from 'node:path';
+const HOME=process.env.HOME||'/home/zfq'; const root=HOME+'/.cache/ms-playwright';
+const dirs=fs.readdirSync(root).filter(d=>d.startsWith('chromium_headless_shell-')).sort();
+const chrome=path.join(root,dirs[dirs.length-1],'chrome-headless-shell-linux64','chrome-headless-shell');
+const HERE='/home/zfq/qqbot/thlyrics/.e2e';
+const libPath=['root/usr/lib/x86_64-linux-gnu','root/lib/x86_64-linux-gnu','root/usr/lib','root/lib'].map(p=>path.join(HERE,p)).join(':');
+const b=await chromium.launch({executablePath:chrome,args:['--no-sandbox'],env:{...process.env,LD_LIBRARY_PATH:libPath}});
+const page=await b.newPage({viewport:{width:400,height:850},isMobile:true,hasTouch:true,deviceScaleFactor:2});
+page.on('pageerror',e=>console.log('  [pageerror]',e.message));
+await page.goto('http://127.0.0.1:8848/#/learn',{waitUntil:'domcontentloaded'});
+await page.waitForSelector('#deck .word'); await page.waitForTimeout(600);
+await page.screenshot({path:'/tmp/ui-learn.png'});
+await page.goto('http://127.0.0.1:8848/#/songs'); await page.waitForTimeout(700);
+await page.screenshot({path:'/tmp/ui-songs.png'});
+await page.locator('.impbox summary').click(); await page.waitForTimeout(300);
+await page.screenshot({path:'/tmp/ui-import.png'});
+await page.locator('.impbox summary').click(); await page.waitForTimeout(200);
+await page.goto('http://127.0.0.1:8848/#/track/t1'); await page.waitForTimeout(900);
+await page.screenshot({path:'/tmp/ui-track.png'});
+await page.locator('#t-sing').click(); await page.waitForTimeout(1200);
+// 逐块测：给任意一块加 playing，看会不会改变高度 / 滚动容器外的东西
+const probe = await page.evaluate(async () => {
+  const blocks=[...document.querySelectorAll('#plyric .lblock')];
+  const h0=blocks.map(e=>Math.round(e.getBoundingClientRect().height*10)/10);
+  const scrollH0=document.querySelector('#plyric').scrollHeight;
+  const pageY0=window.scrollY;
+  blocks.forEach(e=>e.classList.remove('playing'));
+  blocks[7].classList.add('playing');
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const h1=blocks.map(e=>Math.round(e.getBoundingClientRect().height*10)/10);
+  const diff=h0.map((h,i)=>Math.abs(h-h1[i])>0.5?i:null).filter(x=>x!=null);
+  return { lines:blocks.length, changed:diff, scrollH0, scrollH1:document.querySelector('#plyric').scrollHeight, pageY0, pageY1:window.scrollY };
+});
+console.log('行高稳定性:', JSON.stringify(probe));
+await page.waitForTimeout(500);
+await page.screenshot({path:'/tmp/ui-player.png'});
+await b.close();

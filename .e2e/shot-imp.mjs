@@ -1,0 +1,41 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs'; import path from 'node:path';
+const HOME=process.env.HOME||'/home/zfq'; const root=HOME+'/.cache/ms-playwright';
+const dirs=fs.readdirSync(root).filter(d=>d.startsWith('chromium_headless_shell-')).sort();
+const chrome=path.join(root,dirs[dirs.length-1],'chrome-headless-shell-linux64','chrome-headless-shell');
+const HERE='/home/zfq/qqbot/thlyrics/.e2e';
+const libPath=['root/usr/lib/x86_64-linux-gnu','root/lib/x86_64-linux-gnu','root/usr/lib','root/lib'].map(p=>path.join(HERE,p)).join(':');
+const b=await chromium.launch({executablePath:chrome,args:['--no-sandbox'],env:{...process.env,LD_LIBRARY_PATH:libPath}});
+const page=await b.newPage({viewport:{width:400,height:850},isMobile:true,hasTouch:true,deviceScaleFactor:2});
+page.on('pageerror',e=>console.log('  [pageerror]',e.message));
+const band={code:200,playlist:{id:1,name:'東方',tracks:[{id:22645196,name:'Bad Apple!!',ar:[{name:'のみこ'}],al:{name:'東方'}}]}};
+await page.route('**/api.php?*', r => r.request().url().includes('types=playlist')
+  ? r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(band)}) : r.continue());
+await page.goto('http://127.0.0.1:8848/#/songs',{waitUntil:'domcontentloaded'});
+await page.waitForTimeout(1200);
+await page.locator('.impbox summary').click();
+await page.locator('#plinput').fill('https://music.163.com/playlist?id=999000123');
+await page.locator('#plgo').click();
+await page.waitForFunction(()=>!document.querySelector('#plgo').disabled,null,{timeout:120000});
+await page.waitForTimeout(400);
+await page.goto('http://127.0.0.1:8848/#/track/i22645196');
+await page.waitForTimeout(1000);
+await page.locator('#t-sing').click();
+await page.waitForTimeout(1800);
+await page.evaluate(() => {
+  const blocks=[...document.querySelectorAll('#plyric .lblock')];
+  blocks.forEach(e=>e.classList.remove('playing'));
+  const el=blocks.find(b=>/流れてく/.test(b.textContent)) || blocks[3];
+  el.classList.add('playing');
+  const box=document.querySelector('#plyric');
+  const top=el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  box.scrollTop = box.scrollTop + top - box.clientHeight*0.30;
+});
+await page.waitForTimeout(600);
+await page.screenshot({path:'/tmp/shot-imp-fixed.png'});
+console.log(JSON.stringify(await page.evaluate(()=>{
+  const w=[...document.querySelectorAll('#plyric .w')];
+  const withR=w.filter(x=>(x.querySelector('.r')||{}).textContent?.trim()).length;
+  return { words:w.length, pct:Math.round(withR/w.length*100), hasStamp:[...document.querySelectorAll('#plyric .line')].some(e=>/^\[\d+:/.test(e.textContent)) };
+})));
+await b.close();

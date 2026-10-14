@@ -46,7 +46,7 @@ const E2E_PLAYLIST = {
   ] },
 };
 const E2E_LYRIC = {
-  lyric: '[00:00.00] 作词 : E2E\n[00:00.50] 作曲 : E2E\n[00:01.00] おいでよ　此処まで\n[00:03.00] 誰もいない場所で気ままに\n[00:05.00] 踊る憂鬱と\n',
+  lyric: '[00:00.00] 作词 : E2E\n[00:00.50] 作曲 : E2E\n[00:01.00] おいでよ　此処まで\n[00:02.50]\n[00:03.00] 誰もいない場所で気ままに\n[00:05.00] 踊る憂鬱と\n',
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
 const baseRoute = (route) => {
@@ -344,9 +344,13 @@ await page.locator('#t-sing').click();
 await page.waitForTimeout(1600);
 const impPly = await page.evaluate(() => {
   const w = [...document.querySelectorAll('#plyric .w')];
-  return { blocks: document.querySelectorAll('#plyric .lblock').length, w: w.length, withR: w.filter((x) => (x.querySelector('.r') || {}).textContent?.trim()).length };
+  const withR = w.filter((x) => (x.querySelector('.r') || {}).textContent?.trim()).length;
+  return { blocks: document.querySelectorAll('#plyric .lblock').length, w: w.length, withR, pct: Math.round(withR / Math.max(1, w.length) * 100) };
 });
 check('导入曲目能进跟唱页（歌词块 + 逐词罗马音）', impPly.blocks >= 3 && impPly.w > 3 && impPly.withR > 3, JSON.stringify(impPly));
+check('导入曲目逐词罗马音覆盖 ≥90%', impPly.pct >= 90, impPly.pct + '%（词表 + 读音兜底表）');
+const stampLeak = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock .line')].filter((e) => /^\[\d+:\d+/.test(e.textContent)).length);
+check('歌词行不带时间戳残留（空时间戳行不再吃掉下一行）', stampLeak === 0, stampLeak + ' 行');
 await page.locator('#p-close').click();
 await page.waitForTimeout(300);
 await page.goto(BASE + '#/songs');

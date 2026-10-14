@@ -224,6 +224,20 @@ async function main() {
     fs.writeFileSync(path.join(WEB_DATA, 'index.json'), JSON.stringify(idx), 'utf8');
   }
 
+  // 读音兜底表：把内置曲目里出现过的每个词（含助词/活用形）连同读音、词性导出成一个很小的表。
+  // 前端给「导入的歌」补词表外的读音时用它 —— 比在浏览器里挂一套分词词典便宜得多。
+  const rd = {};
+  for (const tr of idx.tracks) {
+    for (const l of tr.lines) {
+      for (const sg of l.segs || []) {
+        if (!sg.s || !sg.y || rd[sg.s]) continue;
+        rd[sg.s] = [sg.y, sg.r || '', sg.k || ''];
+      }
+    }
+  }
+  fs.writeFileSync(path.join(WEB_DATA, 'readings.json'), JSON.stringify(rd), 'utf8');
+  console.log(`读音兜底表：${Object.keys(rd).length} 条 → docs/data/readings.json`);
+
   const s = idx.stats;
   console.log(`曲目 ${s.tracks} · 并入网易云 ${s.withNetease} · 有时间轴 ${s.tracksWithTiming} · 行级译文 ${s.withTranslations} 行`);
   console.log(`释义：共 ${s.withMeaning} 词有释义（人工精译 ${manual} / 机器 ${machine}），另有 ${flagged} 词机器译文可疑已标记`);
