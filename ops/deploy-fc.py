@@ -33,6 +33,23 @@ def build_zip():
         for f in sorted(os.listdir(d)):
             if f.endswith(('.js', '.json', '.cjs', '.mjs')):
                 z.write(os.path.join(d, f), f)
+        # 分词器的 JS 实现：部署时从 node_modules 取（第三方代码不进仓库）；
+        # 词典 18MB 在 OSS kuromoji/dict/，冷启动拉到 /tmp，也不进包。
+        nm = os.path.join(os.path.dirname(HERE), 'node_modules')
+        kuro = os.path.join(nm, 'kuromoji')
+        for f in os.listdir(os.path.join(kuro, 'src')):
+            p = os.path.join(kuro, 'src', f)
+            if os.path.isfile(p):
+                z.write(p, 'vendor/kuromoji/src/' + f)
+        z.write(os.path.join(kuro, 'package.json'), 'vendor/kuromoji/package.json')
+        for dep in ['async', 'doublearray', 'zlibjs', 'lodash']:
+            base = os.path.join(nm, dep)
+            for root, _dirs, files in os.walk(base):
+                if 'node_modules' in root.split(os.sep)[len(base.split(os.sep)):]:
+                    continue
+                for f in files:
+                    p = os.path.join(root, f)
+                    z.write(p, 'vendor/node_modules/' + dep + '/' + os.path.relpath(p, base))
     return base64.b64encode(buf.getvalue()).decode()
 
 def main():
@@ -46,7 +63,7 @@ def main():
         'ALLOW_ORIGINS': 'https://zfqxuz.github.io,http://127.0.0.1:8848,http://localhost:8848',
     }
     body = {
-        'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 30, 'memorySize': 256,
+        'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 60, 'memorySize': 1024,
         'code': {'zipFile': build_zip()}, 'environmentVariables': env,
     }
     r = acs3.call('PUT', HOST, f'/2023-03-30/functions/{FUNC}', body=body)

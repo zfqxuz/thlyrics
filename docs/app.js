@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014r';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014s';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -14,7 +14,13 @@
   const fmt = (s) => (!s || !isFinite(s)) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const norm = (s) => String(s || '').toLowerCase().replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
   const POSNAME = { n: '名词', v: '动词', a: '形容词', na: '形容动词', adv: '副词', prt: '助词', aux: '助动词', conj: '接续词', int: '感叹词', rent: '连体词', pref: '接头词', oth: '其他' };
-  const posKind = (w) => ({ '名詞': 'n', '動詞': 'v', '形容詞': 'a', '副詞': 'adv' }[w.pos] || 'oth');
+  const POS_KIND = { '名詞': 'n', '動詞': 'v', '形容詞': 'a', '形容動詞': 'na', '副詞': 'adv',
+    '助詞': 'prt', '助動詞': 'aux', '接続詞': 'conj', '連体詞': 'rent', '感動詞': 'int', '接頭詞': 'pref', '記号': 'sym' };
+  const posKind = (w) => {
+    if (!w) return 'oth';
+    if (w.pos === '名詞' && w.detail === '形容動詞語幹') return 'na';
+    return POS_KIND[w.pos] || 'oth';
+  };
   const brLabel = (v) => (v && v.br) ? `标日${v.br.bk} 第${v.br.l}课` : '';
   function level(v) {                       // 难度 1..5（点阵）
     if (v.br) return v.br.c <= 24 ? 1 : v.br.c <= 48 ? 2 : 3;
@@ -740,10 +746,51 @@
     flush();
     return out;
   }
+  /** 服务端分词（kuromoji）：一次一首歌的所有行 */
+  async function segmentLines(lines) {
+    const r = await fetch(`${API_BASE}/segment`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lines }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.segs) throw new Error((j && j.error) || '分词失败');
+    return j.segs;
+  }
+  /** 服务端 token → 紧凑存储 [表面形, 读音, 词性码, 词表命中词]（读音能被前端还原成罗马音） */
+  function segsCompact(tokens) {
+    const out = [];
+    for (const t of tokens || []) {
+      const s = String((t && t[0]) || ''); if (!s) continue;
+      const base = String(t[1] || s), rd = String(t[2] || ''), pos = String(t[3] || ''), detail = String(t[4] || '');
+      if (!pos || pos === '記号') { out.push([s, '', 'sym', '']); continue; }
+      const hit = DICT.get(s) || DICT.get(base) || (rd ? DICT.get(rd) : null);
+      const code = hit ? (hit.rd ? (hit.rd[2] || posKind({ pos, detail })) : posKind(hit.v)) : posKind({ pos, detail });
+      const word = (hit && !hit.rd) ? hit.v.word : '';
+      const reading = ((hit && !hit.rd && ((hit.v.forms || {})[hit.form] || {}).reading) || (hit && hit.rd && hit.rd[1]) || rd || '');
+      out.push([s, reading, code, word]);
+    }
+    return out;
+  }
+  /** 紧凑存储 → 渲染用的分片 */
+  function segsFromCompact(arr) {
+    const out = [];
+    for (const t of arr || []) {
+      const s = String((t && t[0]) || ''); if (!s) continue;
+      const k = t[2] || 'oth';
+      if (k === 'sym') { out.push({ s, k: 'sym' }); continue; }
+      const rd = String(t[1] || '') || (/^[\u3041-\u309f\u30a0-\u30ff]+$/.test(s) ? s : '');
+      const seg = { s, k };
+      if (rd) { seg.r = rd; seg.y = kanaRomaji(rd); }
+      if (t[3]) { seg.w = true; seg.b = t[3]; }
+      out.push(seg);
+    }
+    return out;
+  }
   /** 本机存的导入记录 → 和内置曲目同构的 track */
   function impTrack(rec) {
-    const lines = (rec.lines || []).map((l) => {
-      const segs = segsFor(l.text);
+    const lines = (rec.lines || []).map((l, i) => {
+      const compact = rec.segs && rec.segs[i];
+      const segs = (compact && compact.length) ? segsFromCompact(compact) : segsFor(l.text);
       return {
         t: l.t, text: l.text, zh: l.zh || '', jp: jpText(l.text), segs,
         romaji: segs.map((s) => s.y || s.s).join(' ').replace(/\s+/g, ' ').trim(),
@@ -873,7 +920,9 @@
         why = (e && e.message) || '接口不可用';
       }
       if (why) { fail.push({ nid, title, why, tr }); report(title, why, 'fail'); return; }
-      S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, plId: pid, plName: plName || '', at: Date.now() };
+      let segs = null;                       // 服务端 kuromoji 分词（失败就退回前端贪心匹配）
+      try { segs = (await segmentLines(lines.map((l) => l.text))).map(segsCompact); } catch {}
+      S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, segs, plId: pid, plName: plName || '', at: Date.now() };
       try { save(); } catch { delete S.imp['i' + nid]; quota = true; return; }
       ok.push({ nid, title });
       report(title, '', 'ok');
@@ -916,6 +965,31 @@
     const res = await importTracks(list, meta.name || '', pid, onStep);
     return Object.assign(res, { plName: meta.name || '', total: tracks.length, done: list.length, pid, kind: meta.type });
   }
+  /** 老记录补分词：以前导入的歌没有 segs（只有前端贪心匹配），后台慢慢补上服务端的 */
+  let segBackfilling = false;
+  async function backfillSegs() {
+    if (segBackfilling) return;
+    const need = Object.values(S.imp || {}).filter((r) => r && r.lines && r.lines.length && !(r.segs && r.segs.length));
+    if (!need.length) return;
+    segBackfilling = true;
+    let done = 0;
+    for (const rec of need.slice(0, 40)) {
+      try {
+        const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
+        rec.segs = segs;
+        const t = TRACK.get(rec.id);
+        if (t) { const nt = impTrack(rec); t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds; }
+        done++;
+      } catch { break; }        // 接口不可用就下次再说
+    }
+    segBackfilling = false;
+    if (!done) return;
+    save(); indexLibrary();
+    if (location.hash.startsWith('#/songs')) renderSongs();
+    if (location.hash.startsWith('#/learn')) renderLearn();
+    if (location.hash.startsWith('#/home')) renderHome();
+  }
+
   /** 导入 + 把新歌并进内存（供 UI 与测试用） */
   async function importInto(input, limit, onStep) {
     const res = await importFrom(input, limit, onStep);
@@ -1743,7 +1817,12 @@
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
     $('b-back').onclick = () => history.length > 1 ? history.back() : go('#/songs');
     $('p-title').textContent = t.title; $('p-artist').textContent = t.artist + ' · ' + t.album;
-    if (t.coverFile) $('mb-cover').src = 'data/' + t.coverFile; else $('mb-cover').removeAttribute('src');
+    const mbCover = $('mb-cover');
+    if (mbCover) {
+      const src = t.coverFile ? 'data/' + t.coverFile : (t.coverUrl || '');
+      if (src) { mbCover.src = src; mbCover.hidden = false; }
+      else { mbCover.removeAttribute('src'); mbCover.hidden = true; }
+    }
     setNow(t.title + ' — ' + t.artist);
     $('minibar').classList.add('on');
     $('srcinfo').textContent = describeSource(t);
@@ -1757,6 +1836,7 @@
     if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
     else {
       const p0 = (S.pos || {})[t.id];
+      playTrack(t);                                  // 点开就出声（不再让人再点一次「进入跟唱」）
       if (p0 > 5) { jump(p0); toast(`接着上次听：${fmt(p0)}`); }
     }
   }
@@ -1992,6 +2072,8 @@
     // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
     if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
     apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; saveAcc(); if (location.hash.startsWith('#/mine')) renderMine(); } }).catch(() => {});
+    // 老数据补分词：只补没有 segs 的（静默，慢一点没关系）；测试里不跑
+    if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
     if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {
       setTimeout(() => checkPlaylists({ silent: true }), 9000);

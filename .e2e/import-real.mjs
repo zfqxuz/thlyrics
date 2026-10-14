@@ -59,6 +59,19 @@ const t = await page.evaluate(() => ({ blocks: document.querySelectorAll('#plyri
 t.words = words;
 check('导入曲目有歌词/词汇', t.words > 0 && t.blocks > 0, `${t.blocks} 行歌词 · ${t.words} 词`);
 check('导入曲目能解析到可播地址（走后端）', /^https:/.test(t.src) && /music\.126\.net/.test(t.src), t.src.slice(0, 56));
+const qual = await page.evaluate(() => {
+  // 只看日语词（英文曲目 / ASCII 词本来就不该有罗马音）
+  const w = [...document.querySelectorAll('#plyric .w:not([data-plain])')]
+    .filter((x) => /[\u3041-\u30ff\u4e00-\u9fff]/.test(x.dataset.s || ''));
+  const withR = w.filter((x) => ((x.querySelector('.r') || {}).textContent || '').trim()).length;
+  const dict = w.filter((x) => x.dataset.w).length;
+  return { n: w.length, withR, pct: Math.round((withR / Math.max(1, w.length)) * 100), dict, dictPct: Math.round((dict / Math.max(1, w.length)) * 100),
+    cover: (document.getElementById('mb-cover') || {}).src || '', bar: document.getElementById('minibar').classList.contains('on') };
+});
+check('日语词逐词罗马音覆盖（服务端 kuromoji）', qual.n > 10 && qual.pct >= 95, `${qual.withR}/${qual.n} = ${qual.pct}%`);
+check('词表命中率（6423 词库 + 读音兜底）', qual.dictPct >= 50, `${qual.dict}/${qual.n} = ${qual.dictPct}% 的词能点开看释义`);
+check('迷你播放条显示专辑小图', qual.bar && /music\.126\.net/.test(qual.cover), qual.cover.slice(0, 56));
+check('点开曲目自动起播', qual.bar && !!t.src, '播放条已出现：' + qual.bar);
 
 await page.goto(BASE + '?probe=' + Date.now() + '3#/learn', { waitUntil: 'load' });
 await page.waitForTimeout(2500);

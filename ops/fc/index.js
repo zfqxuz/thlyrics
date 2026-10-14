@@ -9,6 +9,7 @@
  *   GET  /api/resolve   ?q=<链接/分享文案/数字ID>  网易云歌曲/专辑/歌单解析（含 163cn.tv 手机短链）
  *   GET  /api/audio     ?id=<歌曲id>&br=320        取可播地址（https，带 expi）
  *   GET  /api/lyric     ?id=<歌曲id>               取歌词 + 中文翻译
+ *   POST /api/segment   {lines:[...]}               kuromoji 分词（词性/读音/辞书形）
  *   POST /api/register  {name, pass}
  *   POST /api/login     {name, pass}
  *   GET  /api/me
@@ -18,6 +19,8 @@
  */
 const crypto = require('node:crypto');
 const https = require('node:https');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const ENV = process.env;
 const OSS_HOST = ENV.OSS_HOST || 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com';
@@ -31,7 +34,7 @@ const MAX_STORE = 12 * 1024 * 1024;    // 每个账号记录的存储上限
 
 // ─────────── OSS 读写（V1 签名，手写，避免打包依赖） ───────────
 const b64 = (b) => Buffer.from(b).toString('base64');
-function ossRequest(method, key, body, contentType) {
+function ossRequest(method, key, body, contentType, raw) {
   return new Promise((resolve, reject) => {
     const date = new Date().toUTCString();
     const md5 = body ? crypto.createHash('md5').update(body).digest('base64') : '';
@@ -49,7 +52,10 @@ function ossRequest(method, key, body, contentType) {
     }, (res) => {
       let buf = [];
       res.on('data', (d) => buf.push(d));
-      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(buf).toString('utf8') }));
+      res.on('end', () => {
+        const all = Buffer.concat(buf);
+        resolve({ status: res.statusCode, body: raw ? all : all.toString('utf8') });
+      });
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(new Error('oss timeout')); });
@@ -252,6 +258,33 @@ async function followShort(url) {
   return null;
 }
 
+// ─────────── 分词：kuromoji(IPADIC)。词典 18MB 放 OSS，冷启动拉到 /tmp 后复用 ───────────
+const KURO_DIR = '/tmp/kuromoji-dict';
+const KURO_PREFIX = 'kuromoji/dict/';
+const KURO_FILES = ['base.dat.gz', 'cc.dat.gz', 'check.dat.gz', 'tid.dat.gz', 'tid_map.dat.gz', 'tid_pos.dat.gz',
+  'unk.dat.gz', 'unk_char.dat.gz', 'unk_compat.dat.gz', 'unk_invoke.dat.gz', 'unk_map.dat.gz', 'unk_pos.dat.gz'];
+let TOKENIZER = null;
+
+async function ensureTokenizer() {
+  if (TOKENIZER) return TOKENIZER;
+  TOKENIZER = (async () => {
+    if (!fs.existsSync(KURO_DIR)) fs.mkdirSync(KURO_DIR, { recursive: true });
+    for (const f of KURO_FILES) {
+      const p = path.join(KURO_DIR, f);
+      if (fs.existsSync(p) && fs.statSync(p).size > 0) continue;
+      const r = await ossRequest('GET', KURO_PREFIX + f, null, null, true);
+      if (r.status !== 200) throw new Error('词典拉取失败 ' + f + '（' + r.status + '）');
+      fs.writeFileSync(p, r.body);
+    }
+    const kuromoji = require('./vendor/kuromoji');
+    return await new Promise((res, rej) => kuromoji.builder({ dicPath: KURO_DIR }).build((e, t) => (e ? rej(e) : res(t))));
+  })().catch((e) => { TOKENIZER = null; throw e; });
+  return TOKENIZER;
+}
+
+/** 片假名 → 平假名（读音显示用） */
+const toHira = (s) => String(s || '').replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
 const normTrack = (x) => ({
   id: x.id, name: x.name || '',
   ar: (x.ar || x.artists || []).map((a) => ({ name: a && a.name })).filter((a) => a.name),
@@ -329,6 +362,22 @@ exports.handler = async (event) => {
       return reply(req, 200, { ok: true, service: 'thlyrics-auth', version: 1, time: new Date().toISOString() });
     }
 
+
+    // 分词：导入的歌在入库时就分好（比前端贪心匹配准得多）
+    if (action === '/segment' && (method === 'POST' || method === 'GET')) {
+      let lines = body.lines;
+      if (!Array.isArray(lines) && q.lines) { try { lines = JSON.parse(String(q.lines)); } catch { lines = null; } }
+      if (!Array.isArray(lines) || !lines.length) return reply(req, 400, { error: '缺 lines' });
+      lines = lines.slice(0, 300).map((x) => String(x == null ? '' : x).slice(0, 400));
+      try {
+        const tk = await ensureTokenizer();
+        const segs = lines.map((text) => tk.tokenize(text)
+          .map((t) => [t.surface_form, t.basic_form && t.basic_form !== '*' ? t.basic_form : t.surface_form,
+            t.reading && t.reading !== '*' ? toHira(t.reading) : '', t.pos, t.pos_detail_1])
+          .filter((t) => String(t[0]).trim() !== ''));
+        return reply(req, 200, { ok: true, segs });
+      } catch (e) { return reply(req, 500, { error: '分词失败：' + String((e && e.message) || e) }); }
+    }
 
     // 音频直链 / 歌词：走自己的函数，前端不吃第三方限流和跨域（公开接口，不要求登录）
     if (action === '/audio') {

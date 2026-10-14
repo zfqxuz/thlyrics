@@ -14,11 +14,14 @@
  *   3. 词表里合并手工释义（meanings.json）
  */
 import fs from 'node:fs';
+import kuromoji from 'kuromoji';
+import { kanaToRomaji } from './kana-romaji.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = path.join(ROOT, 'data');
+const KURO_DICT = path.join(ROOT, 'node_modules', 'kuromoji', 'dict');
 const WEB_DATA = path.join(ROOT, 'docs', 'data');
 const AUDIO_DIR = path.join(DATA, 'audio');
 
@@ -55,6 +58,57 @@ function sim(a, b) {
   for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
     dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
   return 1 - dp[m][n] / Math.max(m, n);
+}
+
+// 《标日》词表里的 POS 名称 → 本站词性体系（前端 posKind 认这几个）
+const POS_NAME = (t) => {
+  if (!t) return '';
+  if (t.pos === '名詞') return t.pos_detail_1 === '形容動詞語幹' ? '形容動詞' : '名詞';
+  if (t.pos === '動詞') return '動詞';
+  if (t.pos === '形容詞') return '形容詞';
+  if (t.pos === '副詞') return '副詞';
+  if (t.pos === '助詞') return '助詞';
+  if (t.pos === '助動詞') return '助動詞';
+  if (t.pos === '接続詞') return '接続詞';
+  if (t.pos === '連体詞') return '連体詞';
+  if (t.pos === '感動詞') return '感動詞';
+  if (t.pos === '接頭詞') return '接頭詞';
+  return '';
+};
+
+/** 词库补充：把 data/biaori.json（5706 个带中文释义的《标日》词条）并进词表。
+ *  只补「词表里还没有」的词；词性用 kuromoji 猜，难度按标日课次排，JLPT 等级顺带标上。 */
+async function mergeBiaori(vocab, biaori, jlpt) {
+  const have = new Set();
+  for (const v of vocab) { have.add(v.word); if (v.reading) have.add(v.reading); }
+  const tk = await new Promise((res, rej) => kuromoji.builder({ dicPath: KURO_DICT }).build((e, t) => (e ? rej(e) : res(t))));
+  const seen = new Set();
+  let id = Math.max(...vocab.map((v) => v.id)) + 1, added = 0, withJl = 0;
+  const words = (biaori && biaori.words) || {};
+  const courses = (biaori && biaori.courses) || {};
+  const jl = (jlpt && jlpt.words) || {};
+  for (const w of Object.values(words)) {
+    const kana = String(w.kana || '').trim(), kn = String(w.kn || '').trim();
+    const word = kn || kana;
+    if (!word || !kana) continue;
+    const key = word + '|' + kana;
+    if (seen.has(key) || have.has(word) || have.has(kana)) continue;
+    seen.add(key); have.add(word); have.add(kana);
+    const toks = tk.tokenize(word).filter((t) => t.pos !== '記号' && t.surface_form.trim());
+    const t = toks[toks.length - 1] || toks[0] || null;
+    const c = Number(w.course) || 0;
+    const v = {
+      id: id++, word, reading: kana, romaji: kanaToRomaji(kana),
+      pos: POS_NAME(t), count: 0, tracks: [], meaning: String(w.zh || '').trim(), hasMeaning: !!w.zh,
+      br: c ? { c, bk: w.book || '', l: Number(w.lesson) || 0 } : null,
+      diff: c ? Math.round((c + (Number(w.lesson) || 0) / 1000) * 1000) / 1000 : 131,
+    };
+    const jw = jl[word] || jl[kana];
+    if (jw && jw.level) { v.jl = jw.level; withJl++; }
+    if (kana !== word) v.forms = { [kana]: { reading: kana, readingHira: kana, romaji: v.romaji, tracks: [] } };
+    vocab.push(v); added++;
+  }
+  return { added, withJl };
 }
 
 async function main() {
@@ -188,6 +242,16 @@ async function main() {
       (v.word.length === 1 && v.meaning.length > 4));
     if (bad) { v.meaningCheck = true; flagged++; }
     else v.hasMeaning = true;
+  }
+
+  // ---- 词库补充：并入《标日》词表（带中文释义 + 课次），让导入的歌有更多词能对上 ----
+  {
+    const biaori = readJson(path.join(DATA, 'biaori.json'), null);
+    const jlpt = readJson(path.join(DATA, 'jlpt.json'), null);
+    if (biaori && biaori.words) {
+      const r = await mergeBiaori(idx.vocab, biaori, jlpt);
+      console.log(`词库补充：《标日》并入 ${r.added} 词（其中 ${r.withJl} 词带 JLPT 等级）→ 共 ${idx.vocab.length} 词`);
+    }
   }
 
   // ---- 阿里云 OSS 音频直链（data/audio-oss.json）：有的话前端直接用它，跳过每次解析地址 ----

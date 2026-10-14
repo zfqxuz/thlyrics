@@ -391,3 +391,30 @@
   后端音频解析，走系统代理跑，因为浏览器要出网）。
 - 重建顺序：`node scripts/build-index.mjs --stats` → `node scripts/build-web.mjs --empty-lib`
   （`--covers` 不用再带，封面已删）。函数：`python3 ops/deploy-fc.py`。
+
+### 词库补充（1358→6423）+ 服务端 kuromoji 分词 + 点开即播 / 迷你条封面（2026-10-14 深夜，已上线）
+
+用户反馈三条：「点击曲目不会自动播放」「播放器专辑小图展示不出来」「词库是不是可以补充？感觉识别不准确」。
+
+- **点开就播**：`showTrack()` 里改成 `playTrack(t)`（之前只预解析，要再点一次「进入跟唱」）；
+  有上次播放位置的仍然 `jump(p0)`。
+- **迷你条封面**：`showTrack` 里原来只认内置曲目的 `coverFile`，导入曲目的 `coverUrl`（网易云图）
+  从没被设过 → 迷你条永远没图。现在两者都认，都没有就 `hidden`（不留空占位）。
+- **词库补充**：`data/biaori.json` 里躺着《标日》**5706 个去重词条（带中文释义 + 课次）**，
+  以前只用来给 1358 词打课次标签。现在 `build-web.mjs` 的 `mergeBiaori()` 把它们并进词表：
+  去重后并入 **5065 词**（词性用 kuromoji 猜、课次做难度 `diff = course + lesson/1000`、JLPT 顺带标），
+  `docs/data/index.json` 词表 **1358 → 6423**（文件 0.48MB → 2.0MB）。
+- **服务端分词**：新增 `POST /api/segment {lines:[…]}` → kuromoji(IPADIC) 的
+  `[表面形, 辞书形, 读音(平假名), 词性, 词性细分]`。理由：前端原来的「词表最长匹配 + Intl.Segmenter」
+  边界靠贪心猜，导入歌里常切错；kuromoji 是 Viterbi，且能给辞书形（活用形也能对回词表）。
+  - 词典 18MB 放 **OSS `kuromoji/dict/`**（`aliyun_oss_put_dir` 上传），FC 冷启动拉到 `/tmp/kuromoji-dict`
+    再复用（实测冷 2.0s / 热 0.13s）；kuromoji 的 JS 放 `ops/fc/vendor/`（含 async/doublearray/zlibjs/lodash），
+    zip 2.1MB。**FC 内存要从 256MB 提到 1024MB**（kuromoji 常驻约 400MB RSS）。
+  - ⚠️ 坑：`unk_char.dat.gz` 只有 306 字节，判断"词典已下载"不能用 `size > 500`（会无限重下）。
+  - 导入时存**紧凑分片** `rec.segs[i] = [[表面形, 读音, 词性码, 词表命中词], …]`，加载时 `segsFromCompact()`
+    还原（罗马音前端现推），避免把账号存储撑爆；接口挂了就退回 `segsFor()` 老路径。
+  - 老数据（已导入、没有 segs）由 `backfillSegs()` 在 boot 后 4s 静默补齐（一次最多 40 首），
+    测试里用 `window.__NO_BACKFILL` 关掉。
+  - `posKind()` 扩了 助詞/助動詞/接続詞/連体詞/感動詞/接頭詞/形容動詞，颜色沿用既有 `k-*` 类。
+- 实测（真网络）：日语词逐词罗马音覆盖 **98%**（英文/ASCII 词不算）；词表命中 56% 的日语 token
+  （其余多是助词/助动词，本来就不进学词表）。E2E 127/127。

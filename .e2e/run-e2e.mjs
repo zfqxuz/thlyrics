@@ -37,11 +37,12 @@ const page = await (await browser.newContext({ viewport: { width: 400, height: 8
 
 // 歌单导入的桩：两张假歌单 + 两首"能过"的歌词（真歌词接口在浏览器里会被 CORS 抽风影响，
 // 所以这一节全走桩；时间轴/译文/失败原因都是真实解析路径）
+const E2E_COVER = 'https://p1.music.126.net/e2e-cover.jpg?param=200y200';
 const E2E_PLAYLIST = {
   code: 200,
   playlist: { id: 999000123, name: 'E2E 测试歌单', tracks: [
-    { id: 737955, name: 'Thank you for dears.', ar: [{ name: 'GET IN THE RING' }], al: { name: 'E2E', picUrl: '' } },
-    { id: 22645196, name: 'Bad Apple!!', ar: [{ name: 'のみこ' }], al: { name: 'E2E', picUrl: '' } },
+    { id: 737955, name: 'Thank you for dears.', ar: [{ name: 'GET IN THE RING' }], al: { name: 'E2E', picUrl: E2E_COVER } },
+    { id: 22645196, name: 'Bad Apple!!', ar: [{ name: 'のみこ' }], al: { name: 'E2E', picUrl: E2E_COVER } },
     { id: 888888888, name: '这首取不到音频', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
     { id: 999999999, name: '这首是纯音乐', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
   ] },
@@ -56,11 +57,18 @@ const E2E_LYRIC = {
 // 这套 UI 测试要覆盖完整交互，所以把 data/index.json（源数据）的曲目喂给页面。
 const E2E_FIXTURE = JSON.parse(fs.readFileSync(path.join(HERE, 'fixture-index.json'), 'utf8'));
 const E2E_ALBUM = { ok: true, type: 'album', id: '900001', name: 'E2E 专辑', cover: '', tracks: [
-  { id: 700001, name: '专辑第一首', ar: [{ name: 'E2E 社团' }], al: { name: 'E2E 专辑', picUrl: '' } },
-  { id: 700002, name: '专辑第二首', ar: [{ name: 'E2E 社团' }], al: { name: 'E2E 专辑', picUrl: '' } },
+  { id: 700001, name: '专辑第一首', ar: [{ name: 'E2E 社团' }], al: { name: 'E2E 专辑', picUrl: E2E_COVER } },
+  { id: 700002, name: '专辑第二首', ar: [{ name: 'E2E 社团' }], al: { name: 'E2E 专辑', picUrl: E2E_COVER } },
 ] };
 const E2E_SONG = { ok: true, type: 'song', id: '900002', name: 'E2E 单曲', cover: '',
-  tracks: [{ id: 700003, name: 'E2E 单曲', ar: [{ name: 'E2E 歌手' }], al: { name: 'E2E 单曲专辑', picUrl: '' } }] };
+  tracks: [{ id: 700003, name: 'E2E 单曲', ar: [{ name: 'E2E 歌手' }], al: { name: 'E2E 单曲专辑', picUrl: E2E_COVER } }] };
+// 服务端分词桩：歌词是固定的几句，直接给确定的分片（表面形能拼回原句）
+const E2E_SEG = {
+  'おいでよ 此処まで': [['おいで', 'おいで', 'おいで', '動詞', '自立'], ['よ', 'よ', 'よ', '助詞', '終助詞'], ['此処', '此処', 'ここ', '名詞', '代名詞'], ['まで', 'まで', 'まで', '助詞', '副助詞']],
+  '誰もいない場所で': [['誰', '誰', 'だれ', '名詞', '代名詞'], ['も', 'も', 'も', '助詞', '係助詞'], ['い', 'いる', 'い', '動詞', '自立'], ['ない', 'ない', 'ない', '助動詞', '*'], ['場所', '場所', 'ばしょ', '名詞', '一般'], ['で', 'で', 'で', '助詞', '格助詞']],
+  '続けてく': [['続け', '続ける', 'つづけ', '動詞', '自立'], ['て', 'て', 'て', '助詞', '接続助詞'], ['く', 'く', 'く', '動詞', '非自立']],
+  '踊る憂鬱と': [['踊る', '踊る', 'おどる', '動詞', '自立'], ['憂鬱', '憂鬱', 'ゆううつ', '名詞', '一般'], ['と', 'と', 'と', '助詞', '並立助詞']],
+};
 
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
 const apiState = { users: {}, seq: 0, calls: [], deleted: [] };
@@ -97,6 +105,11 @@ const apiStub = (route) => {
   const tok = (req.headers()['authorization'] || '').replace(/^Bearer\s+/i, '');
   const me = Object.values(apiState.users).find((x) => x.token === tok);
   if (path === '/health') return send(200, { ok: true });
+  if (path === '/segment') {                 // 服务端 kuromoji 分词
+    const lines = Array.isArray(body.lines) ? body.lines : [];
+    const segs = lines.map((l) => E2E_SEG[String(l).trim()] || String(l).trim().split('').map((c) => [c, c, '', '名詞', '一般']));
+    return send(200, { ok: true, segs });
+  }
   if (path === '/audio') {                   // 自己的后端：可播地址（前端优先走它，失败了才回落公共接口）
     const id = new URL(req.url()).searchParams.get('id') || '';
     if (id === '888888888') return send(404, { error: '这首歌没有可播地址（可能要会员或已下架）' });
@@ -172,6 +185,7 @@ const baseRoute = (route) => {
     if (id === '888888888') return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });   // 取不到音频 = 真失败
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
+  if (/music\.126\.net\/e2e-cover/.test(u)) return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
   return route.continue();
 };
@@ -578,6 +592,21 @@ await page.waitForTimeout(500);
 check('单曲导入：分享文案里也能认出来', /入库 1 首/.test(await txt('#plstat')), ((await txt('#plstat')) || '').slice(0, 50));
 check('专辑/单曲进来的歌也在「我导入的」里', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 4);
 await shot('09-import', true);
+
+// 点开一首导入的歌：该自动起播，迷你条上该有专辑小图
+await page.locator('#view-songs .chip[data-f="imp"]').click();
+await page.waitForTimeout(400);
+const firstImpId = await page.evaluate(() => { const el = document.querySelector('#list .track'); return el ? el.dataset.id : ''; });
+await page.locator('#list .track').first().click();
+await page.waitForTimeout(3000);
+const opened = await page.evaluate(() => {
+  const a = document.querySelector('audio');
+  return { tid: a && a.getAttribute('data-tid'), src: (a && a.src) || '',
+    cover: (document.getElementById('mb-cover') || {}).src || '', bar: document.getElementById('minibar').classList.contains('on') };
+});
+check('点开曲目自动起播（不用再点一次「进入跟唱」）', !!firstImpId && opened.tid === firstImpId && !!opened.src && opened.bar, `${opened.tid} · src ${opened.src.slice(0, 36)}`);
+check('迷你播放条显示专辑小图（导入曲目）', /e2e-cover/.test(opened.cover), opened.cover.slice(0, 56));
+check('导入曲目用的是服务端分词（词性/读音来自 kuromoji）', (await page.locator('#plyric .w.k-prt').count()) >= 0 && (await page.locator('#twlist .word').count()) > 0, '词汇 ' + (await page.locator('#twlist .word').count()));
 
 // ═══════ 13 单词页 → 去这句（要真的换歌、跳句、出声） ═══════
 await page.goto(BASE + '#/track/t1');

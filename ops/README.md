@@ -25,6 +25,7 @@
 | GET | `/api/resolve` | `?q=<链接/分享文案/裸ID>` → `{type: playlist\|album\|song, id, name, cover, tracks[]}`；认网易云链接、**163cn.tv 手机短链**（服务端跟 302） |
 | GET | `/api/audio` | `?id=<歌曲id>&br=320` → `{url, br, size, expi}`（https 直链；无版权/下架 → 404） |
 | GET | `/api/lyric` | `?id=<歌曲id>` → `{lyric, tlyric}` |
+| POST | `/api/segment` | `{lines:[…]}` → kuromoji 分词 `{segs:[[[表面形,辞书形,读音,词性,细分]…]…]}`（词典在 OSS `kuromoji/dict/`，冷启动拉 /tmp） |
 | GET | `/api/admin/files?prefix=` | 管理员：列 OSS 对象（key/size/LastModified），prefix 一般是 `sync/` 或 `audio/` |
 | POST | `/api/admin/delete` | 管理员：`{key}` 删对象（只允许 `sync/` 或 `audio/` 前缀） |
 
