@@ -233,7 +233,7 @@ const baseRoute = (route) => {
     return route.fulfill({ status: 200, headers: { 'content-type': 'audio/wav', 'accept-ranges': 'bytes' }, body: buf });
   };
   if (/_test-tone-long\.wav/.test(u)) return wavRoute('test-tone-long.wav')(route);
-  if (/_test-tone\.wav/.test(u)) return wavRoute('test-tone.wav')(route);
+  if (/_test-tone\.wav/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/wav', body: fs.readFileSync(path.join(HERE, 'test-tone.wav')) });
   if (/music\.126\.net\/e2e-cover/.test(u)) return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
   return route.continue();
