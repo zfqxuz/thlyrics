@@ -79,6 +79,7 @@ async function main() {
 
     // ---- 歌词：把网易云的时间轴+翻译并进来 ----
     if (nm && nm.nid) {
+      let agreeRate = 0, jpLen = 0;         // 没缓存到网易云歌词时保持 0/0
       const cached = readJson(path.join(DATA, 'netease-lyrics', `${tr.id}.json`), null);
       if (cached && cached.lyric) {
         const jp = parseLrc(cached.lyric).filter((l) => l.text);
@@ -126,14 +127,22 @@ async function main() {
           checked++;
           if (jp.some((j) => sim(line.text, j.text) > 0.6)) agree++;
         }
-        const agreeRate = checked ? agree / checked : 0;
-        const good = agreeRate >= 0.45 && jp.length >= 6;
-        // 歌词对得上才挂音频，免得播错歌；对不上只标记不挂
-        if (good) tr.audio = { type: 'netease', nid: nm.nid };
-        else if (tr.audio && tr.audio.type === 'netease') tr.audio = null;
-        tr.netease = { nid: nm.nid, title: nm.nTitle, artist: nm.nArtist, album: nm.nAlbum, status: good ? (nm.status || 'ok') : 'mismatch', agreeRate: Math.round(agreeRate * 100) / 100 };
-        if (good) merged++;
+        agreeRate = checked ? agree / checked : 0;
+        jpLen = jp.length;
       }
+      // 挂音频的两个条件：
+      //   a. 网易云歌词和 THBWiki 歌词对得上（最稳）
+      //   b. 压根没缓存到网易云歌词，但**曲名+艺人核对得上** —— 以前这种一律不挂，
+      //      结果 44 首里 34 首完全没声，「单词页 → 去这句」点过去什么都放不出来
+      const titleHit = norm(tr.title) === norm(nm.nTitle) || sim(tr.title, nm.nTitle) >= 0.9;
+      const artistHit = !tr.artist || !nm.nArtist || sim(tr.artist, nm.nArtist) >= 0.6;
+      // 歌词级证据够多就信歌词；歌词太少（或压根没缓存到）时，退回曲名+艺人核对；
+      // 歌词很多但完全对不上 = 配错版本，绝不放音频
+      const good = (jpLen >= 6 && agreeRate >= 0.45) || (jpLen < 6 && titleHit && artistHit);
+      if (good) tr.audio = { type: 'netease', nid: nm.nid };
+      else if (tr.audio && tr.audio.type === 'netease') tr.audio = null;
+      tr.netease = { nid: nm.nid, title: nm.nTitle, artist: nm.nArtist, album: nm.nAlbum, status: good ? (nm.status || 'ok') : 'mismatch', agreeRate: Math.round(agreeRate * 100) / 100 };
+      if (good) merged++;
     }
 
     // THBWiki 自带的时间轴（部分曲目）
@@ -143,20 +152,27 @@ async function main() {
   // ---- 词表：合并释义（手工优先 > 机器翻译）+ 挂例句 ----
   const linesByWord = new Map();
   for (const tr of idx.tracks) {
+    const playable = !!(tr.audioOss || tr.audio);      // 有音频的曲目优先当例句，不然「去这句」点了放不出声
     for (const line of tr.lines) {
       if (!line.text) continue;
       for (const seg of line.segs || []) {
         if (!seg.w || !seg.b) continue;
         if (!linesByWord.has(seg.b)) linesByWord.set(seg.b, []);
         const arr = linesByWord.get(seg.b);
-        if (arr.length < 3) arr.push({ jp: line.text, zh: line.zh || '', track: tr.title, tid: tr.id, li: tr.lines.indexOf(line), t: line.t });
+        if (arr.length < 12) arr.push({ jp: line.text, zh: line.zh || '', track: tr.title, tid: tr.id, li: tr.lines.indexOf(line), t: line.t, playable });
       }
     }
   }
   let machine = 0, manual = 0, flagged = 0;
   for (const v of idx.vocab) {
-    const ex = linesByWord.get(v.word);
-    if (ex) v.examples = ex;
+    const all = linesByWord.get(v.word);
+    if (all) {
+      const withAudio = all.filter((x) => x.playable);
+      const rest = all.filter((x) => !x.playable);
+      v.examples = (withAudio.length ? withAudio.concat(rest) : all)
+        .slice(0, 3)
+        .map(({ playable, ...x }) => x);
+    }
     const auto = autoMeanings[v.word];
     const man = meanings[v.word];
     const mine = mineMeanings[v.word];

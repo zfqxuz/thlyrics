@@ -426,6 +426,46 @@ await page.waitForTimeout(500);
 check('导入的歌可以删掉', (await page.locator('#list .track').count()) === 1, (await page.locator('#list .track').count()) + ' 首');
 await shot('09-import', true);
 
+// ═══════ 13 单词页 → 去这句（要真的换歌、跳句、出声） ═══════
+await page.goto(BASE + '#/track/t1');
+await page.waitForTimeout(900);
+await page.locator('#playbtn').click();
+await page.waitForTimeout(1500);
+const wid = await page.evaluate(() => {
+  const el = [...document.querySelectorAll('#plyric .w[data-w]')].find((x) => x.dataset.w && window.__tlVid(x.dataset.w));
+  return el ? window.__tlVid(el.dataset.w) : '';
+});
+check('跟唱页能取到一个词（拿它去词条页）', !!wid, wid);
+await page.goto(BASE + '#/word/' + wid);
+await page.waitForTimeout(700);
+const firstEx = await page.locator('#view-word .item').first().textContent();
+check('词条页把「正在听」的那句排在最前', /正在听/.test(firstEx), firstEx.replace(/\s+/g, ' ').slice(0, 44));
+const gotoAttr = await page.locator('#view-word [data-goto]').first().getAttribute('data-goto');
+const [gtid, gli] = gotoAttr.split('@');
+await page.locator('#view-word [data-goto]').first().click();
+await page.waitForTimeout(3000);
+const jumped = await page.evaluate(() => {
+  const a = document.querySelector('audio');
+  const el = document.querySelector('#plyric .lblock.playing');
+  return { hash: location.hash, tid: a.getAttribute('data-tid'), src: !!a.src, paused: a.paused, open: document.querySelector('#player').classList.contains('on'), line: el ? Number(el.dataset.i) : -1 };
+});
+check('去这句：跳到对应那句', jumped.hash === `#/track/${gtid}@${gli}` && jumped.open && jumped.line === Number(gli), JSON.stringify(jumped));
+check('去这句：音频换成这首歌并开始播', jumped.tid === gtid && jumped.src && !jumped.paused, `tid=${jumped.tid} paused=${jumped.paused}`);
+await shot('10-goto', true);
+await page.locator('#p-close').click();
+await page.waitForTimeout(300);
+// 没有音频的曲目：要明确告诉用户，并给绑定入口
+const noAudioId = await page.evaluate(async () => {
+  const d = await (await fetch('data/index.json')).json();
+  const t = d.tracks.find((x) => !x.audioOss && !x.audio);
+  return t ? t.id : '';
+});
+await page.goto(BASE + '#/track/' + noAudioId);
+await page.waitForTimeout(800);
+await page.locator('#mb-meta').click();
+await page.waitForTimeout(500);
+check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
+
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 
 const okN = results.filter((r) => r.ok).length;

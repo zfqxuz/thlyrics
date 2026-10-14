@@ -90,6 +90,7 @@
     if (!local) { try { const b = await idbGet(track.id); if (b) local = URL.createObjectURL(b); } catch {} }
     if (my !== prepToken) return;
     const attach = (url) => {
+      if (audio.getAttribute('data-tid') === track.id && audio.src) return;   // 已经挂上这首了
       stationNid = null; seekTime = null;
       audio.setAttribute('data-tid', track.id);
       audio.src = url; audio.load();
@@ -100,7 +101,7 @@
     const hit = nid ? urlCache.get(String(nid)) : null;
     if (track.audioOss) { attach(track.audioOss); return; }
     if (hit && Date.now() - hit.at < URL_TTL) { stationNid = nid; if (eager) attach(hit.url); else setState('已就绪，点播放'); return; }
-    if (!nid) { setState('还没绑定音频'); return; }
+    if (!nid) { setState('还没有音频'); return; }
     setState('正在准备音频…');
     try {
       const url = await urlFor(track);
@@ -113,6 +114,7 @@
   async function playTrack(track, opts = {}) {
     if (!track) return;
     if (audio.getAttribute('data-tid') !== track.id || !audio.src) {
+      prepToken++;   // 让在飞的 prepAudio 作废，避免它随后 attach → load() 把刚起的播放重置
       audio.pause();
       setLoad(true, '正在准备音频…');
       try {
@@ -710,6 +712,7 @@
   }
   window.__tlImport = (input, limit) => importInto(input, limit);
   window.__tlSegs = (t) => segsFor(t);   // 测试用
+  window.__tlVid = (w) => (VBY.get(w) || {}).id;   // 测试用：词 → 词条 id
   /** 只重试上次失败的那几首（比如当时接口抽风） */
   async function retryFailed() {
     const ctx = impState.ctx;
@@ -906,7 +909,16 @@
     const at = order.findIndex((x) => x.id === v.id);
     const prev = at > 0 ? order[at - 1] : null, next = at >= 0 && at < order.length - 1 ? order[at + 1] : null;
     const forms = Object.entries(v.forms || {}).filter(([f]) => f !== v.word).slice(0, 8);
-    const exs = (v.examples || []).slice(0, 6);
+    // 当前正在听的这首（一般是导入的歌）里如果也有这个词，把那一句排到最前面 ——
+    // 内置曲库里只有 10 来首有音频，光看内置例句的话「去这句」经常点过去没声音
+    const localEx = (() => {
+      if (!curTrack) return null;
+      const i = curTrack.lines.findIndex((l) => (l.segs || []).some((sg) => sg.w && sg.b === v.word));
+      if (i < 0) return null;
+      const l = curTrack.lines[i];
+      return { jp: l.text, zh: l.zh || '', track: curTrack.title, tid: curTrack.id, li: i, now: true };
+    })();
+    const exs = [localEx, ...(v.examples || [])].filter(Boolean).slice(0, 6);
     $('view-word').innerHTML = `
       <div class="row" style="margin-bottom:14px">
         <button class="toolbtn" id="w-back">← 返回</button>
@@ -932,7 +944,7 @@
       <div class="list">${exs.length ? exs.map((ex) => `<div class="item" style="align-items:flex-start">
         <div class="col"><div class="l1" style="font-weight:400;font-size:14.5px;white-space:normal">${esc(ex.jp)}</div>
         ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${esc(ex.zh)}</div>` : ''}
-        <div class="l3">${esc(ex.track || '')}</div></div>
+        <div class="l3">${ex.now ? '正在听：' : ''}${esc(ex.track || '')}${(() => { const t = TRACK.get(ex.tid); return (t && (t.audioOss || t.audio || S.audio[t.id] || S.local[t.id])) ? '' : ' · 无音频'; })()}</div></div>
         ${ex.tid ? `<button class="toolbtn" data-goto="${ex.tid}@${ex.li}">去这句</button>` : ''}</div>`).join('') : '<div class="meta">词表里没给这个词配例句</div>'}</div>`;
     $('w-back').onclick = () => history.length > 1 ? history.back() : go('#/learn');
     $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.goWord)));
@@ -1149,6 +1161,7 @@
     $('minibar').classList.add('on');
     $('srcinfo').textContent = describeSource(t);
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
+    if ($('p-nosrc')) $('p-nosrc').hidden = !!(t.audioOss || t.audio || S.audio[t.id] || S.local[t.id]);
     activeLine = -1; loopLine = null;
     $('m-all').classList.toggle('on', mode === 'all');
     $('m-loop').classList.toggle('on', mode === 'loop');
@@ -1320,6 +1333,12 @@
       if (e.key === 'l' || e.key === 'L') $('p-loop').click();
       if (e.key === 'Escape') { $('player').classList.remove('on'); hidePop(); }
     });
+    $('p-nosrc').onclick = () => {
+      $('player').classList.remove('on');
+      const box = $('srcbox');
+      if (box) { box.open = true; box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      if ($('nidinput')) $('nidinput').focus();
+    };
     $('nidsave').onclick = () => {
       if (!curTrack) return;
       const m = $('nidinput').value.trim().match(/(\d{3,})/);
