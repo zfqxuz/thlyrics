@@ -50,15 +50,15 @@ button{background:none;border:0;cursor:pointer}
 .segs button{flex:1;height:38px;border-radius:11px;background:var(--surface);color:var(--ink3);font-size:13.5px;transition:.15s}
 .segs button.on{background:var(--surface2);color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 
-main{padding:var(--sp-3) var(--sp-4) 132px}
+main{padding:var(--sp-4) var(--sp-4) 140px}
 
 /* ── 通用排版 ── */
-.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:6px 0 2px}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--sp-3);margin:var(--sp-2) 0 2px}
 .sec-title{font-size:var(--fs-title);font-weight:650;letter-spacing:.01em}
 .sec-sub{font-size:var(--fs-meta);color:var(--ink3);margin-top:3px}
 .bar{height:3px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:9px}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
-.hair{height:1px;background:var(--line);margin:14px 0}
+.hair{height:1px;background:var(--line);margin:var(--sp-5) 0}
 .hint{font-size:11.5px;color:var(--ink3);margin-top:10px;line-height:1.7}
 .empty{padding:44px 8px;text-align:center;color:var(--ink3);font-size:13px}
 
@@ -79,7 +79,7 @@ main{padding:var(--sp-3) var(--sp-4) 132px}
 /* ── 导入网易云歌单 ── */
 .tick.del{color:#ff8a7a}
 .tick.del:hover{border-color:rgba(255,95,69,.5);background:var(--accent-soft)}
-.impbox{border:1px solid var(--line);border-radius:13px;padding:11px 14px;margin:2px 0 14px;background:var(--surface)}
+.impbox{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 var(--sp-4);margin:var(--sp-2) 0 var(--sp-4);background:none}
 .impbox summary{font-size:13px;color:var(--ink2);cursor:pointer;list-style:none}
 .impbox summary::-webkit-details-marker{display:none}
 .impbox summary::before{content:'＋ ';color:var(--ink3)}
@@ -128,8 +128,8 @@ main{padding:var(--sp-3) var(--sp-4) 132px}
 .gatecard .row{display:flex;gap:8px}
 .gatecard .row button{flex:1}
 .gatecard .gmsg{font-size:12px;color:var(--p-a);min-height:16px}
-.accbox{margin:10px 0 2px;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--surface)}
-.accbox.on{border-color:rgba(255,95,69,.45)}
+.accbox{margin:var(--sp-4) 0 var(--sp-2);padding:0 0 var(--sp-4);border-bottom:1px solid var(--line)}
+.accbox.on{border-bottom-color:rgba(212,80,60,.35)}
 .accbox .l1{font-size:14px;color:#ffe9df}
 .accbox .l2{font-size:11.5px;color:var(--ink2);line-height:1.55;margin-top:3px}
 .accbox .sel{height:38px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px}
@@ -140,9 +140,13 @@ main{padding:var(--sp-3) var(--sp-4) 132px}
 .btn-ghost{height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);color:var(--ink2);font-size:var(--fs-sub)}
 .btn-danger{height:34px;padding:0 12px;border-radius:11px;border:1px solid var(--danger-soft);color:#f0a294;font-size:var(--fs-meta)}
 
+/* ── 搜索/列表的分段标题 ── */
+.srhead{font-size:var(--fs-meta);color:var(--ink3);letter-spacing:.14em;margin:var(--sp-5) 0 var(--sp-1)}
+.srhead b{color:var(--ink2);font-weight:500;letter-spacing:0}
+
 /* ── 复习卡（生词本的学习闭环） ── */
 .revwrap{max-width:520px;margin:0 auto}
-.revcard{border:1px solid var(--line);border-radius:16px;padding:22px 18px;background:var(--surface);text-align:center;min-height:230px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+.revcard{padding:var(--sp-5) var(--sp-3);text-align:center;min-height:240px;display:flex;flex-direction:column;justify-content:center;gap:var(--sp-2)}
 .revcard .rw{font-size:34px;font-weight:700;letter-spacing:.02em}
 .revcard .rr{font-size:var(--fs-sub);color:var(--ink2)}
 .revcard .rm{font-size:var(--fs-title);color:var(--paper);margin-top:6px}
@@ -168,7 +172,7 @@ main{padding:var(--sp-3) var(--sp-4) 132px}
 .homesearch{display:flex;gap:8px;margin-top:12px}
 .homesearch input{flex:1;min-width:0;height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:var(--fs-body);outline:none}
 .homesearch button{width:64px;border-radius:12px;background:var(--accent);color:var(--paper);font-weight:600;font-size:var(--fs-sub)}
-.nowcard{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--surface)}
+.nowcard{padding:var(--sp-5) 0 var(--sp-4);border-bottom:1px solid var(--line)}
 .nowcard .k{font-size:var(--fs-meta);color:var(--ink3);letter-spacing:.14em;text-transform:uppercase}
 .nowcard .t{font-size:var(--fs-title);font-weight:650;margin-top:7px}
 .nowcard .a{font-size:var(--fs-sub);color:var(--ink2);margin-top:3px}
@@ -189,10 +193,10 @@ main{padding:var(--sp-3) var(--sp-4) 132px}
 .lblock:active{background:rgba(255,255,255,.03)}
 .lblock.playing{background:var(--accent-soft)}
 .lblock.playing::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--accent)}
-.line{font-size:16px;line-height:1.7;letter-spacing:.005em;min-height:2.35em;display:block}
+.line{font-size:17px;line-height:1.9;letter-spacing:.01em;min-height:2.35em;display:block}
 .line.en{color:var(--ink2);font-size:15px}
-.romaji{font-size:11.5px;color:var(--ink3);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px}
-.lblock .zh{font-size:12.5px;color:var(--ink2);margin-top:3px;padding-left:10px;border-left:2px solid rgba(255,95,69,.28)}
+.romaji{font-size:11px;color:var(--ink3);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px}
+.lblock .zh{font-size:13px;color:var(--ink2);margin-top:4px;padding-left:10px;border-left:2px solid rgba(212,80,60,.32)}
 .space{height:10px}
 .line .w{cursor:pointer;border-radius:4px;padding:0 1px;transition:background .12s}
 .line .w:active{background:rgba(255,255,255,.09)}
@@ -206,7 +210,7 @@ main{padding:var(--sp-3) var(--sp-4) 132px}
 /* 逐词罗马音（跟唱用）：罗马音在词上方，中文在词下方，日语居中 */
 body.ruby .line .w{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;
   text-align:center;max-width:9.5em;margin:0 1px;line-height:1.35}
-body.ruby .line .r{display:block;min-height:1.25em;font-size:9.5px;line-height:1.25;color:var(--ink3);
+body.ruby .line .r{display:block;min-height:1.3em;font-size:10.5px;line-height:1.3;color:var(--ink3);
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:400;white-space:nowrap}
 body.gloss .line .w{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;text-align:center;max-width:9.5em}
 body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--ink3);font-weight:400;white-space:normal;padding:0 2px}
@@ -380,10 +384,10 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
         <button id="m-all" class="on">整首</button>
         <button id="m-loop">单句循环</button>
       </div>
-      <button class="modechip" id="p-rate" title="倍速">1.0x</button>
-      <button class="modechip" id="b-display" title="显示设置">显示</button>
+      <button class="modechip" id="b-display" title="更多设置">⋯</button>
     </div>
     <div id="displaybox">
+      <div class="dr"><span>倍速</span><button id="p-rate">1.0x</button></div>
       <div class="dr"><span>词义（逐词中文）</span><button id="b-gloss">关</button></div>
       <div class="dr"><span>整句中文</span><button id="b-zh">开</button></div>
       <div class="dr"><span>逐词罗马音</span><button id="b-ruby">开</button></div>
@@ -409,6 +413,7 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
   <div id="p-morebox" hidden>
     <div class="mt" id="p-ex"></div>
+    <div id="p-exlist"></div>
     <div class="row" id="p-editrow" style="display:none;margin-top:10px">
       <input id="p-editinput" placeholder="写你自己的释义，回车保存">
     </div>
@@ -421,6 +426,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js?v=20261014o"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script src="app.js?v=20261014p"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

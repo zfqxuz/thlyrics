@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014o';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014p';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -382,7 +382,7 @@
         <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入歌单</button></div>
       </div>`}
       <div class="hair"></div>
-      <div class="sec-sub">今天可以从这几个词开始</div>
+      <div class="sec-sub">今天可以从这几个词开始 · 点一下直接跳到它出现的那句</div>
       <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">词表还没准备好</span>'}</div>`;
     const goHome = (h) => { location.hash = h; };
     $('h-go').onclick = () => { const q = ($('h-q').value || '').trim(); if (q) goHome('#/search/' + encodeURIComponent(q)); };
@@ -394,7 +394,13 @@
     if ($('h-continue')) $('h-continue').onclick = () => goHome('#/track/' + last.id);
     if ($('h-pick')) $('h-pick').onclick = () => goHome('#/songs');
     if ($('h-imp')) $('h-imp').onclick = () => { impState.open = true; goHome('#/songs'); };
-    $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => goHome('#/word/' + el.dataset.w)));
+    $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => {
+      // 点一个词 = 去它真正出现的那句（少一跳）
+      const v = VBYID.get(Number(el.dataset.w));
+      const ex = v && (v.examples || [])[0];
+      if (ex && ex.tid) { toast('从这一句开始'); goHome('#/track/' + ex.tid + '@' + (ex.li || 0)); }
+      else goHome('#/word/' + el.dataset.w);
+    }));
   }
   let homeQt = null;
 
@@ -1484,9 +1490,9 @@
     const r = searchAll(q.trim());
     $('view-search').innerHTML = `
       <div class="sec-head"><div><div class="sec-title">搜索「${esc(q)}」</div><div class="sec-sub">词 ${r.words.length} · 曲目 ${r.tracks.length} · 原曲 ${r.originals.length}</div></div></div>
-      ${r.words.length ? `<div class="hair"></div><div class="list">${r.words.map(wordRow).join('')}</div>` : ''}
-      ${r.tracks.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:4px">曲目</div><div class="list">${r.tracks.map(trackRow).join('')}</div>` : ''}
-      ${r.originals.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">原曲</div><div class="chips">${r.originals.map((o) => `<span class="chip" data-base="${esc(o.name)}">${esc(o.name)} · ${o.tracks.length}</span>`).join('')}</div>` : ''}
+      ${r.tracks.length ? `<div class="srhead">曲目 <b>${r.tracks.length}</b></div><div class="list">${r.tracks.map(trackRow).join('')}</div>` : ''}
+      ${r.words.length ? `<div class="srhead">词 <b>${r.words.length}</b></div><div class="list">${r.words.map(wordRow).join('')}</div>` : ''}
+      ${r.originals.length ? `<div class="srhead">原曲 <b>${r.originals.length}</b></div><div class="chips">${r.originals.map((o) => `<span class="chip" data-base="${esc(o.name)}">${esc(o.name)} · ${o.tracks.length}</span>`).join('')}</div>` : ''}
       ${!r.words.length && !r.tracks.length && !r.originals.length ? (() => {
         const hot = [...new Set(IDX.tracks.map((t) => t.artist).filter(Boolean))].slice(0, 6);
         return emptyBox(`没找到「${q.trim()}」`, '可以试试：社团名、原曲名、假名写法、或者中文释义。搜「东方」「幽閉」这类词也行。', [['e-sc', '清空搜索'], ['e-ssongs', '去曲库翻']]) +
@@ -1747,7 +1753,7 @@
     $('p-editrow').style.display = 'none';
     $('pop').classList.add('on');
   }
-  const hidePop = () => $('pop').classList.remove('on');
+  const hidePop = () => { const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; } $('pop').classList.remove('on'); };
 
   // ────────────── 路由 ──────────────
   const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-word', 'view-track', 'view-search', 'view-review'];
@@ -1870,9 +1876,22 @@
       go('#/track/' + ex.tid + '@' + ex.li);
     };
     $('p-lines').onclick = () => {
-      if (!popWord || !curTrack) return;
-      const ls = curTrack.lines.filter((l) => (l.segs || []).some((s) => s.w && s.b === popWord.word));
-      $('p-meta').textContent = ls.length ? ls.slice(0, 4).map((l) => l.text).join(' ／ ') : '这首歌里没找到它';
+      if (!popWord) return;
+      const box = $('p-exlist');
+      if (!box) return;
+      if (box.dataset.on === '1') { box.innerHTML = ''; box.dataset.on = '0'; return; }
+      const here = curTrack ? curTrack.lines.filter((l) => (l.segs || []).some((s) => s.w && s.b === popWord.word)).slice(0, 3) : [];
+      const others = (popWord.examples || []).slice(0, 5);
+      box.dataset.on = '1';
+      const row = (jp, zh, meta, cue) => `<div class="item" style="cursor:default">
+        <div class="col"><div class="l1" style="font-size:var(--fs-sub);font-weight:400;white-space:normal">${esc(jp)}</div>
+        ${zh ? `<div class="l2">${esc(zh)}</div>` : ''}${meta ? `<div class="l3">${esc(meta)}</div>` : ''}</div>
+        ${cue ? `<button class="toolbtn" data-cue="${esc(cue)}">去这句</button>` : ''}</div>`;
+      box.innerHTML =
+        (here.length ? `<div class="mt">正在听的这首里</div><div class="list">${here.map((l) => row(l.text, l.zh, '', curTrack.id + '@' + curLines.indexOf(l))).join('')}</div>` : '')
+        + (others.length ? `<div class="mt">其它曲目里</div><div class="list">${others.map((ex) => row(ex.jp, ex.zh, ex.track, ex.tid ? ex.tid + '@' + (ex.li || 0) : '')).join('')}</div>` : '')
+        + ((!here.length && !others.length) ? '<div class="mt">这个词还没配例句</div>' : '');
+      box.querySelectorAll('[data-cue]').forEach((el) => (el.onclick = () => { const [tid, li] = el.dataset.cue.split('@'); if (!tid) return; hidePop(); go('#/track/' + tid + '@' + li); }));
     };
     document.addEventListener('click', (e) => { if (!e.target.closest('#pop') && !e.target.closest('.w') && !e.target.closest('[data-known]')) hidePop(); });
     window.addEventListener('keydown', (e) => {

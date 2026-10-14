@@ -286,7 +286,7 @@ const rom = await page.evaluate(() => {
 check('罗马音改成逐词对齐（不再整行一串）', rom.ratio > 60 && rom.spaced, rom.ratio + '% 词带罗马音 · ' + rom.sample.slice(0, 3).join(' '));
 check('词级中文（实词下挂释义）', await page.locator('#plyric .g').count() > 5, (await page.locator('#plyric .g').count()) + ' 个');
 const g0 = await page.evaluate(() => document.body.classList.contains('gloss'));
-check('显示开关默认收起（不摊在页面上）', !(await page.locator('#displaybox').isVisible()) && (await txt('#b-display')) === '显示', await txt('#b-display'));
+check('显示开关默认收起（不摊在页面上）', !(await page.locator('#displaybox').isVisible()) && (await txt('#b-display')) === '⋯', await txt('#b-display'));
 await page.locator('#b-display').click();
 await page.waitForTimeout(250);
 check('点「显示」才展开三个开关，且状态写成开/关', await page.locator('#displaybox').isVisible() && /^(开|关)$/.test((await txt('#b-gloss')).trim()), `词义 ${await txt('#b-gloss')} · 中文 ${await txt('#b-zh')} · 罗马音 ${await txt('#b-ruby')}`);
@@ -353,9 +353,13 @@ check('全屏页可收起', await page.locator('#player.on').count() === 0);
 await page.locator('#mb-meta').click();
 await page.waitForTimeout(400);
 const r0 = await page.evaluate(() => document.querySelector('audio').playbackRate);
+await page.locator('#b-display').click();      // 倍速/显示都收在「⋯」抽屉里
+await page.waitForTimeout(250);
 await page.locator('#p-rate').click();
 const r1 = await page.evaluate(() => document.querySelector('audio').playbackRate);
 check('倍速切换生效', r0 !== r1, r0 + 'x → ' + r1 + 'x');
+await page.locator('#b-display').click();      // 收起抽屉
+await page.waitForTimeout(200);
 await page.locator('#m-loop').click();          // 单句循环现在只有播放条上那一个分段控件
 await page.waitForTimeout(200);
 const i0 = await idxOf();
@@ -644,6 +648,35 @@ await page.locator('#rev-ok').click();
 await page.waitForTimeout(600);
 const knownAfter = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').known || {}).filter((k) => JSON.parse(localStorage.getItem('thlyrics.tool.v1')).known[k] > 0).length);
 check('复习：点「记住了」会标已掌握并进下一个', knownAfter === knownBefore + 1, `${knownBefore} → ${knownAfter} 个已掌握 · 上一个词 ${revWord}`);
+
+// 首页点一个词：直接去它出现的那句
+await page.goto(BASE + '?hw=1#/home', { waitUntil: 'load' });
+await page.waitForSelector('#view-home .wordstrip button', { timeout: 15000 });
+await page.locator('#view-home .wordstrip button').first().click();
+await page.waitForTimeout(1200);
+const homeJump = await page.evaluate(() => location.hash);
+check('首页点「今天这几个词」直接跳到它出现的那句', /^#\/track\/\w+@\d+$/.test(homeJump), homeJump);
+await page.waitForTimeout(1200);
+
+// 词卡：例句就地展开（不再把文字塞进 meta）
+const someWord = page.locator('#plyric .lblock.playing .w').first();
+if (await someWord.count()) {
+  await someWord.click();
+  await page.waitForTimeout(500);
+}
+if (await page.locator('#pop.on').count()) {
+  await page.locator('#p-more').click();
+  await page.waitForTimeout(250);
+  await page.locator('#p-lines').click();
+  await page.waitForTimeout(400);
+  const exRows = await page.locator('#p-exlist .item').count();
+  const stillPop = await page.locator('#pop.on').count();
+  check('词卡里「出现的句子」就地展开（不跳页）', exRows > 0 && stillPop === 1, `${exRows} 条例句 · 词卡还开着`);
+  await page.locator('#p-close2').click();
+  await page.waitForTimeout(300);
+} else {
+  check('词卡里「出现的句子」就地展开（不跳页）', false, '没能打开词卡');
+}
 
 // 手机窄屏：不横向溢出
 await page.setViewportSize({ width: 320, height: 720 });
