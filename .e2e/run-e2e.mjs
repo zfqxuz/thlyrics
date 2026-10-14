@@ -46,7 +46,9 @@ const E2E_PLAYLIST = {
   ] },
 };
 const E2E_LYRIC = {
-  lyric: '[00:00.00] 作词 : E2E\n[00:00.50] 作曲 : E2E\n[00:01.00] おいでよ　此処まで\n[00:02.50]\n[00:03.00] 誰もいない場所で気ままに\n[00:05.00] 踊る憂鬱と\n',
+  lyric: '[00:00.00] 作词 : E2E\n[00:00.50] ► 编曲：E2E\n[00:01.00] おいでよ　此処まで\n'
+    + '[00:02.00] ★★★\n[00:02.50]\n[00:03.00] ►►誰もいない場所で◄◄\n'
+    + '[00:04.00] 続\n[00:04.60] け\n[00:05.20] て\n[00:05.80] く\n[00:06.50] 踊る憂鬱と\n',
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
 const baseRoute = (route) => {
@@ -335,6 +337,30 @@ check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSO
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(300);
 check('「我导入的」能筛出 2 首', (await page.locator('#list .track').count()) === 2);
+// 曲库内的搜索框 + 按社团/专辑分组
+await page.locator('#view-songs .chip[data-f="all"]').click();
+await page.waitForTimeout(250);
+const allN = await page.locator('#list .track').count();
+await page.locator('#qs').fill('IOSYS');
+await page.waitForTimeout(350);
+const qN = await page.locator('#list .track').count();
+check('曲库内搜索能过滤（曲名/社团/专辑）', qN > 0 && qN < allN, `全部 ${allN} → 搜 IOSYS ${qN}`);
+await page.locator('#qs').fill('');
+await page.waitForTimeout(300);
+await page.locator('#view-songs .segtext button[data-v="artist"]').click();
+await page.waitForTimeout(350);
+const grpN = await page.locator('#view-songs .grp').count();
+check('可以按社团分组', grpN > 5, grpN + ' 个社团');
+await page.locator('#view-songs .grp').first().locator('summary').click();
+await page.waitForTimeout(250);
+check('分组能展开看曲目', (await page.locator('#view-songs .grp').first().locator('.track').count()) > 0);
+await page.locator('#view-songs .segtext button[data-v="album"]').click();
+await page.waitForTimeout(350);
+check('可以按专辑分组', (await page.locator('#view-songs .grp').count()) > 5, (await page.locator('#view-songs .grp').count()) + ' 张专辑');
+await page.locator('#view-songs .segtext button[data-v="list"]').click();
+await page.waitForTimeout(250);
+await page.locator('#view-songs .chip[data-f="imp"]').click();
+await page.waitForTimeout(300);
 await page.locator('#list .track').first().click();
 await page.waitForTimeout(700);
 const impHead = await page.locator('#view-track .l3').first().textContent();
@@ -343,7 +369,7 @@ check('导入曲目也用现有词表分词（有词汇列表）', (await page.l
 await page.locator('#t-sing').click();
 await page.waitForTimeout(1600);
 const impPly = await page.evaluate(() => {
-  const w = [...document.querySelectorAll('#plyric .w')];
+  const w = [...document.querySelectorAll('#plyric .w:not([data-plain])')];
   const withR = w.filter((x) => (x.querySelector('.r') || {}).textContent?.trim()).length;
   return { blocks: document.querySelectorAll('#plyric .lblock').length, w: w.length, withR, pct: Math.round(withR / Math.max(1, w.length) * 100) };
 });
@@ -351,6 +377,20 @@ check('导入曲目能进跟唱页（歌词块 + 逐词罗马音）', impPly.blo
 check('导入曲目逐词罗马音覆盖 ≥90%', impPly.pct >= 90, impPly.pct + '%（词表 + 读音兜底表）');
 const stampLeak = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock .line')].filter((e) => /^\[\d+:\d+/.test(e.textContent)).length);
 check('歌词行不带时间戳残留（空时间戳行不再吃掉下一行）', stampLeak === 0, stampLeak + ' 行');
+const symLeak = await page.evaluate(() => {
+  // 每行的"日文原文"= 各片段的 data-s 拼起来（textContent 里混着罗马音和释义，不能直接比）
+  const raw = [...document.querySelectorAll('#plyric .lblock .line')].map((line) => [...line.children].map((sp) => sp.dataset.s != null ? sp.dataset.s : sp.textContent).join(''));
+  return {
+    bad: raw.filter((t) => /[★☆♪♫►◄✦✧◆◇]/.test(t)).length,
+    texts: raw,
+    merged: raw.includes('続けてく'),
+    meta: raw.some((t) => /编曲|作词/.test(t)),
+  };
+});
+check('装饰符号/纯符号行被清掉（不留 ★ ► 之类）', symLeak.bad === 0, symLeak.texts.join(' | ').slice(0, 70));
+check('夹在歌词里的 ►◄ 被剥掉、元信息行被丢掉', !symLeak.meta && symLeak.texts.includes('誰もいない場所で'), symLeak.texts.join(' | ').slice(0, 60));
+check('逐字分行的 LRC 并回一句（続/け/て/く → 続けてく）', symLeak.merged, symLeak.texts.join(' | ').slice(0, 50));
+check('导入失败给出「重试」入口', (await page.locator('#plretry').count()) === 1, await page.locator('#plretry').textContent().catch(() => ''));
 // 同一句里，有读音的词、没读音的词、标点，日文那一行必须在同一高度上（否则就是"一上一下"）
 const align = await page.evaluate(() => {
   const spreads = [];
@@ -362,8 +402,14 @@ const align = await page.evaluate(() => {
       if (!node) return null;
       const rg = document.createRange(); rg.selectNodeContents(node);
       return rg.getBoundingClientRect().top;
-    }).filter((x) => x != null);
-    if (tops.length > 1) spreads.push(Math.max(...tops) - Math.min(...tops));
+    }).filter((x) => x != null).sort((a, b) => a - b);
+    // 长句会折行 → 先按「视觉行」聚类（同一行内 top 差 < 6px），再逐行检查对齐
+    const rows = [];
+    for (const t of tops) {
+      const last = rows[rows.length - 1];
+      if (last && t - last[0] < 6) last.push(t); else rows.push([t]);
+    }
+    for (const r of rows) if (r.length > 1) spreads.push(Math.max(...r) - Math.min(...r));
   }
   return { lines: spreads.length, max: Math.round(Math.max(...spreads) * 10) / 10 };
 });

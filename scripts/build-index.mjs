@@ -589,8 +589,10 @@ async function main() {
         v.count++;
         if (v.tracks[v.tracks.length - 1] !== id) v.tracks.push(id);
         const fk = seg.s;
-        const fReading = seg.l || seg.r || '';
-        if (!v.forms[fk]) v.forms[fk] = { reading: seg.r || '', readingHira: seg.l || '', romaji: fReading ? kanaToRomaji(fReading) : '', tracks: [id] };
+        // 活用形的读音一律用「表面形读音」(seg.r)：seg.l 是词条形读音，
+        // 会写出 咲い→さう / 見→む / 続け→つづける 这种错的（跟唱要用实际唱出来的音）
+        const fReading = seg.r || seg.l || '';
+        if (!v.forms[fk]) v.forms[fk] = { reading: seg.r || '', readingHira: fReading ? toHira(fReading) : '', romaji: fReading ? kanaToRomaji(fReading) : '', tracks: [id] };
         else if (!v.forms[fk].tracks.includes(id)) v.forms[fk].tracks.push(id);
       }
     }

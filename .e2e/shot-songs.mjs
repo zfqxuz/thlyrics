@@ -1,0 +1,17 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs'; import path from 'node:path';
+const HOME=process.env.HOME||'/home/zfq'; const root=HOME+'/.cache/ms-playwright';
+const dirs=fs.readdirSync(root).filter(d=>d.startsWith('chromium_headless_shell-')).sort();
+const chrome=path.join(root,dirs[dirs.length-1],'chrome-headless-shell-linux64','chrome-headless-shell');
+const HERE='/home/zfq/qqbot/thlyrics/.e2e';
+const libPath=['root/usr/lib/x86_64-linux-gnu','root/lib/x86_64-linux-gnu','root/usr/lib','root/lib'].map(p=>path.join(HERE,p)).join(':');
+const b=await chromium.launch({executablePath:chrome,args:['--no-sandbox'],env:{...process.env,LD_LIBRARY_PATH:libPath}});
+const page=await b.newPage({viewport:{width:400,height:850},isMobile:true,hasTouch:true,deviceScaleFactor:2});
+await page.goto('http://127.0.0.1:8848/#/songs',{waitUntil:'domcontentloaded'});
+await page.waitForTimeout(900);
+await page.locator('#view-songs .segtext button[data-v="artist"]').click();
+await page.waitForTimeout(400);
+await page.locator('#view-songs .grp').first().locator('summary').click();
+await page.waitForTimeout(300);
+await page.screenshot({path:'/tmp/shot-songs-group.png'});
+await b.close();

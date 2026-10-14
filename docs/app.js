@@ -523,9 +523,12 @@
         continue;
       }
       const f = hit.v.forms && hit.v.forms[hit.form];
+      // 活用形的罗马音一律按它的「表面形读音」推（続け→tsuzuke、咲い→sai），
+      // 不能用 forms[].romaji —— 那个字段历史上存的是词条形读音
+      const rd = (f && f.reading) || hit.v.reading || '';
       out.push({
         s: surf, k: posKind(hit.v), w: true, b: hit.v.word,
-        y: (f && f.romaji) || hit.v.romaji || '', r: (f && f.reading) || hit.v.reading || '',
+        y: rd ? kanaRomaji(rd) : (f && f.romaji) || hit.v.romaji || '', r: rd,
       });
       i += len;
     }
@@ -551,7 +554,9 @@
       vocabIds: [...ids].map((w) => VBY.get(w)).filter(Boolean).map((v) => v.id), lines,
     };
   }
-  const LRC_META = /^\s*(作词|作曲|编曲|制作人|混音|母带|吉他|贝斯|鼓|录音|和声|歌词来源|校对|翻译|调校|曲绘|PV|原曲|社团|专辑|演唱|Vocals|Lyrics|Composer|Arranger|Album|Producer)\s*[:：]/i;
+  const LRC_META = /^\s*(作词|作詞|作曲|编曲|編曲|制作人|製作人|混音|母带|母帶|吉他|贝斯|鼓|录音|和声|和聲|歌词来源|歌詞來源|校对|翻譯|翻译|调校|調教|曲绘|曲繪|PV|原曲|原作曲|原作|社团|社團|专辑|專輯|演唱|歌手|来自|來自|出典|收录|收錄|封面|插图|插圖|LRC|歌词|歌詞|Vocals|Lyrics|Composer|Arranger|Album|Producer|Mixing|Mastering)\s*[:：]/i;
+  // 歌词里常见的装饰性符号（跟唱时没用、还会把行搞得乱七八糟）
+  const LRC_DECO = /[♪♫♬♩►◄★☆✦✧✩✪✫✬✭✮❀✿❁❃❋◇◆◈○●◎■□▲△▼▽※→←↑↓⇔⇒⌒〓۩۞๑๑۩〄〆々]+/g;
   /** LRC → 行数组（只保留唱出来的行；翻译按时间就近配对） */
   function parseLrc(lyric, tlyric) {
     // 注意：[\d] 后面只能用 [ \t]*，用 \s* 会把换行也吃进去 —— 空时间戳行（[00:26.000]）
@@ -561,18 +566,42 @@
         t: Number(m[1]) * 60 + Number(String(m[2]).replace(':', '.')),
         text: m[3].replace(/^(\s*\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\])+\s*/, '').trim(),
       }));
-    const trs = rows(tlyric).filter((r) => r.text).map((r) => ({ t: r.t, text: r.text, used: false }));
+    const trs = rows(tlyric)
+      .map((r) => ({ t: r.t, text: r.text.replace(LRC_DECO, '').trim(), used: false }))
+      .filter((r) => r.text);
     const out = [];
     for (const r of rows(lyric)) {
-      if (!r.text || LRC_META.test(r.text) || /歌词来源|THB\s?WIKI|纯音乐/i.test(r.text)) continue;
+      // 装饰符号去掉；去掉之后没有语言字符（假名/汉字/英数）的整行不要
+      const clean = r.text.replace(LRC_DECO, '').replace(/\s+/g, ' ').trim();
+      if (!clean || !/[\u3041-\u309f\u30a0-\u30ff\u4e00-\u9fffA-Za-z0-9]/.test(clean)) continue;
+      if (LRC_META.test(clean) || /歌词来源|THB\s?WIKI|纯音乐/i.test(clean)) continue;
       const hit = trs.find((x) => !x.used && Math.abs(x.t - r.t) < .35);
       if (hit) hit.used = true;
-      out.push({ t: Math.round(r.t * 100) / 100, text: r.text, zh: hit ? hit.text : '' });
+      out.push({ t: Math.round(r.t * 100) / 100, text: clean, zh: hit ? hit.text.replace(LRC_DECO, '').trim() : '' });
     }
     out.sort((a, b) => a.t - b.t);
     const seen = new Set();
-    return out.filter((l) => (seen.has(l.t) ? false : (seen.add(l.t), true)));
+    const uniq = out.filter((l) => (seen.has(l.t) ? false : (seen.add(l.t), true)));
+    return mergeShortLines(uniq);
   }
+  /** 有的 LRC 是逐字/逐拍一行一行的（唱到哪标到哪），跟唱时一行一个字很碎。
+   *  把「连续几个都很短、且间隔很近」的行并回一句。 */
+  function mergeShortLines(lines) {
+    const vis = (s) => s.replace(/\s/g, '').length;
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      let cur = Object.assign({}, lines[i]);
+      while (i + 1 < lines.length && vis(lines[i].text) <= 2 && vis(lines[i + 1].text) <= 2 && (lines[i + 1].t - lines[i].t) <= 1.3) {
+        const nx = lines[i + 1];
+        cur.text += nx.text;
+        if (nx.zh && (!cur.zh || cur.zh !== nx.zh)) cur.zh = cur.zh ? cur.zh + ' ' + nx.zh : nx.zh;
+        i++;
+      }
+      out.push(cur);
+    }
+    return out;
+  }
+
   // 这个中转站偶尔会抽风（限流 / 少 CORS 头），所以网络层失败重试两次
   async function gdJson(q, tries = 3) {
     let lastErr = null;
@@ -616,17 +645,8 @@
     return { error: `短链里没有歌单 ID。点开链接，把地址栏里 id= 后面的数字填进来` };
   }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
-  async function importPlaylist(input, limit, onStep) {
-    const rid = await resolvePlaylistId(input);
-    if (rid.error) return { error: rid.error };
-    const pid = rid.id;
-    let pl = null;
-    try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
-    catch { return { error: '拉取歌单失败（接口超时或暂时不可用）' }; }
-    if (!pl) return { error: '歌单不存在或读不到' };
-    const all = (pl.tracks || []).filter((x) => x && x.id);
-    if (!all.length) return { error: '这张歌单里没有歌' };
-    const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all;   // 默认整张歌单
+  /** 逐首导入（首次导入和「重试失败」都走这里） */
+  async function importTracks(list, plName, pid, onStep) {
     const ok = [], fail = [], skip = [];
     let done = 0, quota = false;
     const report = (title, mark, kind) => { done++; if (onStep) onStep(done, list.length, title, mark, kind); };
@@ -656,8 +676,8 @@
       } catch (e) {
         why = (e && e.message) || '接口不可用';
       }
-      if (why) { fail.push({ nid, title, why }); report(title, why, 'fail'); return; }
-      S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, plId: pid, plName: pl.name || '', at: Date.now() };
+      if (why) { fail.push({ nid, title, why, tr }); report(title, why, 'fail'); return; }
+      S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, plId: pid, plName: plName || '', at: Date.now() };
       try { save(); } catch { delete S.imp['i' + nid]; quota = true; return; }
       ok.push({ nid, title });
       report(title, '', 'ok');
@@ -666,7 +686,21 @@
     await Promise.all([0, 1, 2, 3].map(async () => {
       while (queue.length && !quota) { const tr = queue.shift(); await one(tr); }
     }));
-    return { ok, fail, skip, quota, plName: pl.name || '', total: all.length, done: list.length };
+    return { ok, fail, skip, quota };
+  }
+  async function importPlaylist(input, limit, onStep) {
+    const rid = await resolvePlaylistId(input);
+    if (rid.error) return { error: rid.error };
+    const pid = rid.id;
+    let pl = null;
+    try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
+    catch { return { error: '拉取歌单失败（接口超时或暂时不可用）' }; }
+    if (!pl) return { error: '歌单不存在或读不到' };
+    const all = (pl.tracks || []).filter((x) => x && x.id);
+    if (!all.length) return { error: '这张歌单里没有歌' };
+    const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all;   // 默认整张歌单
+    const res = await importTracks(list, pl.name || '', pid, onStep);
+    return Object.assign(res, { plName: pl.name || '', total: all.length, done: list.length, pid });
   }
   /** 导入 + 把新歌并进内存（供 UI 与测试用） */
   async function importInto(input, limit, onStep) {
@@ -676,6 +710,32 @@
   }
   window.__tlImport = (input, limit) => importInto(input, limit);
   window.__tlSegs = (t) => segsFor(t);   // 测试用
+  /** 只重试上次失败的那几首（比如当时接口抽风） */
+  async function retryFailed() {
+    const ctx = impState.ctx;
+    if (!ctx || !ctx.list.length || importing) return;
+    importing = true;
+    impState.fails = []; impState.failsRaw = [];
+    const stat = $('plstat');
+    if ($('plgo')) $('plgo').disabled = true;
+    if ($('pllist')) $('pllist').innerHTML = '';
+    if (stat) stat.textContent = `重试 ${ctx.list.length} 首…`;
+    const res = await importTracks(ctx.list, ctx.plName, ctx.pid, (n, total, title, mark, kind) => {
+      if (kind === 'fail') { impState.fails.push({ title, mark }); if ($('pllist')) $('pllist').innerHTML = impRowsHtml(); }
+      if (stat) stat.textContent = `重试 ${n}/${total}…`;
+    });
+    importing = false;
+    if ($('plgo')) $('plgo').disabled = false;
+    for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+    impState.ctx = res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: ctx.plName, pid: ctx.pid } : null;
+    const bits = [`这次补上 ${res.ok.length} 首`];
+    if (res.drop || res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
+    if (res.fail.length) bits.push(`还差 ${res.fail.length} 首`);
+    renderSongs();
+    if ($('plstat')) $('plstat').textContent = bits.join(' · ');
+    if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
+    toast(res.ok.length ? `补上 ${res.ok.length} 首` : '还是没成功');
+  }
   function impPlaylists() {
     const m = new Map();
     for (const rec of Object.values(S.imp || {})) {
@@ -698,9 +758,10 @@
   }
   function impRowsHtml() {
     if (!impState.fails.length) return '';
-    return `<div class="implog">${impState.fails.map((x) => `<div class="improw bad">✗ <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`;
+    return `<div class="implog">${impState.fails.map((x) => `<div class="improw bad">✗ <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`
+      + `<div class="row" style="margin-top:8px"><button class="toolbtn" id="plretry">重试失败的 ${impState.fails.length} 首</button></div>`;
   }
-  const impState = { fails: [], msg: '' };
+  const impState = { fails: [], failsRaw: [], ctx: null, msg: '' };
   async function startImport() {
     if (importing) return;
     const input = $('plinput') ? $('plinput').value : '';
@@ -722,6 +783,7 @@
     if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首（纯音乐／没有歌词／曲库已有）`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
     impState.msg = `${res.plName} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
+    impState.ctx = res.fail && res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: res.plName, pid: res.pid } : null;
     renderSongs();
     if ($('plstat')) $('plstat').textContent = impState.msg;
     if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
@@ -729,7 +791,23 @@
     else toast('没有可导入的歌');
   }
 
+  let songQ = '', songView = 'list';
+  /** 按社团/专辑分组（原生 details 折叠，不用额外状态） */
+  function groupsHtml(list) {
+    const key = songView === 'artist' ? 'artist' : 'album';
+    const m = new Map();
+    for (const t of list) {
+      const k = (t[key] || (key === 'artist' ? '未知社团' : '未知专辑')).trim() || '未知';
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(t);
+    }
+    return [...m.entries()]
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], 'ja'))
+      .map(([k, arr]) => `<details class="grp"><summary>${esc(k)}<span class="meta">${arr.length} 首</span></summary>
+        <div class="list">${arr.map(trackRow).join('')}</div></details>`).join('');
+  }
   function renderSongs() {
+    const nq = norm(songQ.trim());
     const list = IDX.tracks.filter((t) => {
       if (filter === 'audio' && !(t.audioOss || t.audio || S.audio[t.id] || S.local[t.id])) return false;
       if (filter === 'imp' && !t.imp) return false;
@@ -738,10 +816,21 @@
         const k = (t.vocabIds || []).filter((i) => S.known[i]).length;
         if (t.vocabIds && t.vocabIds.length && k / t.vocabIds.length > .8) return false;
       }
+      if (nq && !norm(`${t.title} ${t.artist} ${t.album} ${t.plName || ''}`).includes(nq)) return false;
       return true;
     });
     $('view-songs').innerHTML = `
-      <div class="sec-head"><div><div class="sec-title">曲库</div><div class="sec-sub">${IDX.tracks.length} 首 · 显示 ${list.length} 首</div></div></div>
+      <div class="sec-head">
+        <div><div class="sec-title">曲库</div><div class="sec-sub">${IDX.tracks.length} 首 · 显示 ${list.length} 首</div></div>
+        <div class="segtext">
+          <button class="${songView === 'list' ? 'on' : ''}" data-v="list">列表</button>
+          <button class="${songView === 'artist' ? 'on' : ''}" data-v="artist">社团</button>
+          <button class="${songView === 'album' ? 'on' : ''}" data-v="album">专辑</button>
+        </div>
+      </div>
+      <div class="row" style="margin:2px 0 0">
+        <input id="qs" class="sel" style="flex:1;min-width:150px;height:34px" placeholder="搜曲名 / 社团 / 专辑" value="${esc(songQ)}">
+      </div>
       <div class="chips">
         <button class="chip ${filter === 'all' ? 'on' : ''}" data-f="all">全部</button>
         <button class="chip ${filter === 'audio' ? 'on' : ''}" data-f="audio">有音频</button>
@@ -759,14 +848,25 @@
         <div id="pllist">${impRowsHtml()}</div>
         ${impPlaylists().length ? `<div class="meta" style="margin-top:10px">已导入：${impPlaylists().map((p) => `${esc(p.name)}（${p.n} 首）`).join('、')}</div>` : ''}
       </details>
-      <div class="list" id="list">${list.map(trackRow).join('') || '<div class="empty">没有匹配的曲目</div>'}</div>`;
-    $('view-songs').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
+      ${songView === 'list'
+        ? `<div class="list" id="list">${list.map(trackRow).join('') || '<div class="empty">没有匹配的曲目</div>'}</div>`
+        : (groupsHtml(list) || '<div class="empty">没有匹配的曲目</div>')}`;
+    $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
+    $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; renderSongs(); }));
+    if ($('qs')) $('qs').oninput = (e) => {
+      songQ = e.target.value;
+      const pos = e.target.selectionStart;
+      renderSongs();
+      const n = $('qs');
+      if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch {} }
+    };
     $('view-songs').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
       if (e.target.closest('[data-del]')) return;
       go('#/track/' + el.dataset.id);
     }));
     $('view-songs').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); }));
     if ($('plgo')) $('plgo').onclick = () => startImport();
+    if ($('plretry')) $('plretry').onclick = () => retryFailed();
     if ($('plinput')) $('plinput').onkeydown = (e) => { if (e.key === 'Enter') startImport(); };
     if (importing) setTimeout(() => { if (!importing) renderSongs(); }, 800);
   }
