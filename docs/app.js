@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession } from './platform/index.js?v=20261015e';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore } from './platform/index.js?v=20261015f';
 
 (() => {
   'use strict';
@@ -257,7 +257,13 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   async function urlFor(track) {
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
-    if (!st || !st.nid) return null;
+    if (!st) return null;
+    if (st.type === 'local') {                                       // 本机文件：没有直链要解析，也没有过期一说
+      const u = await mediaStore.url(st);
+      if (!u) throw new Error('本机音频找不到了（可能被清理过）');
+      return u;
+    }
+    if (!st.nid) return null;
     const cacheKey = (st.type || 'netease') + ':' + st.nid;
     const hit = urlCache.get(cacheKey);
     if (hit && Date.now() - hit.at < URL_TTL) return hit.url;
@@ -281,8 +287,17 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       audio.src = url; audio.load();
       setState(eager ? '缓冲中…' : '已就绪，点播放');
     };
-    const nid = (S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null;
-    const srcType = (S.audio[track.id] && S.audio[track.id].type) || (track.audio && track.audio.type) || 'netease';
+    const st0 = S.audio[track.id] || track.audio;
+    if (st0 && st0.type === 'local') {                               // 本机音频：取到地址直接挂上
+      try {
+        const u = await mediaStore.url(st0);
+        if (my !== prepToken) return;
+        if (u) attach(u); else setState('本机音频找不到了');
+      } catch { if (my === prepToken) setState('本机音频找不到了'); }
+      return;
+    }
+    const nid = (st0 && st0.nid) || (track.audio && track.audio.nid) || null;
+    const srcType = (st0 && st0.type) || (track.audio && track.audio.type) || 'netease';
     const hit = nid ? urlCache.get(srcType + ':' + nid) : null;
     if (track.audioOss) { attach(track.audioOss); return; }
     if (hit && Date.now() - hit.at < URL_TTL) { stationNid = nid; if (eager) attach(hit.url); else setState('已就绪，点播放'); return; }
@@ -334,14 +349,22 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const nid = curTrack && ((S.audio[curTrack.id] && S.audio[curTrack.id].nid) || (curTrack.audio && curTrack.audio.nid));
       if (curTrack && nid && !healing) {
         healing = true;
+        // 记住听到哪：重解析之后要从这儿接着播。
+        // 踩过的坑：以前这里直接 playTrack(curTrack) 从头开始，后台回来进度会从 100 多秒跳回 0。
+        const at = (audio.currentTime > 3) ? audio.currentTime : ((S.pos || {})[curTrack.id] || 0);
         if (curTrack.audioOss) delete curTrack.audioOss;      // 旧地址作废
         urlCache.delete(String(nid));                          // 解析缓存也作废
         audio.removeAttribute('src');
         setState('地址失效，正在重新取…');
-        setTimeout(() => { playTrack(curTrack).finally(() => { healing = false; }); }, 300);
+        setTimeout(() => { playTrack(curTrack, at > 5 ? { at } : {}).finally(() => { healing = false; }); }, 300);
         return;
       }
       setState('音频加载失败，点播放重试');
+    });
+    // 整首听完了：把进度清掉，下次点开从头开始
+    // （踩过：不清的话「续播」会把 20 秒的曲子直接跳到结尾，看起来像坏了）
+    audio.addEventListener('ended', () => {
+      if (curTrack && S.pos && S.pos[curTrack.id] != null) { delete S.pos[curTrack.id]; save(); }
     });
     // 记住听到哪：每 3 秒落一次，下次进这首歌从这儿继续
     audio.addEventListener('timeupdate', () => {
@@ -1361,7 +1384,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     g.hidden = false;
     document.body.classList.add('gated');
     g.innerHTML = `<div class="gatecard">
-      <div class="gtitle">TH Lyrics</div>
+      <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">TH Lyrics</div>
       <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选，注册后也能换）</span></label>
       <input type="file" id="g-av" accept="image/*" hidden>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
@@ -2208,6 +2231,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   function describeSource(t) {
     if (t.audioOss) return `音频：阿里云 OSS`;
     const s = S.audio[t.id] || t.audio;
+    if (s && s.type === 'local') return `音频：本机文件${s.name ? ' · ' + s.name : ''}`;
     if (s && s.nid) return `音频：${s.type === 'tencent' ? 'QQ音乐' : '网易云'}`;
     return '没有音频';
   }
@@ -2481,6 +2505,21 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const box = $('srcbox');
       if (box) { box.open = true; box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
       if ($('nidinput')) $('nidinput').focus();
+    };
+    if ($('pickfile')) $('pickfile').onclick = async () => {
+      if (!curTrack) return;
+      let f = null;
+      try { f = await mediaStore.pick(); } catch (e) { toast('打开选择器失败：' + (e && e.message || e)); return; }
+      if (!f) return;
+      if (f.error) { toast('导入失败：' + f.error); return; }
+      S.audio[curTrack.id] = { type: 'local', key: f.key, path: f.path, name: f.name };
+      delete curTrack.audioOss;
+      save();
+      $('srcinfo').textContent = describeSource(curTrack);
+      if ($('localfile')) $('localfile').textContent = f.name ? `${f.name} · ${(f.size / 1048576).toFixed(1)}MB` : '';
+      audio.removeAttribute('src');
+      toast('已绑定本机音频，正在起播…');
+      playTrack(curTrack);
     };
     $('nidsave').onclick = () => {
       if (!curTrack) return;

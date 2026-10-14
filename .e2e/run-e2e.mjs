@@ -215,7 +215,25 @@ const baseRoute = (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
   if (/aqqmusic\.tc\.qq\.com/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mp4', body: 'ID3' });
-  if (/_test-tone\.wav/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/wav', body: fs.readFileSync(path.join(HERE, 'test-tone.wav')) });
+  // 音频桩要支持 Range 请求：否则 media 的 seekable 区间是 [0,0]，测试里根本没法 seek
+  // （踩过：自愈续播用例一直测不出来，就是被这个假象带偏的）
+  const wavRoute = (file) => (route) => {
+    const buf = fs.readFileSync(path.join(HERE, file));
+    const range = route.request().headers()['range'];
+    const m = range && /bytes=(\d+)-(\d*)/.exec(range);
+    if (m) {
+      const start = Number(m[1]);
+      const end = m[2] ? Number(m[2]) : buf.length - 1;
+      return route.fulfill({
+        status: 206,
+        headers: { 'content-type': 'audio/wav', 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${buf.length}` },
+        body: buf.subarray(start, end + 1),
+      });
+    }
+    return route.fulfill({ status: 200, headers: { 'content-type': 'audio/wav', 'accept-ranges': 'bytes' }, body: buf });
+  };
+  if (/_test-tone-long\.wav/.test(u)) return wavRoute('test-tone-long.wav')(route);
+  if (/_test-tone\.wav/.test(u)) return wavRoute('test-tone.wav')(route);
   if (/music\.126\.net\/e2e-cover/.test(u)) return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
   return route.continue();
@@ -1147,6 +1165,43 @@ check('管理员：能列出 OSS 上的文件（带大小）', adminRows >= 2, a
 const delKey = await page.evaluate(() => { const el = document.querySelector('#view-admin [data-admdel]'); return el ? el.dataset.admdel : null; });
 if (delKey) { await page.locator(`#view-admin [data-admdel="${delKey}"]`).first().click(); await page.waitForTimeout(1500); }
 check('管理员：能删 OSS 上的文件（走管理员接口）', !!delKey && apiState.deleted.indexOf(delKey) >= 0, delKey ? `已请求删除 ${delKey}` : '没找到可删的');
+
+// ── 13.9 地址失效自愈：重解析之后要从原进度续播，不能从头开始 ──
+// 场景：直链过期/CDN 掉线 → audio 触发 error → 丢掉坏地址重解析 → 以前这里直接 playTrack() 从头播，
+// 后台回来会出现「进度从 100 多秒跳回 0」。断言续播位置必须贴近失效前的进度。
+await page.route('**/api/audio*', (route) => route.fulfill({
+  status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+  body: JSON.stringify({ ok: true, url: '/_test-tone-long.wav?heal=1', br: 320, size: 999999 }),
+}));
+await page.evaluate(() => { location.hash = '#/songs'; });
+await page.waitForTimeout(600);
+const healTid = await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.item.track')].find((e) => e.dataset.id.startsWith('i'));
+  if (!el) return null;
+  el.click(); return el.dataset.id;
+});
+await page.waitForTimeout(1200);
+const healPlayed = await page.evaluate(async () => {
+  const a = document.querySelector('audio');
+  a.src = '/_test-tone-long.wav?base=1'; a.load();
+  await new Promise((r) => { if (a.readyState >= 1) r(); else a.addEventListener('loadedmetadata', r, { once: true }); });
+  await a.play().catch(() => {});
+  // App 自己的 prepAudio 可能稍后再挂一次源，把位置冲掉 —— 重试几次直到 seek 稳住
+  for (let i = 0; i < 12; i++) {
+    a.currentTime = 5.0;                  // 主路径要求 > 3 秒
+    await new Promise((r) => setTimeout(r, 150));
+    if (Math.abs(a.currentTime - 5.0) < 0.4) break;
+  }
+  await new Promise((r) => setTimeout(r, 400));
+  return { t: a.currentTime, paused: a.paused, dur: a.duration };
+});
+await page.evaluate(() => { const a = document.querySelector('audio'); a.dispatchEvent(new Event('error')); });
+await page.waitForTimeout(2000);
+const healAfter = await page.evaluate(() => { const a = document.querySelector('audio'); return { t: a.currentTime, paused: a.paused, src: String(a.src).slice(-24) }; });
+check('地址失效自愈后从原进度续播（不再从头开始）',
+  !!healTid && healPlayed.t > 4.5 && healAfter.t >= 4.5,
+  `曲目 ${healTid} · 失效前 ${healPlayed.t.toFixed(2)}s → 自愈后 ${healAfter.t.toFixed(2)}s（paused=${healAfter.paused}）`);
+await page.unroute('**/api/audio*');
 
 // 退出 → 回到闸门（本机记录保留）
 await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });

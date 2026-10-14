@@ -10,7 +10,9 @@
  * 用法：node scripts/check-layers.mjs   （npm run check）
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,6 +73,19 @@ for (const file of files) {
   const layer = layerOf(file);
   const rel = path.relative(ROOT, file);
   const src = fs.readFileSync(file, 'utf8');
+
+  // 语法检查：用 node --check 过一遍（注释里写了 */ 这类低级错误，只有跑起来才发现——
+  // 真踩过：块注释里写 ".qmc*/" 会把注释提前结束，整个前端白屏）
+  try {
+    const tmp = path.join(os.tmpdir(), `tl-check-${process.pid}-${path.basename(file)}.mjs`);
+    fs.writeFileSync(tmp, src);
+    execFileSync(process.execPath, ['--check', tmp], { stdio: 'pipe' });
+    fs.unlinkSync(tmp);
+  } catch (e) {
+    const msg = String(e.stderr || e.message || '').split('\n').slice(0, 3).join(' ').slice(0, 160);
+    problems.push(`${rel}: 语法错误 → ${msg}`);
+    continue;
+  }
 
   // 去掉注释（保留行号，避免误报 + 报错行号还对得上）
   const code = src

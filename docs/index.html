@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TH Lyrics</title>
+<!-- 图标：安卓/桌面 PWA 用 manifest，浏览器用 favicon（顺手修掉之前 favicon 404 的控制台报错） -->
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#A52628">
 <style>
 :root{
   /* 一条视觉路线：墨蓝底 + 暖白纸 + 一点朱红。不用渐变、发光、玻璃拟态。 */
@@ -350,6 +356,8 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .row label{font-size:12px;color:var(--ink3)}
 .meta{font-size:11.5px;color:var(--ink3)}
+
+.glogo{width:56px;height:56px;border-radius:16px;display:block;margin:0 auto 10px;box-shadow:0 4px 16px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
@@ -401,6 +409,11 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
         <input id="nidinput" class="sel" style="flex:1;min-width:170px;height:36px" placeholder="粘贴链接或数字 ID">
         <button class="toolbtn" id="nidsave">绑定到这首</button>
       </div>
+      <div class="row">
+        <button class="toolbtn" id="pickfile">选本机音频</button>
+        <span class="meta" id="localfile"></span>
+      </div>
+      <div class="meta">本机音频会复制一份到 App 里，断网也能听（网易云/QQ 客户端下载的加密文件放不了）</div>
     </details>
     </div>
 
@@ -501,6 +514,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script type="module" src="app.js?v=20261015e"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261015f"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
