@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015j';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015l';
 
 (() => {
   'use strict';
@@ -2201,13 +2201,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     host.addEventListener('click', (e) => {
       const wEl = e.target.closest('.w');
       if (wEl && !wEl.dataset.plain) {
-        // 再点同一个词 = 收起（不然抽屉开着没地方关，真机反馈过）
-        if (popWordEl === wEl && $('pop').classList.contains('on')) { hidePop(); return; }
+        // 点别的词 = 直接切过去看那个词（查词顺手）；要关就点抽屉外、下拉、或 ✕
         const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
         const blk = e.target.closest('.lblock[data-i]');
         showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '',
           li: blk ? Number(blk.dataset.i) : null, ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
-        popWordEl = wEl;
         return;
       }
       const b = e.target.closest('.lblock[data-i]');
@@ -2323,7 +2321,6 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
 
   // ────────────── 词条弹层 ──────────────
   let popWord = null, popFallback = null, popSeg = null, popPos = null, romaCtx = null, romaWasPlaying = false;
-  let popWordEl = null;                                  // 当前抽屉是点哪个词开的（再点它要收起）
   function showPop(w, fallback, seg) {
     popFallback = fallback || null;
     popSeg = seg || null;
@@ -2360,7 +2357,6 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   }
   /** 关弹层：顺手把罗马音编辑器收起来，编辑时停掉的播放继续 */
   const hidePop = () => {
-    popWordEl = null;
     const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; }
     closeRomaEditor();
     $('pop').classList.remove('on');
@@ -2563,6 +2559,31 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       box.querySelectorAll('[data-cue]').forEach((el) => (el.onclick = () => { const [tid, li] = el.dataset.cue.split('@'); if (!tid) return; hidePop(); go('#/track/' + tid + '@' + li); }));
     };
     document.addEventListener('click', (e) => { if (!e.target.closest('#pop') && !e.target.closest('.w') && !e.target.closest('[data-known]')) hidePop(); });
+
+    // 底部弹层下拉关闭（内容滚到顶才生效，不然会把正常滚动当成关闭手势）
+    (function sheetDrag() {
+      const sheet = $('pop');
+      if (!sheet) return;
+      let y0 = null, dy = 0;
+      const pt = (e) => (e.touches && e.touches[0]) || e;
+      const start = (e) => { if (sheet.scrollTop > 0) return; y0 = pt(e).clientY; dy = 0; sheet.style.transition = 'none'; };
+      const move = (e) => {
+        if (y0 == null) return;
+        dy = pt(e).clientY - y0;
+        if (dy > 0) { sheet.style.transform = `translateY(${dy}px)`; if (e.cancelable) e.preventDefault(); }
+      };
+      const end = () => {
+        if (y0 == null) return;
+        sheet.style.transition = ''; sheet.style.transform = '';
+        const closed = dy > 70;
+        y0 = null; dy = 0;
+        if (closed) hidePop();
+      };
+      sheet.addEventListener('touchstart', start, { passive: true });
+      sheet.addEventListener('touchmove', move, { passive: false });
+      sheet.addEventListener('touchend', end);
+      sheet.addEventListener('touchcancel', end);
+    })();
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT') return;
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }

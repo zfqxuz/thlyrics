@@ -1203,6 +1203,28 @@ check('地址失效自愈后从原进度续播（不再从头开始）',
   `曲目 ${healTid} · 失效前 ${healPlayed.t.toFixed(2)}s → 自愈后 ${healAfter.t.toFixed(2)}s（paused=${healAfter.paused}）`);
 await page.unroute('**/api/audio*');
 
+// ── 13.11 词抽屉：点外部（包括别的词）先收起 ──
+await page.evaluate(() => { location.hash = '#/songs'; });
+await page.waitForTimeout(900);
+await page.evaluate(() => { const el = document.querySelector('.item.track'); if (el) el.click(); });
+await page.waitForTimeout(1600);
+await page.evaluate(() => { const b = document.getElementById('t-sing'); if (b) b.click(); });   // 进跟唱页，歌词在 #plyric 里
+await page.waitForSelector('#plyric .w', { timeout: 8000 });
+await page.locator('#plyric .w').first().click();
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+const openA = await page.evaluate(() => document.getElementById('pop').classList.contains('on'));
+const wordA = await page.evaluate(() => document.getElementById('p-word').textContent);
+await page.locator('#plyric .w').nth(1).click();          // 点另一个词 → 直接切过去
+await page.waitForTimeout(400);
+const switched = await page.evaluate(() => ({ on: document.getElementById('pop').classList.contains('on'), word: document.getElementById('p-word').textContent }));
+check('抽屉开着时点另一个词 → 直接切到那个词', openA === true && switched.on === true && switched.word !== wordA, `${wordA} → ${switched.word}`);
+await page.locator('#plyric .w').first().click();
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+await page.evaluate(() => document.querySelector('.phead').click());   // 点抽屉外的区域
+await page.waitForTimeout(400);
+const afterOutside = await page.evaluate(() => document.getElementById('pop').classList.contains('on'));
+check('点抽屉外的区域 → 收起', afterOutside === false, afterOutside ? '仍开着' : '已收起');
+
 // 退出 → 回到闸门（本机记录保留）
 await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#acc-out', { timeout: 15000 });

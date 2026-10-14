@@ -668,3 +668,13 @@ App 里页面 origin 是 **`https://localhost`**（iOS 是 `capacitor://localhos
 - **门禁 `npm run check` 现在带语法检查**（`node --check` 每个前端文件）。真踩过：块注释里写了
   `.qmc*/` 会把注释提前结束 → 整个前端白屏。这类错误以后必须在门禁就被拦下。
 - E2E 里新增 `.e2e/test-tone-long.wav`（8 秒）：自愈续播的主路径要求进度 > 3s，3 秒的老文件够不到。
+
+#### 五、真机自动化两个坑（都踩过）
+
+1. **adb 的 `input tap` 用屏幕坐标，页面 `clientY` 从 WebView 顶部算** —— 两者差一个状态栏高度
+   （本机实测差 **108 设备像素 / 36 CSS 像素**）。小目标（按钮）不校正就点不到，大目标（歌词区）无所谓，
+   所以"有时能点到、有时点不到"最容易误判成代码 bug。
+   校正办法：随便点一下，用 `touchstart` 读回 `clientY`，`偏移 = 屏幕y - clientY*dpr`。
+2. **合成 click ≠ 真实触摸**：用 `element.click()` 验交互只能证明"逻辑对"，
+   证明不了"手指点得到"（弹层位置、遮挡、手势冲突都测不出来）。涉及手势/弹层的交互，
+   必须用 `adb shell input tap/swipe` 真打一遍。
