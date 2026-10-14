@@ -527,3 +527,101 @@
 - 罗马音输入框补了 `autocapitalize/autocorrect/spellcheck=off`、`enterkeyhint=done`、`inputmode=latin`
   （手机键盘不再自动大写/纠错）。
 - E2E 164/164。
+
+### 安卓 App（Capacitor 壳）：结构、构建、真机验证（2026-10-15，已跑通）
+
+**用户要求**：先只做安卓；音源默认走链接（除非用户自己下载到本地）；自用不传播。
+
+#### 一、仓库结构（M0+M1 已完成并上线）
+
+```
+docs/            前端源码 = 发布产物（无构建步骤，原生 ESM）
+  app.js         组装：状态/路由/渲染（还没拆完）
+  core/          纯逻辑：禁 DOM / 禁平台 API（目前只放了 README，M2 往里搬）
+  platform/      平台适配层：kv / net / player / media-session（业务只 import 这里）
+  ui/            视图（M3 再拆）
+  version.js     版本号唯一来源
+app/             Capacitor 工程（webDir = ../docs，前端改一次两端同时生效）
+  android/       原生工程（提交进仓库；build/ .gradle/ local.properties 走 .gitignore）
+.e2e/            Playwright（网页层 164 条）
+.e2e/android/    ★ adb + CDP 的真机验收脚本（cdp.mjs 是页面级 CDP 小客户端）
+```
+
+- **分层门禁**：`npm run check`（scripts/check-layers.mjs）——core 禁 DOM/平台 API、
+  platform 禁 import ui、ui 与 app.js 禁直接调平台 API。改完前端必须跑，0 违规才算过。
+- **版本号**：改前端后跑 `node scripts/bump-version.mjs`（自动把 `20261015d` → `20261015e`，
+  同时改 index.html 与所有模块 import 上的 `?v=`）。**必须推**，否则 Pages 的 10 分钟缓存会
+  让用户拿到"旧 index.html + 新 app.js"（app.js 已变成 ESM，经典脚本加载会直接语法错误白屏）。
+- 删掉了孤儿目录 `web/`（1.3MB，无引用）与两个临时截图。
+
+#### 二、构建（WSL 里，无需 sudo）
+
+```bash
+# 一次性：JDK21（清华 Adoptium）+ Android SDK 36（腾讯 AndroidSDK 镜像）
+#   ~/tools/jdk-21.0.12.1+1 、~/android-sdk（platforms/android-36 + build-tools/36.0.0）
+#   ~/.gradle/init.gradle 已配阿里云 Maven 镜像
+export JAVA_HOME=~/tools/jdk-21.0.12.1+1 ANDROID_HOME=~/android-sdk
+cd app && npx cap sync android          # 把 docs/ 拷进 android/app/src/main/assets/public
+cd android && ./gradlew assembleDebug --no-daemon
+# 产物：app/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+- Capacitor 8 要求 **Java 21**、compileSdk/targetSdk **36**、Gradle **8.14.3**（wrapper 已指向腾讯镜像）。
+- `app/.npmrc` 指向 npmmirror（npmjs 直连 12s 起步）。
+- **坑**：`androidx.media:media:1.7.0` 里 `MediaSessionCompat` / `PlaybackStateCompat` /
+  `MediaMetadataCompat` 仍在 **`android.support.v4.media.*`** 旧包名下，只有
+  `MediaStyle` 在 `androidx.media.app.NotificationCompat.*`。按 androidx 包名 import 会编译不过。
+
+#### 三、播放层结论（真机实测，别再猜）
+
+| 结论 | 证据 |
+|---|---|
+| WebView 里 `<audio>` 能播、能 seek、能流式 | 真机 `readyState=4`、进度实时推进、源是网易云 CDN |
+| Capacitor 默认已放开自动播放 | `Bridge.java` 里 `setMediaPlaybackRequiresUserGesture(false)` |
+| **没有前台服务，后台播放保不住** | 切后台后 WebView 被挂起：CDP 失去响应、回前台进度重置 |
+| **挂上 mediaPlayback 前台服务后，息屏后台稳定播放** | 真机连续 90 秒：37.3→112.9s，`isForeground=true` 全程在 |
+| WebView **不支持** Media Session Web API | 官方插件原话 + 实测；所以自研插件转 MediaSessionCompat |
+| 媒体键闭环可用 | `input keyevent 127/126` → `state=2/3`，音频真的暂停/续播，App 未重启 |
+| 媒体会话通知豁免 POST_NOTIFICATIONS | Android 官方文档明文（真机上确实不用申请权限） |
+
+- 前台服务：`PlaybackService`（`foregroundServiceType="mediaPlayback"`，通知带 3 个按钮）。
+- 桥：`MediaSessionPlugin`（`update()` 推状态 / `action` 事件回传按键）。
+- 前端：`docs/platform/media-session.js`（网页走 navigator.mediaSession，原生走插件，同一接口）。
+
+#### 四、后端 CORS 必须带 App 的 origin（踩过）
+
+App 里页面 origin 是 **`https://localhost`**（iOS 是 `capacitor://localhost`）。
+不在 `ALLOW_ORIGINS` 里 → **所有 /api/* 被 CORS 拦死**（登录/注册/同步/解析全废），
+而网页端完全正常，很容易漏。`ops/fc/index.js` 默认值与 `ops/deploy-fc.py` 的环境变量都要有。
+改后端后别忘了 `python3 ops/deploy-fc.py`。
+
+#### 五、真机验证怎么做（可复用）
+
+- 手机 USB 连 Windows 即可：WSL 里直接调 `adb.exe`（`/mnt/c/Users/zfq/AppData/Local/Android/Sdk/platform-tools/adb.exe`）。
+- **CDP 直连 WebView**：Playwright 的 `connectOverCDP` 连不上（WebView 只有页面级端点，
+  浏览器级会 1006 断开）。用 `.e2e/android/cdp.mjs`（Node 自带 WebSocket 直连页面）。
+  取 socket：`adb shell cat /proc/net/unix | grep webview_devtools_remote` → `adb forward tcp:9222 localabstract:<socket>`。
+- 骚扰点：安装/截图需要**手机解锁亮屏**（锁屏时 adb install 会一直挂着）；
+  华为 USB 连接会自动弹 HiSuite 抢前台，注意把 App 拉回来。
+- 临时账号用完要清：`/tmp/oss.py`（V1 签名小工具）删 `sync/users/<uid>/*` 并从
+  `sync/users/_index.json` 移除。清理后索引里只应剩 `zfq` 和 `seki`。
+
+#### 六、Windows 模拟器：当前不可用
+
+- Windows 那套 SDK/模拟器是 **30.8.4（2021）**，且 **WHPX 初始化失败**
+  （`Failed to setup partition hr=c0350005`）——因为这台 Windows 跑着 WSL2/Hyper-V 且未开嵌套虚拟化。
+- 纯软件模拟（`-accel off`）能起（API 30 / WebView 仅 **Chrome 83**），但极慢：CDP evaluate 会卡死，
+  只能做"装上能开"级别的验证，不能当验收环境。**真机才是验收环境。**
+- WSL 里 `/dev/kvm` 存在且 `kvm_intel.nested=Y`，docker 可用（镜像站 `dockerproxy.net` 可拉）——
+  以后想要自动化回归，可以走"容器里的 Linux 模拟器 + KVM"，但没做。
+
+#### 七、已知待办（真机暴露的）
+
+1. **部分歌只有 30 秒试听**：后端返回的直链 `size≈481KB`（如 752043、Bad Apple 22645196），
+   完整曲是 13MB（如 737955）。这是网易云的版权限制，不是 bug；可考虑在导入时提示"试听片段"。
+2. **后台恢复时的进度异常**：一次采样里进度从 112.9s 变成 40.8s（App 进程没重启），
+   疑似 URL 过期后的 healing 重解析把进度带回去了，待查。
+3. **"用户自己下载到本地"这条支线还没做**：按设计是 `local` provider
+   （App 端存沙盒 + `convertFileSrc`，网页端 IndexedDB/文件句柄）。注意 `.ncm/.uc!/.qmc*/mflac/mgg`
+   这些网易云/QQ 的下载文件是加密容器，**不能直接用，也不要去解密**（规避技术措施是独立违法）。
+4. M2（core 抽纯逻辑）/ M3（ui 拆页面）还没做——不影响使用，属于可维护性投资。
