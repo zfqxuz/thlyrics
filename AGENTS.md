@@ -168,3 +168,15 @@
   就得在浏览器里挂 kuromoji 词典，约 17MB 一次性下载）。
 - 测试：`.e2e/run-e2e.mjs` 第 12 节（歌单/歌词全打桩，63/63）；
   真网络下的手动验证曾用 737955 / 22645196 / 752043 这三首。
+
+### QQ 发图 / 发文件（2026-10-14 修好，无需重建容器）
+
+- 症状：`qq_send_image` / `qq_send_file` 传工作区路径报 `ENOENT`。原因：NapCat 容器只挂了
+  `/app/napcat/cache`（宿主 `/home/zfq/qqbot/napcat-cache`）等三个目录，工作区没挂进去。
+- 修法：`/home/zfq/qqbot/tools/qq-send.sh <文件>` —— 它把文件 `docker cp` 进挂载目录，
+  并在容器里建软链 `/home/zfq/qqbot/napcat-cache -> /app/napcat/cache`，
+  于是"宿主路径"在容器里也能解析。脚本会打印该传给 qq_send_image 的路径，例如：
+  `/home/zfq/qqbot/napcat-cache/foo.png`。
+- 容器被 **重建** 后软链会丢（重启不丢），重跑一次脚本即可。
+- 想彻底解决就给 napcat 服务加一句挂载 `-v /home/zfq/qqbot:/home/zfq/qqbot:ro`（要重建容器，
+  会断一次 QQ 连接，需要重新快速登录/扫码），目前没做。
