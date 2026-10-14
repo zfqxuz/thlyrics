@@ -22,7 +22,8 @@ const OSS_BUCKET = ENV.OSS_BUCKET || 'thlyrics-audio';
 const PREFIX = 'sync/users/';
 const TOKEN_DAYS = 180;
 const ALLOW = (ENV.ALLOW_ORIGINS || 'https://zfqxuz.github.io,http://127.0.0.1:8848,http://localhost:8848').split(',');
-const MAX_BODY = 8 * 1024 * 1024;      // 单次上传上限（导入的歌单整份也够）
+const MAX_BODY = 8 * 1024 * 1024;      // 单次请求体上限
+const MAX_STORE = 12 * 1024 * 1024;    // 每个账号记录的存储上限
 
 // ─────────── OSS 读写（V1 签名，手写，避免打包依赖） ───────────
 const b64 = (b) => Buffer.from(b).toString('base64');
@@ -212,6 +213,9 @@ exports.handler = async (event) => {
       }
       if (method === 'PUT' || method === 'POST') {
         const merged = mergeStates(body.data || {}, cur.data || {});
+        if (JSON.stringify(merged).length > MAX_STORE) {
+          return reply(req, 413, { error: `这个账号的记录超过上限（${Math.round(MAX_STORE / 1048576)}MB），先删掉一些导入的歌再同步` });
+        }
         const at = new Date().toISOString();
         await ossPutJson(dataKey(me.sub), { v: 1, at, data: merged });
         return reply(req, 200, { ok: true, at, data: merged });

@@ -52,15 +52,6 @@ const E2E_LYRIC = {
     + '[00:04.00] 続\n[00:04.60] け\n[00:05.20] て\n[00:05.80] く\n[00:06.50] 踊る憂鬱と\n',
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
-// 云端同步的桩：页面会去读 data/oss-sync.json，再对 get/put 地址读写；这里全用假的，别碰真 OSS
-let cloudProg = null;    // sync/progress.json（进度/释义/删除墓碑）
-let cloudImp = null;     // sync/imports.json（导入的歌，大）
-let cloudExtra = false;  // 打开才模拟“另一台设备”也往云端写了一份（验合并用）
-const OTHER_DEVICE_TRACK = {
-  id: 'i888800001', nid: '888800001', title: '别的设备导入的歌', artist: '測試', album: '東方', cover: '',
-  lines: [{ t: 1, text: '流れてく　時の中ででも', zh: '就算在流逝的时间中' }, { t: 3, text: '気だるさが', zh: '仍能发现' }, { t: 5, text: 'ほらグルグル廻って', zh: '只在原地打转不停' }],
-  plId: '1', plName: '另一台设备的歌单', at: Date.now(),
-};
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
 const apiState = { users: {}, seq: 0, calls: [] };
 const apiMerge = (a, b) => {
@@ -123,23 +114,6 @@ const apiStub = (route) => {
 const baseRoute = (route) => {
   const u = route.request().url();
   if (/^https:\/\/thlyrics-auth-[^/]+\.cn-hangzhou\.fcapp\.run\//.test(u)) return apiStub(route);
-  if (/data\/oss-sync\.json/.test(u)) {
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-      imports: { get: 'https://sync.e2e/imports-get', put: 'https://sync.e2e/imports-put' },
-      progress: { get: 'https://sync.e2e/progress-get', put: 'https://sync.e2e/progress-put' },
-    }) });
-  }
-  if (u === 'https://sync.e2e/imports-put') { cloudImp = route.request().postData() || ''; return route.fulfill({ status: 200, contentType: 'text/plain', body: '' }); }
-  if (u === 'https://sync.e2e/progress-put') { cloudProg = route.request().postData() || ''; return route.fulfill({ status: 200, contentType: 'text/plain', body: '' }); }
-  if (u === 'https://sync.e2e/imports-get') {
-    const j = cloudImp ? JSON.parse(cloudImp) : { imp: {} };
-    j.imp = j.imp || {};
-    if (cloudExtra) j.imp['i888800001'] = j.imp['i888800001'] || OTHER_DEVICE_TRACK;   // 模拟另一台设备写进来的
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
-  }
-  if (u === 'https://sync.e2e/progress-get') {
-    return route.fulfill({ status: 200, contentType: 'application/json', body: cloudProg || '{}' });
-  }
   if (/gdstudio/.test(u) && /types=playlist/.test(u)) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(E2E_PLAYLIST) });
   }
@@ -185,6 +159,14 @@ const tapLine = async (host, i, opts = {}) => {
 
 // ═══════ 1 学词页（词汇入手 + 新视觉） ═══════
 await page.goto(BASE, { waitUntil: 'load', timeout: 30000 });
+// ═══════ 0 登录闸门（没注册没登录不让用） ═══════
+await page.waitForSelector('#g-reg', { timeout: 25000 });
+check('未登录：只有登录闸门，看不到任何内容', (await page.locator('#gate').isVisible()) && (await page.locator('#deck .word').count()) === 0, ((await txt('.gatecard .gtitle')) || '').slice(0, 20));
+await page.locator('#g-name').fill('e2e_user');
+await page.locator('#g-pass').fill('e2e-pass-123');
+await page.locator('#g-reg').click();
+await page.waitForTimeout(3000);
+check('注册后放行，进入应用', (await page.locator('#gate').isVisible()) === false, '已进入');
 await page.waitForSelector('#deck .word', { timeout: 20000 });
 await page.waitForTimeout(400);
 check('默认进学词页', await page.locator('#view-learn').isVisible());
@@ -554,133 +536,73 @@ await page.locator('#mb-meta').click();
 await page.waitForTimeout(500);
 check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
 
-// ═══════ 14 记录持久化（云端自动同步 / 换设备 / 清空浏览器数据 / 删除不被复活） ═══════
+// ═══════ 14 账号：自动同步 / 墓碑 / 清空 / 换设备登录恢复 ═══════
 if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
-await page.locator('#tab-mine').click();
-await page.waitForTimeout(400);
-check('生词本给出云端同步入口', (await page.locator('#m-push').count()) === 1 && (await page.locator('#m-pull').count()) === 1, await txt('#m-push'));
-check('生词本给出自动同步开关与状态行', (await page.locator('#m-auto').count()) === 1 && /云端/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 26));
-
-// 先造一条自定义释义：验证“记录”里不只是歌单
-const widMine = await page.evaluate(() => (document.querySelector('#view-mine .chip') || {}).dataset ? document.querySelector('#view-mine .chip').dataset.w : null);
-if (widMine) {
-  await page.goto(BASE + '#/word/' + widMine);
-  await page.waitForTimeout(500);
-  await page.locator('#w-edit').click();
-  await page.locator('#w-editinput').fill('E2E 自定义释义');
-  await page.locator('#w-editinput').press('Enter');
-  await page.waitForTimeout(400);
-  await page.locator('#tab-mine').click();
-  await page.waitForTimeout(400);
-}
-
-const cloudView = () => {
-  const d = Object.assign({ known: {}, notes: {}, audio: {}, del: {}, clearedAt: 0, imp: {} }, cloudProg ? JSON.parse(cloudProg) : {});
-  d.imp = Object.assign({}, cloudImp ? JSON.parse(cloudImp).imp || {} : {});
-  return d;
-};
-const impBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {}).length);
-await page.locator('#m-push').click();
-await page.waitForTimeout(1600);
-const pushed = cloudView();
-check('同步到云端：把本机导入的歌传上去', Object.keys(pushed.imp).length === impBefore, `云端收到 ${Object.keys(pushed.imp).length} 首 / 本机 ${impBefore} 首`);
-check('同步到云端：进度、自定义释义一起传（不是只传歌单）', Object.keys(pushed.known).length > 0 && Object.keys(pushed.notes).length > 0, `已掌握 ${Object.keys(pushed.known).length} 词 · 释义 ${Object.keys(pushed.notes).length} 条`);
-check('云端拆成两份：标词只传小的那份（不重传整个歌单）', !!cloudProg && (cloudImp || '').length > 0, `进度 ${cloudProg ? cloudProg.length : 0}B / 歌单 ${cloudImp ? cloudImp.length : 0}B`);
-cloudExtra = true;                       // 这次让云端多出“另一台设备”的一首
-await page.locator('#m-pull').click();
-await page.waitForTimeout(1800);
-cloudExtra = false;
-const impAfter = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {}).length);
-check('从云端拉回：另一台设备导入的歌并进来了', impAfter === impBefore + 1, `本机 ${impBefore} → ${impAfter} 首`);
-await page.goto(BASE + '#/songs');
-await page.waitForTimeout(900);
-const pulledN = await page.evaluate(() => document.querySelectorAll('#list .track').length);
-check('拉回的歌能在曲库看到', pulledN > 0, pulledN + ' 首');
-
-// 自动同步：不点任何按钮，只标一个词
-cloudExtra = false;
-await page.goto(BASE + '#/learn');
-await page.waitForSelector('#deck .word', { timeout: 15000 });
-const newWordId = await page.evaluate(() => { const el = document.querySelector('#deck .word .tick:not(.on)'); return el ? el.closest('.word').dataset.id : null; });
-if (newWordId) await page.locator('#deck .word .tick:not(.on)').first().click();
-await page.waitForTimeout(4500);        // 等去抖 1.8s + 往返
-const autoView = cloudView();
-check('改动会自动同步（一个按钮都没点）', !!newWordId && n0(autoView.known[newWordId]) > 0, `词 id ${newWordId} → 云端 ${newWordId ? JSON.stringify(autoView.known[newWordId]) : '—'}`);
-
-// 清空浏览器数据 = 换设备：打开就该自动恢复
-const beforeWipe = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { imp: Object.keys(j.imp || {}).length, known: Object.keys(j.known || {}).filter((k) => j.known[k] > 0).length }; });
-await page.evaluate(() => localStorage.clear());
-await page.goto(BASE + '?wipe=1#/mine', { waitUntil: 'load' });   // 换 URL 强制整页重载（只改 hash 不会重载）
-await page.waitForSelector('#m-push', { timeout: 15000 });
-await page.waitForTimeout(5000);        // 等 boot 的自动拉取
-const afterWipe = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { imp: Object.keys(j.imp || {}).length, known: Object.keys(j.known || {}).filter((k) => j.known[k] > 0).length }; });
-check('清空浏览器数据后，打开页面自动恢复导入的歌', afterWipe.imp > 0 && afterWipe.imp >= beforeWipe.imp, `${beforeWipe.imp} → ${afterWipe.imp} 首`);
-check('清空浏览器数据后，进度也自动恢复', afterWipe.known > 0 && afterWipe.known >= beforeWipe.known, `${beforeWipe.known} → ${afterWipe.known} 词`);
-
-// 删掉的导入曲目不会被云端拉回来
-await page.goto(BASE + '#/songs', { waitUntil: 'load' });
-await page.waitForTimeout(1500);
-const delId = await page.evaluate(() => { const el = document.querySelector('#list [data-del]'); return el ? el.dataset.del : null; });
-if (delId) { await page.locator(`#list [data-del="${delId}"]`).first().click(); await page.waitForTimeout(4500); }
-const cloud2 = cloudView();
-check('删掉的导入曲目会记墓碑，不会被云端拉回来', !!delId && !!cloud2.del[delId] && !cloud2.imp[delId], delId ? `墓碑 ${cloud2.del[delId] ? '有' : '无'} · 云端还留着 ${cloud2.imp[delId] ? '是' : '否'}` : '没找到可删的导入曲目');
-
-// 清空进度也不会被云端顶回来
-await page.goto(BASE + '#/mine', { waitUntil: 'load' });
-await page.waitForSelector('#m-clear', { timeout: 15000 });
-await page.locator('#m-clear').click();
-await page.waitForTimeout(4500);
-const cloud3 = cloudView();
-const clearedLocal = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return Object.values(j.known || {}).filter((v) => v > 0).length; });
-check('清空进度后不会被云端拉回来', clearedLocal === 0 && Object.values(cloud3.known || {}).filter((v) => v > 0).length === 0, `本机 ${clearedLocal} 词 · 云端 ${Object.values(cloud3.known || {}).filter((v) => v > 0).length} 词`);
-
-// ═══════ 15 账号（注册 / 登录 / 退出 / 换设备） ═══════
 await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
-await page.waitForSelector('#acc-reg', { timeout: 15000 });
-check('生词本给出账号入口', (await page.locator('#acc-reg').count()) === 1 && (await page.locator('#acc-login').count()) === 1, await txt('#acc-reg'));
-check('未登录时状态行说明记录只在本机', /未登录/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 30));
+await page.waitForSelector('#m-push', { timeout: 15000 });
+await page.waitForTimeout(1500);
+const accData = () => (apiState.users['e2e_user'] || {}).data || {};
+check('生词本给出同步入口与自动同步开关', (await page.locator('#m-push').count()) === 1 && (await page.locator('#m-auto').count()) === 1, await txt('#m-push'));
+check('状态行写明已登录哪个账号', /账号 e2e_user/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 30));
+check('本机已有记录在注册时就带上去了', Object.keys(accData().known || {}).length > 0, `账号里 ${Object.keys(accData().known || {}).length} 个词`);
 
-await page.locator('#acc-name').fill('e2e_user');
-await page.locator('#acc-pass').fill('e2e-pass-123');
-await page.locator('#acc-reg').click();
-await page.waitForTimeout(2500);
-check('注册并登录成功（界面切到已登录）', (await page.locator('#acc-out').count()) === 1 && /账号 e2e_user/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 26));
-check('注册时把本机已有的记录一起带上去', !!apiState.users['e2e_user'], apiState.users['e2e_user'] ? `已掌握 ${Object.keys(apiState.users['e2e_user'].data.known || {}).length} 词 · 导入 ${Object.keys(apiState.users['e2e_user'].data.imp || {}).length} 首` : '—');
+// 改一条释义：一个按钮都不点，应该自己同步进账号
+const widMine = await page.evaluate(() => { const el = document.querySelector('#view-mine .chip'); return el ? el.dataset.w : null; });
+await page.goto(BASE + '?acc=1#/word/' + widMine);
+await page.waitForTimeout(800);
+await page.locator('#w-edit').click();
+await page.locator('#w-editinput').fill('E2E 自定义释义');
+await page.locator('#w-editinput').press('Enter');
+await page.waitForTimeout(4500);
+check('改释义自动同步进账号（没点按钮）', !!((accData().notes || {})[widMine]) && accData().notes[widMine].meaning === 'E2E 自定义释义', `词 ${widMine} → ${JSON.stringify((accData().notes || {})[widMine] || null)}`);
 
-const uidWord = await page.evaluate(async () => {
-  location.hash = '#/learn';
-  return null;
-});
+// 标一个词 → 也应该自己同步
+await page.goto(BASE + '?acc=1#/learn', { waitUntil: 'load' });
 await page.waitForSelector('#deck .word .tick:not(.on)', { timeout: 15000 });
 const accWordId = await page.evaluate(() => { const el = document.querySelector('#deck .word .tick:not(.on)'); return el ? el.closest('.word').dataset.id : null; });
 await page.locator('#deck .word .tick:not(.on)').first().click();
 await page.waitForTimeout(4500);
-check('登录后标词自动存进账号', !!accWordId && n0((apiState.users['e2e_user'] || {}).data.known[accWordId]) > 0, `词 id ${accWordId} → 账号里 ${apiState.users['e2e_user'] ? JSON.stringify(apiState.users['e2e_user'].data.known[accWordId]) : '—'}`);
+check('标词自动同步进账号', !!accWordId && n0(accData().known[accWordId]) > 0, `词 ${accWordId} → ${JSON.stringify(accData().known[accWordId])}`);
 
+// 删一首导入的歌：留墓碑，重登不会被拉回来
+await page.goto(BASE + '?acc=1#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(1800);
+const delId2 = await page.evaluate(() => { const el = document.querySelector('#list [data-del]'); return el ? el.dataset.del : null; });
+if (delId2) { await page.locator(`#list [data-del="${delId2}"]`).first().click(); await page.waitForTimeout(4500); }
+check('删掉的导入曲目会记墓碑，不会被账号拉回来', !!delId2 && !!accData().del[delId2] && !accData().imp[delId2], delId2 ? `墓碑 ${accData().del[delId2] ? '有' : '无'} · 账号还留着 ${accData().imp[delId2] ? '是' : '否'}` : '没找到可删的导入曲目');
+
+// 清空进度：账号里也要清掉，否则重登又被顶回来
 await page.goto(BASE + '?acc=1#/mine', { waitUntil: 'load' });
-await page.waitForSelector('#acc-out', { timeout: 15000 });
-await page.locator('#acc-out').click();
-await page.waitForTimeout(600);
-check('退出登录：回到未登录界面（本机记录还在）', (await page.locator('#acc-reg').count()) === 1 && (await page.locator('#view-mine .chip').count()) > 0, (await page.locator('#view-mine .chip').count()) + ' 个词');
+await page.waitForSelector('#m-clear', { timeout: 15000 });
+await page.locator('#m-clear').click();
+await page.waitForTimeout(4500);
+const localPos = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return Object.values(j.known || {}).filter((v) => v > 0).length; });
+check('清空进度会一起清掉（重登不会被账号顶回来）', localPos === 0 && Object.values(accData().known || {}).filter((v) => v > 0).length === 0, `本机 ${localPos} 词 · 账号 ${Object.values(accData().known || {}).filter((v) => v > 0).length} 词`);
 
-// 换设备 = 清掉浏览器数据，重新登录同一个账号
+// 换设备 = 清掉浏览器数据：先被闸门挡住，登录同账号后记录回来
 await page.evaluate(() => localStorage.clear());
 await page.goto(BASE + '?acc=2#/mine', { waitUntil: 'load' });
-await page.waitForSelector('#acc-login', { timeout: 15000 });
-await page.waitForTimeout(3500);                       // 等进页面那次自动同步（它会 toast + 重渲染，会把输入框清掉）
+await page.waitForSelector('#g-login', { timeout: 15000 });
+check('清掉浏览器数据后：又被闸门挡住', (await page.locator('#gate').isVisible()) && (await page.locator('#view-mine .chip').count()) === 0, '闸门');
 expect401 = true;
-await page.locator('#acc-name').fill('e2e_user');
-await page.locator('#acc-pass').fill('wrong-pass');
-await page.locator('#acc-login').click();
-await page.waitForTimeout(2000);
-check('密码错给明确提示', /用户名或密码不对/.test((await txt('#p-state')) || '') && (await page.locator('#acc-out').count()) === 0, ((await txt('#p-state')) || '').slice(0, 24));
+await page.locator('#g-name').fill('e2e_user');
+await page.locator('#g-pass').fill('wrong-pass');
+await page.locator('#g-login').click();
+await page.waitForTimeout(2500);
+check('密码错：给明确提示，仍挡在闸门里', /用户名或密码不对/.test((await txt('#g-msg')) || ''), ((await txt('#g-msg')) || '').slice(0, 26));
 expect401 = false;
-await page.locator('#acc-name').fill('e2e_user');      // 再填一遍（上一步的 toast/渲染可能把表单清了）
-await page.locator('#acc-pass').fill('e2e-pass-123');
-await page.locator('#acc-login').click();
-await page.waitForTimeout(4000);
-const backAcc = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { known: Object.keys(j.known || {}).filter((k) => j.known[k] > 0).length, imp: Object.keys(j.imp || {}).length }; });
-check('换设备登录同一个账号：记录全回来', backAcc.known > 0 && backAcc.imp > 0, `${backAcc.known} 词 · ${backAcc.imp} 首`);
+await page.locator('#g-pass').fill('e2e-pass-123');
+await page.locator('#g-login').click();
+await page.waitForTimeout(6500);
+const afterLogin = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { imp: Object.keys(j.imp || {}).length, del: Object.keys(j.del || {}).length, acc: !!localStorage.getItem('thlyrics.account.v1') }; });
+// 前面刚把导入的歌删了、进度也清了，所以这里验的是「账号里那份状态确实被拉回来了」：删除墓碑（+账号登录态）在，就说明合并成功
+check('换设备登录同账号：账号里的记录（含删除墓碑）都回来了', afterLogin.acc && afterLogin.del > 0, `${afterLogin.del} 个墓碑 · ${afterLogin.imp} 首`);
+check('登录后闸门放行，能正常用', (await page.locator('#gate').isVisible()) === false && (await page.locator('#m-push').count()) === 1, '已进入');
+
+// 退出 → 回到闸门（本机记录保留）
+await page.locator('#acc-out').click();
+await page.waitForTimeout(1000);
+check('退出登录：回到闸门', (await page.locator('#gate').isVisible()) && (await page.locator('#g-login').count()) === 1, '闸门');
 
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 

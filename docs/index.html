@@ -113,6 +113,15 @@ main{padding:10px 16px 132px}
 .sel{height:34px;padding:0 10px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-size:12.5px}
 .toolbtn{height:34px;padding:0 12px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-size:12.5px}
 .toolbtn.on{background:var(--accent-soft);border-color:rgba(255,95,69,.45);color:#ffb9ad}
+#gate{position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:18px}
+#gate[hidden]{display:none}
+.gatecard{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.gatecard .gtitle{font-size:20px;color:#ffe9df}
+.gatecard .gsub{font-size:12px;color:var(--ink2);line-height:1.6}
+.gatecard .sel{height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);padding:0 12px;font-size:14px}
+.gatecard .row{display:flex;gap:8px}
+.gatecard .row button{flex:1}
+.gatecard .gmsg{font-size:12px;color:var(--p-a);min-height:16px}
 .accbox{margin:10px 0 2px;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--surface)}
 .accbox.on{border-color:rgba(255,95,69,.45)}
 .accbox .l1{font-size:14px;color:#ffe9df}
@@ -224,6 +233,7 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
 </style>
 </head>
 <body>
+<div id="gate" hidden></div>
 <div class="topbar">
   <div class="brand">东方同人曲 学唱机</div>
   <button class="iconbtn" id="btn-search" title="搜索">搜</button>
@@ -344,6 +354,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script src="app.js?v=20261014j"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script src="app.js?v=20261014k"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

@@ -312,3 +312,17 @@
   退出、密码错提示、清浏览器数据后登录同账号恢复）。账号那节在 `.e2e/run-e2e.mjs` 里是**打桩**的
   （拦 `thlyrics-auth-*.cn-hangzhou.fcapp.run`），别让它打真 API。
 - 真机验证脚本：`.e2e/sync-real.mjs <url>`（真 OSS；跑完记得把云端对象恢复成空）。
+
+### 必须登录 + 账号制（2026-10-14 深夜，已上线）
+
+- 用户要求「没注册没登录的人就不让用」。现在 `docs/index.html` 有个 `#gate` 全屏闸门：
+  boot 时若没有 `ACC` 就只显示登录/注册卡片，**不渲染任何内容**（注意：`if (!location.hash) history.replaceState(...)`
+  而不是 `location.replace(...)`，否则 hashchange 会把闸门后面的页面渲染出来；`hashchange` 监听要在闸门之前挂上）。
+  退出登录 → 回到闸门。
+- **公开预签名对象已废弃**：`docs/data/oss-sync.json` 和 `scripts/gen-sync-urls.mjs` 已删，
+  OSS 里的 `sync/imports.json` / `sync/progress.json` 也删了（旧链接现在 404）。
+  同步只有一条路：登录后打函数计算 API（服务端合并）。没登录 = 不联网、不落云端。
+- API 端加了每账号存储上限 12MB（`MAX_STORE`），超了返回 413 提示先删歌。
+- E2E 96/96（第 0 节：未登录只有闸门、注册后放行；第 14 节整节改成账号制：
+  改释义/标词自动同步、删除墓碑、清空进度不被顶回来、清浏览器数据后登录恢复、退出回闸门）。
+- 真机验证脚本 `.e2e/acc-real.mjs <url> <用户名>`（线上真 API，跑完记得删账号对象 + 重置 _index.json）。

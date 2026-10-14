@@ -732,16 +732,6 @@
   const knownCount = () => (VOCAB || []).filter((v) => n0(S.known[v.id]) > 0).length;
   const hashStr = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return String(h); };
 
-  async function syncUrls() {
-    if (!syncCfg) {
-      const cfg = await (await fetch('data/oss-sync.json', { cache: 'no-store' })).json();
-      // 兼容老格式（只有一对 get/put，指向 sync/imports.json）
-      if (!cfg.imports) cfg.imports = { get: cfg.get, put: cfg.put };
-      if (!cfg.progress) cfg.progress = cfg.imports;
-      syncCfg = cfg;
-    }
-    return syncCfg;
-  }
   /** 账号 API（函数计算）：带 token 的 JSON 调用 */
   async function apiCall(path, opts = {}) {
     const headers = { 'content-type': 'application/json' };
@@ -754,19 +744,6 @@
     try { j = await r.json(); } catch {}
     if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
     return j || {};
-  }
-
-  async function readJson(url) {
-    if (!url) return null;
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) return null;
-    return r.json().catch(() => null);
-  }
-  async function putJson(url, obj) {
-    const body = JSON.stringify(obj);
-    const r = await fetch(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return body;
   }
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
@@ -813,7 +790,7 @@
   }
 
   function queueSync() {
-    if (applying || S.autoSync === false) return;
+    if (applying || S.autoSync === false || !ACC || !ACC.token) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => { syncNow({ auto: true }); }, SYNC_DEBOUNCE);
   }
@@ -823,48 +800,21 @@
     if (importing || syncBusy) { syncQueued = true; return false; }
     syncBusy = true;
     try {
-      if (ACC && ACC.token) {                     // 账号模式：一次 PUT 就够（服务端合并后返回全量）
-        const res = await apiCall('/data', { method: 'PUT', body: { data: userState(S) } });
-        const mergedAcc = mergeStates(userState(S), res.data || {});
-        if (JSON.stringify(mergedAcc) !== JSON.stringify(userState(S))) {
-          await ensureReadings().catch(() => {});
-          applying = true;
-          S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
-          S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.clearedAt = mergedAcc.clearedAt;
-          save(); applying = false;
-          registerImpTracks();
-        }
-        applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; save(); applying = false;
-        syncErr = '';
-        return true;
-      }
-      const cfg = await syncUrls();
-      const [cProg, cImp] = await Promise.all([readJson(cfg.progress.get), readJson(cfg.imports.get)]);
-      const cState = Object.assign({}, cProg && cProg.data ? cProg.data : (cProg || {}));
-      cState.imp = (cImp && (cImp.imp || (cImp.data && cImp.data.imp))) || {};
-      const before = userState(S);
-      const merged = mergeStates(before, cState);
-      const gained = Object.keys(merged.imp).length - Object.keys(before.imp).length;
-      if (JSON.stringify(merged) !== JSON.stringify(before)) {
+      if (!ACC || !ACC.token) { syncBusy = false; return false; }   // 没登录就不动云
+      const res = await apiCall('/data', { method: 'PUT', body: { data: userState(S) } });   // 一次 PUT：服务端合并后返回全量
+      const mergedAcc = mergeStates(userState(S), res.data || {});
+      const gained = Object.keys(mergedAcc.imp).length - Object.keys(userState(S).imp).length;
+      if (JSON.stringify(mergedAcc) !== JSON.stringify(userState(S))) {
         await ensureReadings().catch(() => {});
         applying = true;
-        S.known = merged.known; S.notes = merged.notes; S.audio = merged.audio;
-        S.imp = merged.imp; S.del = merged.del; S.clearedAt = merged.clearedAt;
+        S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
+        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();
       }
-      const at = new Date().toISOString();
-      // 进度/释义这份很小，改一点就传；导入的歌那份大，只有歌单真变了才传
-      const progJson = JSON.stringify({ v: 1, at, dev: devId, known: merged.known, notes: merged.notes,
-        audio: merged.audio, del: merged.del, clearedAt: merged.clearedAt });
-      const impJson = JSON.stringify({ v: 1, at, dev: devId, count: Object.keys(merged.imp).length, imp: merged.imp });
-      const hP = hashStr(progJson), hI = hashStr(impJson);
-      let wrote = false;
-      if (hP !== S.syncHashP || opts.force) { await putJson(cfg.progress.put, JSON.parse(progJson)); applying = true; S.syncHashP = hP; wrote = true; applying = false; }
-      if (hI !== S.syncHashI || opts.force) { await putJson(cfg.imports.put, JSON.parse(impJson)); applying = true; S.syncHashI = hI; wrote = true; applying = false; }
-      applying = true; S.syncAt = at; if (wrote) S.syncErr = ''; save(); applying = false;
+      applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; S.syncHash = ''; save(); applying = false;
       syncErr = '';
-      if (opts.auto && gained > 0) toast(`已从云端恢复 ${gained} 首导入的歌`);
+      if (opts.auto && gained > 0) toast(`已从账号取回 ${gained} 首导入的歌`);
       return true;
     } catch (e) {
       syncErr = e.message || '同步失败';
@@ -881,6 +831,7 @@
   function syncMsgHtml() {
     const logged = !!(ACC && ACC.token);
     const who = logged ? '账号 ' + esc(ACC.name) : '未登录';
+    if (!logged) return '未登录：登录后记录才会跟着账号走';
     if (S.autoSync === false) return '云端：自动同步已关（点「自动同步：关」可打开）· ' + who;
     if (syncBusy) return '云端：同步中… · ' + who;
     if (syncErr) return '云端：上次同步失败（' + esc(syncErr) + '），有改动会自动重试 · ' + who;
@@ -905,7 +856,7 @@
         <div class="row" style="margin-top:8px"><button class="toolbtn" id="acc-pw">改密码</button></div>`;
     }
     return `<div class="accbox"><div class="col"><div class="l1">登录后记录跟着账号走</div>
-      <div class="l2">现在未登录：进度只在本机浏览器 + 一个公开对象里。注册一个账号（只存用户名和密码哈希），<br>换手机、清掉浏览器数据，登录一下记录就全回来了。</div></div>
+      <div class="l2">登录后记录跟着账号走：换手机、清掉浏览器数据，登录一下全回来。</div></div>
       <div class="row" style="margin-top:8px">
         <input class="sel" id="acc-name" placeholder="用户名" style="flex:1;min-width:100px;height:38px" autocomplete="username">
         <input class="sel" id="acc-pass" type="password" placeholder="密码（≥6 位）" style="flex:1;min-width:100px;height:38px" autocomplete="current-password">
@@ -916,10 +867,37 @@
       </div></div>`;
   }
 
-  async function doAuth(kind) {
-    const name = ($('acc-name') && $('acc-name').value || '').trim();
-    const pass = ($('acc-pass') && $('acc-pass').value) || '';
-    if (!name || !pass) { toast('用户名和密码都要填'); return; }
+  // ────────────── 登录闸门（没登录不让用） ──────────────
+  function gateMsg(t) { const el = $('g-msg'); if (el) el.textContent = t || ''; }
+  function afterLogin() {
+    const g = $('gate'); if (g) g.hidden = true;
+    document.body.classList.remove('gated');
+    route();
+    if (location.hash.startsWith('#/mine')) renderMine();
+  }
+  function showGate(msg) {
+    const g = $('gate'); if (!g) return;
+    g.hidden = false;
+    document.body.classList.add('gated');
+    g.innerHTML = `<div class="gatecard">
+      <div class="gtitle">东方同人曲 学唱机</div>
+      <div class="gsub">登录后开始：进度 / 自定义释义 / 导入的歌单都跟着账号走，换设备登录一下也在。</div>
+      <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
+      <input class="sel" id="g-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
+      <div class="row"><button class="btn-primary" id="g-login">登录</button><button class="toolbtn" id="g-reg">注册新账号</button></div>
+      <div class="gmsg" id="g-msg">${esc(msg || '')}</div>
+      <div class="gsub">没有账号就点「注册新账号」，起个名字设个密码就行（只存用户名和密码哈希）。</div>
+    </div>`;
+    $('g-login').onclick = () => authFrom('login', 'g-name', 'g-pass', afterLogin);
+    $('g-reg').onclick = () => authFrom('reg', 'g-name', 'g-pass', afterLogin);
+    const onKey = (e) => { if (e.key === 'Enter') authFrom('login', 'g-name', 'g-pass', afterLogin); };
+    $('g-name').onkeydown = onKey; $('g-pass').onkeydown = onKey;
+  }
+
+  async function authFrom(kind, nSel, pSel, after) {
+    const name = (($(nSel) && $(nSel).value) || '').trim();
+    const pass = (($(pSel) && $(pSel).value) || '');
+    if (!name || !pass) { toast('用户名和密码都要填'); gateMsg('用户名和密码都要填'); return; }
     setLoad(true, kind === 'reg' ? '注册中…' : '登录中…');
     try {
       const body = { name, pass };
@@ -929,10 +907,15 @@
       saveAcc();
       setLoad(false);
       toast(kind === 'reg' ? `注册好了，欢迎 ${res.user.name}` : `已登录：${res.user.name}`);
-      await syncNow({ auto: true });                        // 立刻拉一次（PUT 会带回服务端合并后的全量）
-      renderMine();
-    } catch (e) { setLoad(false); toast((kind === 'reg' ? '注册失败：' : '登录失败：') + e.message); }
+      if (after) { await syncNow({ auto: true }); after(); }   // 闸门里登录：拉一次再放行
+      else { await syncNow({ auto: true }); renderMine(); }
+    } catch (e) {
+      setLoad(false);
+      const msg = (kind === 'reg' ? '注册失败：' : '登录失败：') + e.message;
+      toast(msg); gateMsg(msg);
+    }
   }
+  const doAuth = (kind) => authFrom(kind, 'acc-name', 'acc-pass', null);
 
   async function changePass() {
     const oldp = ($('acc-old') && $('acc-old').value) || '', newp = ($('acc-new') && $('acc-new').value) || '';
@@ -947,6 +930,7 @@
 
   async function pushCloud() {
     if (importing) return;
+    if (!ACC || !ACC.token) { toast('先登录才能同步'); return; }
     if (syncBusy) { toast('正在同步中，稍等一下'); return; }
     setLoad(true, '同步到云端…');
     const ok = await syncNow({ manual: true, force: true });
@@ -957,6 +941,7 @@
   }
   async function pullCloud() {
     if (importing) return;
+    if (!ACC || !ACC.token) { toast('先登录才能同步'); return; }
     if (syncBusy) { toast('正在同步中，稍等一下'); return; }
     const impB = Object.keys(S.imp || {}).length, kB = knownCount();
     setLoad(true, '从云端拉取…');
@@ -1152,7 +1137,7 @@
     const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
     if (accReg) accReg.onclick = () => doAuth('reg');
     if (accLogin) accLogin.onclick = () => doAuth('login');
-    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录（本机记录还在，随时可以再登）'); renderMine(); };
+    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); toast('已退出登录（本机记录还在，再登回来即可）'); showGate('已退出登录。本机记录还在，登录即可继续。'); };
     const accPw = $('acc-pw'), accPwDo = $('acc-pwdo');
     if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
     if (accPwDo) accPwDo.onclick = () => changePass();
@@ -1637,10 +1622,11 @@
       if (audio.paused) { if (audio.error || audio.readyState === 0) playTrack(curTrack); else audio.play().catch(() => {}); }
       else audio.pause();
     }
-    window.addEventListener('hashchange', route);
-    if (!location.hash) location.replace('#/learn');
+    if (!location.hash) history.replaceState(null, '', '#/learn');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
+    window.addEventListener('hashchange', route);                     // 闸门也要挂：登录后靠它路由
+    if (!ACC || !ACC.token) { showGate(); return; }   // 必须登录才能用
     route();
-    // 打开页面先跟云端对一次：本机空的就自动恢复，本机有的就把新增的并上去
+    // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
     if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
   }
   boot();
