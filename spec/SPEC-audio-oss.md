@@ -19,10 +19,17 @@
 `https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t1.mp3` 并把 `signed` 改成 false 即可
 （我会自动做）。注意：换了签名 URL 这种形式后，AK 一旋转链接就失效——所以推荐尽快切公共读。
 
-## 待办（阶段 B/C）
+## 阶段 B 已完成（2026-10-14）
 
-- 阶段 B：把现有 10 首有音频的曲目全部上传（用 `aliyun_oss_put_dir` 批量）
-- 阶段 C：其余 34 首待音源
+- 10 首有音频的曲目**全部**下载（320kbps 原文件，字节与 CDN 一致）并上传到 `audio/<trackId>.mp3`
+- `data/audio-oss.json` 由 `dsh-plugins/aliyun-oss/scripts/gen-oss-map.mjs` 生成（默认 10 年签名 URL；
+  关掉「阻止公共访问」后加 `--public` 重新生成即可换成固定直链）
+- 抽验 t44：206 / TTFB 187ms；E2E 52/52
+- 落盘脚本：`node scripts/gen-oss-map.mjs [--public]`（在 `/home/zfq/dev/dsh-plugins/aliyun-oss`）
+
+## 待办（阶段 C）
+
+- 其余 34 首待音源（需要用户提供 mp3 或指定来源）
 
 ---
 

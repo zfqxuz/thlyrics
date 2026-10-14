@@ -1,9 +1,9 @@
 {
-  "_note": "音频改走阿里云 OSS 的映射表：trackId -> 对象信息。由 scripts/build-web.mjs 合并进 track.audioOss。",
+  "_note": "音频走阿里云 OSS 的映射表：trackId -> 对象。由 scripts/build-web.mjs 合并进 track.audioOss。",
   "_bucket": "thlyrics-audio",
   "_region": "oss-cn-hangzhou",
-  "_stage": "阶段A（先上一首，t1）",
-  "_blocker": "阿里云账号级「阻止公共访问」未关闭，公共 URL 现在会被 403；先临时用 10 年有效期的签名 URL。关闭后把 url 换成 https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t1.mp3 并把 signed 改成 false。",
+  "_stage": "阶段B（10 年签名 URL，等账号级\"阻止公共访问\"关闭后换成 --public 重新生成）",
+  "_regen": "node scripts/gen-oss-map.mjs [--public]（在 dsh-plugins/aliyun-oss 下）",
   "tracks": {
     "t1": {
       "key": "audio/t1.mp3",
@@ -11,7 +11,79 @@
       "contentType": "audio/mpeg",
       "cacheControl": "public, max-age=31536000",
       "signed": true,
-      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t1.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107284294&Signature=N7Ok%2FUi%2FGRqUxsUj1Q8kjG5nb30%3D"
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t1.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=f%2FIbuWGB%2FCN%2Fbs7%2Ba8Sy5yzR5nM%3D"
+    },
+    "t10": {
+      "key": "audio/t10.mp3",
+      "bytes": 9575489,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t10.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=phrgIRQHkSdV%2BAymnLdvH4uvicU%3D"
+    },
+    "t12": {
+      "key": "audio/t12.mp3",
+      "bytes": 12913938,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t12.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=c4g0sy0Z4ZzxBxekvkTCdcYm8a4%3D"
+    },
+    "t15": {
+      "key": "audio/t15.mp3",
+      "bytes": 10368566,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t15.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=MZIqNgF6sV%2BhDx5gK%2FQ%2B7jqI%2FAo%3D"
+    },
+    "t20": {
+      "key": "audio/t20.mp3",
+      "bytes": 9105285,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t20.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=p8pVv04rISK6p1rgS%2Frtz%2BxeGSo%3D"
+    },
+    "t28": {
+      "key": "audio/t28.mp3",
+      "bytes": 15794721,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t28.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=fAqhc2Usp2uwp3tw8dpZn74sZR8%3D"
+    },
+    "t32": {
+      "key": "audio/t32.mp3",
+      "bytes": 11952631,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t32.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=ssZ%2BtVSeHynaTVN5%2F6bYUCoFJjs%3D"
+    },
+    "t36": {
+      "key": "audio/t36.mp3",
+      "bytes": 10089578,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t36.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=SUn7Gq0sM8SZMbEwuu1OShNs2qk%3D"
+    },
+    "t44": {
+      "key": "audio/t44.mp3",
+      "bytes": 9581758,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t44.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=lZUl1O15IFiL4g6IjZFsR5Bzdd8%3D"
+    },
+    "t5": {
+      "key": "audio/t5.mp3",
+      "bytes": 7983064,
+      "contentType": "audio/mpeg",
+      "cacheControl": "public, max-age=31536000",
+      "signed": true,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/audio/t5.mp3?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107304914&Signature=Ay9P9La62KdRKZ1DcfJu1lu5eQc%3D"
     }
   }
 }
