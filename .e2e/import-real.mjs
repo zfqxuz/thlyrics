@@ -21,6 +21,8 @@ await page.addInitScript(() => localStorage.setItem('thlyrics.account.v1', JSON.
 const errs = [];
 page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !/status of 4\d\d/.test(m.text())) errs.push('console: ' + m.text().slice(0, 120)); });
+page.setDefaultTimeout(45000);
+page.setDefaultNavigationTimeout(60000);
 let bad = 0;
 const check = (n, ok, extra = '') => { if (!ok) bad++; console.log(`${ok ? '✓' : '✗'} ${n}${extra ? ' — ' + extra : ''}`); };
 
@@ -102,6 +104,10 @@ const qqOpened = await page.evaluate(async () => {
   return { tid: a && a.getAttribute('data-tid'), src: (a && a.src) || '' };
 });
 check('QQ 曲目能取到可播地址（后端 vkey）', !!qqOpened && /^https:\/\//.test(qqOpened.src) && /qq\.com/.test(qqOpened.src), qqOpened ? qqOpened.src.slice(0, 56) : '没找到曲目');
+
+// QQ 会员曲：歌词能拿、音源拿不到 → 也要入库并标「暂无音源」（不再整首丢）
+const vipStat = await imp('分享单曲：晴天 https://y.qq.com/n/ryqq/songDetail/0039MnYb0qxYhV');
+check('QQ 会员曲：入库但标暂无音源', /入库 1 首/.test(vipStat) && /暂无音源/.test(vipStat), vipStat.slice(0, 64));
 
 // ── 新一批 UI：我的页 / 黑白开关 / 入库倒序 / 专辑网格 / 收藏会唱 ──
 await page.goto(BASE + '?ui=1#/me', { waitUntil: 'load' });

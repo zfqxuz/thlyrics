@@ -691,8 +691,14 @@ check('导入曲目用的是服务端分词（词性/读音来自 kuromoji）', 
 await page.goto(BASE + '?org=1#/songs', { waitUntil: 'load' });
 await page.waitForSelector('#list .track', { timeout: 15000 });
 await page.waitForTimeout(500);
-const firstTitle = await page.evaluate(() => (document.querySelector('#list .track .l1') || {}).textContent || '');
-check('曲库默认按入库时间（新→旧）', /QQ 专辑第二首/.test(firstTitle), '第一首（最后导入的那首）：' + firstTitle.trim());
+const newestCheck = await page.evaluate(() => {
+  const recs = Object.values(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {});
+  const newest = recs.reduce((a, b) => (Number(b.at) > Number(a.at) ? b : a), recs[0] || {});
+  const first = document.querySelector('#list .track');
+  return { firstId: first ? first.dataset.id : '', newestId: newest.id || '', newestTitle: newest.title || '' };
+});
+check('曲库默认按入库时间（新→旧）', newestCheck.firstId === newestCheck.newestId,
+  `列表第一首 ${newestCheck.firstId} · 最近入库 ${newestCheck.newestTitle}（${newestCheck.newestId}）`);
 const titlesOf = () => page.evaluate(() => [...document.querySelectorAll('#list .track .l1')].map((e) => e.textContent.trim()));
 const byTitleAsc = await page.evaluate(() => { const t0 = [...document.querySelectorAll('#list .track .l1')].map((e) => e.textContent.trim()); return t0; });
 await page.locator('#tsort').selectOption('az');
