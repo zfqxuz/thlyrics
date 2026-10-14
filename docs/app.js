@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014x';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014y';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
@@ -68,33 +68,35 @@
     if (by === 'azd') return arr.sort((a, b) => byTitle(b, a));
     return arr.sort((a, b) => trackTime(b) - trackTime(a) || byTitle(a, b));
   }
-  // ── 罗马音纠正：键 = 表面形|读音，值 {y: 用户写的罗马音, u: 时间戳}（跟着账号同步）──
-  const romaKey = (s, r) => String(s || '') + '|' + String(r || '');
-  const romaOf = (s, r) => {
-    const o = S.roma && S.roma[romaKey(s, r)];
+  // ── 罗马音纠正：只认「哪首歌 · 哪一行 · 第几个词」这一处（不扩散到同词、更不跨曲）──
+  //    S.roma = { '<trackId>|<行号>|<词位>': { y: 用户写的罗马音, u: 时间戳 } }，跟着账号同步
+  const romaKey = (tid, li, ti) => String(tid) + '|' + Number(li) + '|' + Number(ti);
+  const romaOf = (tid, li, ti) => {
+    if (tid == null || li == null || ti == null) return '';
+    const o = S.roma && S.roma[romaKey(tid, li, ti)];
     return (o && (typeof o === 'object' ? o.y : o)) || '';
   };
-  function setRoma(s, r, y, drop) {
-    const k = romaKey(s, r);
+  function setRoma(tid, li, ti, y, drop) {
+    const k = romaKey(tid, li, ti);
     S.roma = S.roma || {};
     if (drop || !String(y || '').trim()) delete S.roma[k];
     else S.roma[k] = { y: String(y).trim(), u: Date.now() };
     save();
   }
   /** 备选：赫本（当前）/ 训令式 / 长音不标 等，外加用户已经改过的值 */
-  function romaVariants(surface, reading) {
+  function romaVariants(reading) {
     const base = String(kanaRomaji(reading || '') || '').trim();
     const kana = String(reading || '');
     const out = [];
     const push = (v) => { const t = String(v || '').trim(); if (t && !out.includes(t)) out.push(t); };
-    const cur = romaOf(surface, reading);
-    if (cur) push(cur);
     push(base);
     push(base.replace(/shi/g, 'si').replace(/chi/g, 'ti').replace(/tsu/g, 'tu').replace(/fu/g, 'hu')
       .replace(/ji/g, 'zi').replace(/sha/g, 'sya').replace(/shu/g, 'syu').replace(/sho/g, 'syo')
       .replace(/cha/g, 'tya').replace(/chu/g, 'tyu').replace(/cho/g, 'tyo')
       .replace(/ja/g, 'zya').replace(/ju/g, 'zyu').replace(/jo/g, 'zyo'));
-    push(base.replace(/ou/g, 'o').replace(/uu/g, 'u'));
+    push(base.replace(/ou/g, 'o').replace(/uu/g, 'u'));                    // 长音不标
+    push(base.replace(/ou/g, 'ō').replace(/uu/g, 'ū'));                    // 用长音符
+    push(base.replace(/n([bmp])/g, 'm$1'));                                // ん 的听感写法（shimbun）
     // 促音（っ）不双写、长音分写等手写习惯
     push(base.replace(/([bcdfghjklmpqrstvwxyz])\1/g, '$1'));
     const kanaRoma = { 'し': 'shi', 'ち': 'chi', 'つ': 'tsu', 'ふ': 'fu', 'じ': 'ji' };
@@ -618,7 +620,7 @@
       <div class="revbar"><i style="width:${Math.round(((revI) / revDeck.length) * 100)}%"></i></div>
       <div class="revcard">
         <div class="rw">${esc(v.word)}</div>
-        ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(romaOf(v.word, v.reading) || v.romaji || '')}</div>
+        ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(v.romaji || '')}</div>
           <div class="rm">${esc(meaningOf(v) || '（没有释义）')}</div>
           ${ex ? `<div class="rx">${esc(ex.track || '')}<br>${esc(ex.jp)}${ex.zh ? '<br>' + esc(ex.zh) : ''}</div>` : ''}`
         : '<div class="rr">？</div>'}
@@ -1870,7 +1872,7 @@
         ${next ? `<button class="toolbtn" data-go-word="${next.id}">${esc(next.word)} →</button>` : ''}
       </div>
       <div class="sec-title" style="font-size:30px">${esc(v.word)}</div>
-      <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(romaOf(v.word, v.reading) || v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
+      <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
       <div class="bar" style="margin:14px 0 0"><i style="width:${level(v) * 20}%"></i></div>
       <div style="font-size:17px;margin-top:14px;color:#ffe9df" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
       <div class="row" style="margin-top:14px">
@@ -2003,7 +2005,8 @@
       const ruby = S.ruby !== false;
       let flat = [];
       if (l.segs && l.segs.length) {
-        for (const sg of l.segs) {
+        for (let ti = 0; ti < l.segs.length; ti++) {
+          const sg = l.segs[ti];
           if (!sg.s) continue;
           if (!sg.k) {
             // 标点/英文这类纯文本也要占住「罗马音那一行」，否则它们会浮在词的上面
@@ -2021,9 +2024,11 @@
           const w = sym ? null : ((sg.w && VBY.get(sg.b)) || SURF.get(sg.s) || null);
           const span = document.createElement('span');
           span.className = 'w k-' + sg.k + (w && isKnown(w) ? ' known' : '');
-          const y = romaOf(sg.s, sg.r) || sg.y || '';
+          const y = romaOf(t.id, i, ti) || sg.y || '';
           span.dataset.s = sg.s;
           if (sg.r) span.dataset.r = sg.r;
+          span.dataset.ti = String(ti);
+          if (romaOf(t.id, i, ti)) span.dataset.fixed = '1';       // 改过的标一下（用户自己看得见）
           if (y) span.dataset.y = y;
           if (sym) span.dataset.plain = '1';
           if (sg.w && sg.b) span.dataset.w = sg.b;
@@ -2056,7 +2061,9 @@
       const wEl = e.target.closest('.w');
       if (wEl && !wEl.dataset.plain) {
         const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
-        showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '' });
+        const blk = e.target.closest('.lblock[data-i]');
+        showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '',
+          li: blk ? Number(blk.dataset.i) : null, ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
         return;
       }
       const b = e.target.closest('.lblock[data-i]');
@@ -2170,16 +2177,17 @@
   }
 
   // ────────────── 词条弹层 ──────────────
-  let popWord = null, popFallback = null, popSeg = null, romaCtx = null, romaWasPlaying = false;
+  let popWord = null, popFallback = null, popSeg = null, popPos = null, romaCtx = null, romaWasPlaying = false;
   function showPop(w, fallback, seg) {
     popFallback = fallback || null;
     popSeg = seg || null;
+    popPos = (seg && seg.li != null && seg.ti != null && curTrack) ? { tid: curTrack.id, li: seg.li, ti: seg.ti } : null;
     const on = (id) => { const el = $(id); if (el) el.style.display = ''; };
     if (!w) {
       const rd = (seg && seg.r) ? norm(seg.r) : '';
       $('p-word').textContent = fallback || '';
       $('p-reading').textContent = rd ? '（' + rd + '）' : '';
-      $('p-romaji').textContent = romaOf(seg && seg.s, seg && seg.r) || (seg && seg.y) || '';
+      $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || (seg && seg.y) || '';
       $('p-meaning').textContent = rd ? '词表未收录' : '词表未收录，也没查到读音';
       $('p-ex').textContent = ''; $('p-meta').textContent = '';
       $('p-known').style.display = 'none'; $('p-goto').style.display = 'none';
@@ -2194,7 +2202,7 @@
     if ($('p-goto')) $('p-goto').style.display = exG && exG.tid ? '' : 'none';
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
-    $('p-romaji').textContent = romaOf((seg && seg.s) || w.word, (seg && seg.r) || w.reading) || w.romaji || '';
+    $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
     const ex = exG;
     $('p-ex').textContent = ex ? `例句（${ex.track}）：${ex.jp}${ex.zh ? ' → ' + ex.zh : ''}` : '';
@@ -2343,10 +2351,11 @@
     $('p-more').onclick = () => { const b = $('p-morebox'); if (b) b.hidden = !b.hidden; };
     // ── 罗马音纠正：打开时暂停播放，保存/关闭后继续 ──
     const romaTarget = () => {
+      if (!popPos) return null;
       const seg = popSeg, w = popWord;
       const surface = (seg && seg.s) || (w && w.word) || '';
       const reading = (seg && seg.r) || (w && w.reading) || '';
-      return surface ? { surface, reading, seg, w } : null;
+      return surface ? Object.assign({ surface, reading, seg, w }, popPos) : null;
     };
     $('p-roma').onclick = () => {
       const t = romaTarget(); if (!t) return;
@@ -2354,8 +2363,9 @@
       romaWasPlaying = !audio.paused && !!audio.src;
       if (romaWasPlaying) audio.pause();
       const box = $('p-romabox'); if (box) box.hidden = false;
-      $('p-romainput').value = romaOf(t.surface, t.reading) || (t.seg && t.seg.y) || (t.w && t.w.romaji) || '';
-      const cands = romaVariants(t.surface, t.reading);
+      $('p-romainput').value = romaOf(t.tid, t.li, t.ti) || (t.seg && t.seg.y) || (t.w && t.w.romaji) || '';
+      $('p-romacands').dataset.hint = (t.seg && t.seg.s) || t.surface;
+      const cands = romaVariants(t.reading);
       $('p-romacands').innerHTML = cands.map((v) => `<button class="chip" data-r="${esc(v)}">${esc(v)}</button>`).join('')
         + (cands.length ? '' : '<span class="meta">这个词没有读音可推，直接手写吧</span>');
       $('p-romacands').querySelectorAll('[data-r]').forEach((el) => (el.onclick = () => { $('p-romainput').value = el.dataset.r; }));
@@ -2363,7 +2373,7 @@
     };
     const saveRoma = (drop) => {
       if (!romaCtx) return;
-      setRoma(romaCtx.surface, romaCtx.reading, drop ? '' : $('p-romainput').value, drop);
+      setRoma(romaCtx.tid, romaCtx.li, romaCtx.ti, drop ? '' : $('p-romainput').value, drop);
       const keepPlaying = romaWasPlaying;
       romaWasPlaying = false;
       const box = $('p-romabox'); if (box) box.hidden = true;
@@ -2372,7 +2382,7 @@
       if (popWord || popSeg) showPop(popWord, popFallback, popSeg);
       else hidePop();
       if (keepPlaying && curTrack) playTrack(curTrack);
-      toast(drop ? '已还原' : '罗马音已更新');
+      toast(drop ? '已还原' : '这一处的罗马音已更新');
     };
     $('p-romasave').onclick = () => saveRoma(false);
     $('p-romareset').onclick = () => saveRoma(true);

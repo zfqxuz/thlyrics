@@ -845,8 +845,13 @@ await page.evaluate(() => {                 // headless 的假 mp3 播不起来�
 });
 await page.locator('#t-sing').click();
 await page.waitForTimeout(1200);
-const rw = await page.evaluate(() => { const el = document.querySelector('#plyric .w[data-w]'); return el ? { s: el.dataset.s, r: el.dataset.r || '' } : null; });
-await page.locator('#plyric .w[data-w]').first().click();
+const rw = await page.evaluate(() => {          // 挑一个能推出多种写法的词（含 し/ち/つ/ふ/じ）
+  const els = [...document.querySelectorAll('#plyric .w[data-w]')];
+  const i = els.findIndex((x) => /[しちつふじシチツフジ]/.test(x.dataset.r || ''));
+  const el = els[i >= 0 ? i : 0];
+  return el ? { i: i >= 0 ? i : 0, s: el.dataset.s, r: el.dataset.r || '' } : null;
+});
+await page.locator('#plyric .w[data-w]').nth(rw ? rw.i : 0).click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.locator('#p-roma').click();
 await page.waitForTimeout(400);
@@ -857,7 +862,8 @@ const romaOpen = await page.evaluate(() => ({
   val: (document.getElementById('p-romainput') || {}).value || '',
 }));
 check('改罗马音：编辑器打开并暂停播放', romaOpen.box && romaOpen.calls.includes('pause'), `调用 ${romaOpen.calls.join('/')}`);
-check('给出备选（含训令式等写法）', romaOpen.cands >= 2, `${romaOpen.cands} 个备选 · 当前「${romaOpen.val}」`);
+const hasVarKana = /[しちつふじシチツフジ]/.test(rw ? rw.r : '');
+check('给出备选（能推出多种写法时给多个）', romaOpen.cands >= 1 && (!hasVarKana || romaOpen.cands >= 2), `${romaOpen.cands} 个备选 · 当前「${romaOpen.val}」`);
 await page.locator('#p-romacands button').nth(1).click();
 await page.waitForTimeout(200);
 const chosen = await page.locator('#p-romainput').inputValue();
@@ -865,14 +871,22 @@ await page.locator('#p-romasave').click();
 await page.waitForTimeout(900);
 const romaAfter = await page.evaluate((k) => {
   const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}');
-  const el = [...document.querySelectorAll('#plyric .w')].find((x) => x.dataset.s === k.s);
-  const rEl = el && el.querySelector('.r');
-  return { saved: Object.keys(j.roma || {}).length, shown: rEl ? rEl.textContent.trim() : '', calls: (window.__calls || []).slice() };
+  const keys = Object.keys(j.roma || {});
+  const fixed = [...document.querySelectorAll('#plyric .w[data-fixed="1"]')];
+  const sameWord = [...document.querySelectorAll('#plyric .w')].filter((x) => x.dataset.s === k.s);
+  const others = sameWord.filter((x) => x.dataset.fixed !== '1');
+  const rOf = (el) => { const r = el && el.querySelector('.r'); return r ? r.textContent.trim() : ''; };
+  return { saved: keys.length, key: keys[0] || '', shown: rOf(fixed[0]), fixedN: fixed.length,
+    sameN: sameWord.length, othersChanged: others.filter((x) => rOf(x) === chosen).length,
+    calls: (window.__calls || []).slice() };
 }, rw);
-check('保存后歌词里立刻生效 + 继续播放', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.calls.includes('play'),
+check('保存后立刻生效 + 继续播放', romaAfter.saved === 1 && romaAfter.shown === chosen && romaAfter.calls.includes('play'),
   `存 ${romaAfter.saved} 条 · 显示「${romaAfter.shown}」`);
-// 自定义输入
-await page.locator('#plyric .w[data-w]').first().click();
+check('只改这一处：同曲同词的其它位置不动', romaAfter.fixedN === 1 && romaAfter.othersChanged === 0,
+  `本曲同词 ${romaAfter.sameN} 处 · 改动 ${romaAfter.fixedN} 处 · 其它被误改 ${romaAfter.othersChanged} 处`);
+check('纠正键带曲目和位置（不会跨曲）', /^t1\|\d+\|\d+$/.test(romaAfter.key), romaAfter.key || '(空)');
+// 自定义输入（还是刚才那一处）
+await page.locator('#plyric .w[data-fixed="1"]').first().click();
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 await page.locator('#p-roma').click();
 await page.waitForTimeout(300);
