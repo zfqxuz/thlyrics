@@ -24,6 +24,7 @@ const chrome = (() => {
 const libPath = ['root/usr/lib/x86_64-linux-gnu', 'root/lib/x86_64-linux-gnu', 'root/usr/lib', 'root/lib']
   .map((p) => path.join(HERE, p)).join(':');
 
+const n0 = (v) => (Number(v) || 0);
 const results = [];
 const check = (name, ok, extra = '') => { results.push({ name, ok, extra }); console.log(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`); };
 
@@ -52,26 +53,32 @@ const E2E_LYRIC = {
   tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
 };
 // 云端同步的桩：页面会去读 data/oss-sync.json，再对 get/put 地址读写；这里全用假的，别碰真 OSS
-let cloudBlob = null;
+let cloudProg = null;    // sync/progress.json（进度/释义/删除墓碑）
+let cloudImp = null;     // sync/imports.json（导入的歌，大）
+let cloudExtra = false;  // 打开才模拟“另一台设备”也往云端写了一份（验合并用）
+const OTHER_DEVICE_TRACK = {
+  id: 'i888800001', nid: '888800001', title: '别的设备导入的歌', artist: '測試', album: '東方', cover: '',
+  lines: [{ t: 1, text: '流れてく　時の中ででも', zh: '就算在流逝的时间中' }, { t: 3, text: '気だるさが', zh: '仍能发现' }, { t: 5, text: 'ほらグルグル廻って', zh: '只在原地打转不停' }],
+  plId: '1', plName: '另一台设备的歌单', at: Date.now(),
+};
 const baseRoute = (route) => {
   const u = route.request().url();
   if (/data\/oss-sync\.json/.test(u)) {
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ get: 'https://sync.e2e/get', put: 'https://sync.e2e/put' }) });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      imports: { get: 'https://sync.e2e/imports-get', put: 'https://sync.e2e/imports-put' },
+      progress: { get: 'https://sync.e2e/progress-get', put: 'https://sync.e2e/progress-put' },
+    }) });
   }
-  if (u === 'https://sync.e2e/put') {
-    cloudBlob = route.request().postData() || '';
-    return route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
-  }
-  if (u === 'https://sync.e2e/get') {
-    if (!cloudBlob) return route.fulfill({ status: 404, contentType: 'text/plain', body: 'no such key' });
-    const j = JSON.parse(cloudBlob);
-    // 模拟"另一台设备"也导入了 1 首：云端这份比本机多一条
-    j.imp['i888800001'] = j.imp['i888800001'] || {
-      id: 'i888800001', nid: '888800001', title: '别的设备导入的歌', artist: '測試', album: '東方', cover: '',
-      lines: [{ t: 1, text: '流れてく　時の中ででも', zh: '就算在流逝的时间中' }, { t: 3, text: '気だるさが', zh: '仍能发现' }, { t: 5, text: 'ほらグルグル廻って', zh: '只在原地打转不停' }],
-      plId: '1', plName: '另一台设备的歌单', at: Date.now(),
-    };
+  if (u === 'https://sync.e2e/imports-put') { cloudImp = route.request().postData() || ''; return route.fulfill({ status: 200, contentType: 'text/plain', body: '' }); }
+  if (u === 'https://sync.e2e/progress-put') { cloudProg = route.request().postData() || ''; return route.fulfill({ status: 200, contentType: 'text/plain', body: '' }); }
+  if (u === 'https://sync.e2e/imports-get') {
+    const j = cloudImp ? JSON.parse(cloudImp) : { imp: {} };
+    j.imp = j.imp || {};
+    if (cloudExtra) j.imp['i888800001'] = j.imp['i888800001'] || OTHER_DEVICE_TRACK;   // 模拟另一台设备写进来的
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
+  }
+  if (u === 'https://sync.e2e/progress-get') {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: cloudProg || '{}' });
   }
   if (/gdstudio/.test(u) && /types=playlist/.test(u)) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(E2E_PLAYLIST) });
@@ -486,24 +493,85 @@ await page.locator('#mb-meta').click();
 await page.waitForTimeout(500);
 check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
 
-// ═══════ 14 导入的歌能不能换设备（云端同步 / 文件导出） ═══════
+// ═══════ 14 记录持久化（云端自动同步 / 换设备 / 清空浏览器数据 / 删除不被复活） ═══════
 if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
 await page.locator('#tab-mine').click();
 await page.waitForTimeout(400);
 check('生词本给出云端同步入口', (await page.locator('#m-push').count()) === 1 && (await page.locator('#m-pull').count()) === 1, await txt('#m-push'));
+check('生词本给出自动同步开关与状态行', (await page.locator('#m-auto').count()) === 1 && /云端/.test((await txt('#syncmsg')) || ''), ((await txt('#syncmsg')) || '').slice(0, 26));
+
+// 先造一条自定义释义：验证“记录”里不只是歌单
+const widMine = await page.evaluate(() => (document.querySelector('#view-mine .chip') || {}).dataset ? document.querySelector('#view-mine .chip').dataset.w : null);
+if (widMine) {
+  await page.goto(BASE + '#/word/' + widMine);
+  await page.waitForTimeout(500);
+  await page.locator('#w-edit').click();
+  await page.locator('#w-editinput').fill('E2E 自定义释义');
+  await page.locator('#w-editinput').press('Enter');
+  await page.waitForTimeout(400);
+  await page.locator('#tab-mine').click();
+  await page.waitForTimeout(400);
+}
+
+const cloudView = () => {
+  const d = Object.assign({ known: {}, notes: {}, audio: {}, del: {}, clearedAt: 0, imp: {} }, cloudProg ? JSON.parse(cloudProg) : {});
+  d.imp = Object.assign({}, cloudImp ? JSON.parse(cloudImp).imp || {} : {});
+  return d;
+};
 const impBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {}).length);
 await page.locator('#m-push').click();
-await page.waitForTimeout(1200);
-const pushed = cloudBlob ? JSON.parse(cloudBlob) : null;
-check('同步到云端：把本机导入的歌传上去', !!pushed && Object.keys(pushed.imp || {}).length === impBefore, `云端收到 ${pushed ? Object.keys(pushed.imp || {}).length : '—'} 首 / 本机 ${impBefore} 首`);
+await page.waitForTimeout(1600);
+const pushed = cloudView();
+check('同步到云端：把本机导入的歌传上去', Object.keys(pushed.imp).length === impBefore, `云端收到 ${Object.keys(pushed.imp).length} 首 / 本机 ${impBefore} 首`);
+check('同步到云端：进度、自定义释义一起传（不是只传歌单）', Object.keys(pushed.known).length > 0 && Object.keys(pushed.notes).length > 0, `已掌握 ${Object.keys(pushed.known).length} 词 · 释义 ${Object.keys(pushed.notes).length} 条`);
+check('云端拆成两份：标词只传小的那份（不重传整个歌单）', !!cloudProg && (cloudImp || '').length > 0, `进度 ${cloudProg ? cloudProg.length : 0}B / 歌单 ${cloudImp ? cloudImp.length : 0}B`);
+cloudExtra = true;                       // 这次让云端多出“另一台设备”的一首
 await page.locator('#m-pull').click();
-await page.waitForTimeout(1500);
+await page.waitForTimeout(1800);
+cloudExtra = false;
 const impAfter = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').imp || {}).length);
 check('从云端拉回：另一台设备导入的歌并进来了', impAfter === impBefore + 1, `本机 ${impBefore} → ${impAfter} 首`);
 await page.goto(BASE + '#/songs');
-await page.waitForTimeout(600);
+await page.waitForTimeout(900);
 const pulledN = await page.evaluate(() => document.querySelectorAll('#list .track').length);
 check('拉回的歌能在曲库看到', pulledN > 0, pulledN + ' 首');
+
+// 自动同步：不点任何按钮，只标一个词
+cloudExtra = false;
+await page.goto(BASE + '#/learn');
+await page.waitForSelector('#deck .word', { timeout: 15000 });
+const newWordId = await page.evaluate(() => { const el = document.querySelector('#deck .word .tick:not(.on)'); return el ? el.closest('.word').dataset.id : null; });
+if (newWordId) await page.locator('#deck .word .tick:not(.on)').first().click();
+await page.waitForTimeout(4500);        // 等去抖 1.8s + 往返
+const autoView = cloudView();
+check('改动会自动同步（一个按钮都没点）', !!newWordId && n0(autoView.known[newWordId]) > 0, `词 id ${newWordId} → 云端 ${newWordId ? JSON.stringify(autoView.known[newWordId]) : '—'}`);
+
+// 清空浏览器数据 = 换设备：打开就该自动恢复
+const beforeWipe = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { imp: Object.keys(j.imp || {}).length, known: Object.keys(j.known || {}).filter((k) => j.known[k] > 0).length }; });
+await page.evaluate(() => localStorage.clear());
+await page.goto(BASE + '?wipe=1#/mine', { waitUntil: 'load' });   // 换 URL 强制整页重载（只改 hash 不会重载）
+await page.waitForSelector('#m-push', { timeout: 15000 });
+await page.waitForTimeout(5000);        // 等 boot 的自动拉取
+const afterWipe = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { imp: Object.keys(j.imp || {}).length, known: Object.keys(j.known || {}).filter((k) => j.known[k] > 0).length }; });
+check('清空浏览器数据后，打开页面自动恢复导入的歌', afterWipe.imp > 0 && afterWipe.imp >= beforeWipe.imp, `${beforeWipe.imp} → ${afterWipe.imp} 首`);
+check('清空浏览器数据后，进度也自动恢复', afterWipe.known > 0 && afterWipe.known >= beforeWipe.known, `${beforeWipe.known} → ${afterWipe.known} 词`);
+
+// 删掉的导入曲目不会被云端拉回来
+await page.goto(BASE + '#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(1500);
+const delId = await page.evaluate(() => { const el = document.querySelector('#list [data-del]'); return el ? el.dataset.del : null; });
+if (delId) { await page.locator(`#list [data-del="${delId}"]`).first().click(); await page.waitForTimeout(4500); }
+const cloud2 = cloudView();
+check('删掉的导入曲目会记墓碑，不会被云端拉回来', !!delId && !!cloud2.del[delId] && !cloud2.imp[delId], delId ? `墓碑 ${cloud2.del[delId] ? '有' : '无'} · 云端还留着 ${cloud2.imp[delId] ? '是' : '否'}` : '没找到可删的导入曲目');
+
+// 清空进度也不会被云端顶回来
+await page.goto(BASE + '#/mine', { waitUntil: 'load' });
+await page.waitForSelector('#m-clear', { timeout: 15000 });
+await page.locator('#m-clear').click();
+await page.waitForTimeout(4500);
+const cloud3 = cloudView();
+const clearedLocal = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return Object.values(j.known || {}).filter((v) => v > 0).length; });
+check('清空进度后不会被云端拉回来', clearedLocal === 0 && Object.values(cloud3.known || {}).filter((v) => v > 0).length === 0, `本机 ${clearedLocal} 词 · 云端 ${Object.values(cloud3.known || {}).filter((v) => v > 0).length} 词`);
 
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 

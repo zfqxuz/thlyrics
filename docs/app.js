@@ -22,12 +22,14 @@
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all' };
-  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; }
-  const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
-  const isKnown = (w) => !!(w && S.known[w.id]);
+  let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true };
+  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.autoSync = S.autoSync !== false; }
+  // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
+  const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} queueSync(); };
+  // 已掌握记的是时间戳：正数=标了，负数=明确取消（云端合并时按时间戳取胜，不会被旧数据顶回来）
+  const isKnown = (w) => !!(w && Number(S.known[w.id]) > 0);
   const meaningOf = (w) => (w && ((S.notes[w.id] && S.notes[w.id].meaning) || w.meaning)) || '';
-  const toggleKnown = (w) => { if (!w) return; if (S.known[w.id]) delete S.known[w.id]; else S.known[w.id] = 1; save(); };
+  const toggleKnown = (w) => { if (!w) return; if (isKnown(w)) S.known[w.id] = -Date.now(); else S.known[w.id] = Date.now(); save(); };
 
   // ────────────── 本地音频（IndexedDB） ──────────────
   function idb() { return new Promise((res, rej) => { const r = indexedDB.open(IDB_NAME, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('audio')) r.result.createObjectStore('audio'); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
@@ -713,47 +715,164 @@
   window.__tlImport = (input, limit) => importInto(input, limit);
   window.__tlSegs = (t) => segsFor(t);   // 测试用
   window.__tlVid = (w) => (VBY.get(w) || {}).id;   // 测试用：词 → 词条 id
-  // ────────────── 导入歌单的云端同步（预签名 URL，无后端） ──────────────
-  let syncCfg = null;
+  // ────────────── 云端持久化（预签名 URL，无后端） ──────────────
+  // 进度 / 自定义释义 / 导入的歌 会整份自动同步到自己 OSS 上的一个对象里。
+  // 清掉浏览器数据、换设备，打开页面自动拉回来；合并是逐条按时间戳取胜，
+  // 所以两台设备各改各的也不会互相抹掉。
+  const SYNC_DEBOUNCE = 1800;
+  const DEV_KEY = 'thlyrics.dev.v1';
+  var syncCfg = null, syncTimer = null, syncBusy = false, syncQueued = false, syncErr = '', applying = false;
+  const devId = (() => { try { let d = localStorage.getItem(DEV_KEY); if (!d) { d = Math.random().toString(36).slice(2, 10); localStorage.setItem(DEV_KEY, d); } return d; } catch { return 'x'; } })();
+  const n0 = (v) => (Number(v) || 0);
+  const knownCount = () => (VOCAB || []).filter((v) => n0(S.known[v.id]) > 0).length;
+  const hashStr = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return String(h); };
+
   async function syncUrls() {
-    if (!syncCfg) syncCfg = await (await fetch('data/oss-sync.json', { cache: 'no-store' })).json();
+    if (!syncCfg) {
+      const cfg = await (await fetch('data/oss-sync.json', { cache: 'no-store' })).json();
+      // 兼容老格式（只有一对 get/put，指向 sync/imports.json）
+      if (!cfg.imports) cfg.imports = { get: cfg.get, put: cfg.put };
+      if (!cfg.progress) cfg.progress = cfg.imports;
+      syncCfg = cfg;
+    }
     return syncCfg;
   }
-  async function pushCloud() {
-    if (importing) return;
-    const n = Object.keys(S.imp || {}).length;
-    if (!n) { toast('本机还没导入过歌'); return; }
+  async function readJson(url) {
+    if (!url) return null;
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return r.json().catch(() => null);
+  }
+  async function putJson(url, obj) {
+    const body = JSON.stringify(obj);
+    const r = await fetch(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return body;
+  }
+
+  /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
+  function mergeStates(a, b) {
+    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, a);
+    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, clearedAt: 0 }, b);
+    const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
+    out.known = {};
+    for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
+      const x = n0(A.known[k]), y = n0(B.known[k]);
+      const v = Math.abs(y) > Math.abs(x) ? y : x;              // 正=标了，负=取消
+      if (v && Math.abs(v) > out.clearedAt) out.known[k] = v;    // 比“清空进度”更早的一律丢掉
+    }
+    out.notes = {};
+    for (const k of new Set([...Object.keys(A.notes), ...Object.keys(B.notes)])) {
+      const x = A.notes[k] || {}, y = B.notes[k] || {};
+      const v = n0(y.u) > n0(x.u) ? y : x;
+      if (v && v.meaning && (n0(v.u) > out.clearedAt || !out.clearedAt)) out.notes[k] = v;
+    }
+    out.audio = Object.assign({}, B.audio, A.audio);             // 手册绑定的音频地址：本机优先
+    out.del = Object.assign({}, B.del);
+    for (const [k, v] of Object.entries(A.del)) out.del[k] = Math.max(n0(out.del[k]), n0(v));
+    out.imp = {};
+    for (const k of new Set([...Object.keys(A.imp), ...Object.keys(B.imp)])) {
+      const x = A.imp[k] || {}, y = B.imp[k] || {};
+      const v = n0(y.at) > n0(x.at) ? y : x;
+      if (n0(out.del[k]) > n0(v.at)) continue;                   // 删掉的不会被拉回来
+      out.imp[k] = v;
+    }
+    return out;
+  }
+  const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {}, clearedAt: n0(o.clearedAt) });
+
+  /** 合并后多出来的导入曲目，挂进内存里的曲库 */
+  function registerImpTracks() {
+    if (!TRACK || !IDX) return false;
+    let added = false;
+    for (const rec of Object.values(S.imp || {})) {
+      if (!rec || !rec.id || TRACK.has(rec.id)) continue;
+      const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(t.id, t); added = true;
+    }
+    if (added) { if (location.hash.startsWith('#/songs')) renderSongs(); if (location.hash.startsWith('#/mine')) renderMine(); }
+    return added;
+  }
+
+  function queueSync() {
+    if (applying || S.autoSync === false) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => { syncNow({ auto: true }); }, SYNC_DEBOUNCE);
+  }
+
+  /** 读云端 → 逐条合并 → 有变化就写回；云端多的也会并回本机 */
+  async function syncNow(opts = {}) {
+    if (importing || syncBusy) { syncQueued = true; return false; }
+    syncBusy = true;
     try {
       const cfg = await syncUrls();
-      const payload = JSON.stringify({ v: 1, at: new Date().toISOString(), count: n, imp: S.imp });
-      setLoad(true, '同步到云端…');
-      const r = await fetch(cfg.put, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: payload });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      S.syncAt = new Date().toISOString();
-      save();
-      setLoad(false);
-      toast(`已同步 ${n} 首（${Math.round(payload.length / 1024)}KB）`);
-    } catch (e) { setLoad(false); toast('同步失败：' + e.message); }
+      const [cProg, cImp] = await Promise.all([readJson(cfg.progress.get), readJson(cfg.imports.get)]);
+      const cState = Object.assign({}, cProg && cProg.data ? cProg.data : (cProg || {}));
+      cState.imp = (cImp && (cImp.imp || (cImp.data && cImp.data.imp))) || {};
+      const before = userState(S);
+      const merged = mergeStates(before, cState);
+      const gained = Object.keys(merged.imp).length - Object.keys(before.imp).length;
+      if (JSON.stringify(merged) !== JSON.stringify(before)) {
+        await ensureReadings().catch(() => {});
+        applying = true;
+        S.known = merged.known; S.notes = merged.notes; S.audio = merged.audio;
+        S.imp = merged.imp; S.del = merged.del; S.clearedAt = merged.clearedAt;
+        save(); applying = false;
+        registerImpTracks();
+      }
+      const at = new Date().toISOString();
+      // 进度/释义这份很小，改一点就传；导入的歌那份大，只有歌单真变了才传
+      const progJson = JSON.stringify({ v: 1, at, dev: devId, known: merged.known, notes: merged.notes,
+        audio: merged.audio, del: merged.del, clearedAt: merged.clearedAt });
+      const impJson = JSON.stringify({ v: 1, at, dev: devId, count: Object.keys(merged.imp).length, imp: merged.imp });
+      const hP = hashStr(progJson), hI = hashStr(impJson);
+      let wrote = false;
+      if (hP !== S.syncHashP || opts.force) { await putJson(cfg.progress.put, JSON.parse(progJson)); applying = true; S.syncHashP = hP; wrote = true; applying = false; }
+      if (hI !== S.syncHashI || opts.force) { await putJson(cfg.imports.put, JSON.parse(impJson)); applying = true; S.syncHashI = hI; wrote = true; applying = false; }
+      applying = true; S.syncAt = at; if (wrote) S.syncErr = ''; save(); applying = false;
+      syncErr = '';
+      if (opts.auto && gained > 0) toast(`已从云端恢复 ${gained} 首导入的歌`);
+      return true;
+    } catch (e) {
+      syncErr = e.message || '同步失败';
+      applying = true; S.syncErr = syncErr; save(); applying = false;
+      return false;
+    } finally {
+      syncBusy = false;
+      refreshSyncMsg();
+      if (syncQueued) { syncQueued = false; clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow({ auto: true }), 1200); }
+    }
+  }
+
+  function refreshSyncMsg() { const el = $('syncmsg'); if (el) el.textContent = syncMsgHtml(); }
+  function syncMsgHtml() {
+    if (S.autoSync === false) return '云端：自动同步已关（点「自动同步：关」可打开）';
+    if (syncBusy) return '云端：同步中…';
+    if (syncErr) return '云端：上次同步失败（' + esc(syncErr) + '），有改动会自动重试';
+    if (S.syncAt) return '云端：已自动同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + '　·　标词 / 改释义 / 导入都会自己存上去，换设备或清掉浏览器数据后打开就自动恢复';
+    return '云端：等着第一次同步…';
+  }
+
+  async function pushCloud() {
+    if (importing) return;
+    if (syncBusy) { toast('正在同步中，稍等一下'); return; }
+    setLoad(true, '同步到云端…');
+    const ok = await syncNow({ manual: true, force: true });
+    setLoad(false);
+    if (ok) toast(`已同步：导入的歌 ${Object.keys(S.imp || {}).length} 首 · 已掌握 ${knownCount()} 词`);
+    else toast('同步失败：' + syncErr);
+    renderMine();
   }
   async function pullCloud() {
     if (importing) return;
-    try {
-      const cfg = await syncUrls();
-      setLoad(true, '从云端拉取…');
-      const r = await fetch(cfg.get, { cache: 'no-store' });
-      if (!r.ok) throw new Error(r.status === 404 ? '云端还没有数据' : 'HTTP ' + r.status);
-      const j = await r.json();
-      const cloud = j.imp || {};
-      let added = 0;
-      for (const [id, rec] of Object.entries(cloud)) if (!S.imp[id]) { S.imp[id] = rec; added++; }
-      if (added) {
-        save();
-        for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
-        if (location.hash.startsWith('#/songs')) renderSongs();
-      }
-      setLoad(false);
-      toast(added ? `云端拉回 ${added} 首（本机共 ${Object.keys(S.imp).length} 首）` : '云端和本机一样');
-    } catch (e) { setLoad(false); toast('拉取失败：' + e.message); }
+    if (syncBusy) { toast('正在同步中，稍等一下'); return; }
+    const impB = Object.keys(S.imp || {}).length, kB = knownCount();
+    setLoad(true, '从云端拉取…');
+    const ok = await syncNow({ manual: true });
+    setLoad(false);
+    if (!ok) { toast('拉取失败：' + syncErr); renderMine(); return; }
+    const d1 = Object.keys(S.imp || {}).length - impB, d2 = knownCount() - kB;
+    toast(d1 || d2 ? `已拉回：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '云端和本机一样');
+    renderMine();
   }
 
   /** 只重试上次失败的那几首（比如当时接口抽风） */
@@ -795,7 +914,7 @@
     const rec = S.imp[id];
     if (!rec) return;
     if (!confirm(`删除《${rec.title}》？`)) return;
-    delete S.imp[id]; save();
+    delete S.imp[id]; S.del[id] = Date.now(); save();
     const i = IDX.tracks.findIndex((t) => t.id === id);
     if (i >= 0) IDX.tracks.splice(i, 1);
     TRACK.delete(id);
@@ -859,7 +978,7 @@
       if (filter === 'imp' && !t.imp) return false;
       if (filter === 'zh' && !t.lines.some((l) => l.zh)) return false;
       if (filter === 'known') {
-        const k = (t.vocabIds || []).filter((i) => S.known[i]).length;
+        const k = (t.vocabIds || []).filter((i) => Number(S.known[i]) > 0).length;
         if (t.vocabIds && t.vocabIds.length && k / t.vocabIds.length > .8) return false;
       }
       if (nq && !norm(`${t.title} ${t.artist} ${t.album} ${t.plName || ''}`).includes(nq)) return false;
@@ -921,20 +1040,30 @@
     const knownList = VOCAB.filter(isKnown);
     const noted = VOCAB.filter((v) => S.notes[v.id] && S.notes[v.id].meaning);
     $('view-mine').innerHTML = `
-      <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词 · 导入的歌 ${Object.keys(S.imp || {}).length} 首${S.syncAt ? ' · 上次同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) : ''}</div></div></div>
+      <div class="sec-head"><div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词 · 导入的歌 ${Object.keys(S.imp || {}).length} 首</div></div></div>
+      <div class="meta" id="syncmsg" style="color:var(--ink2)">${syncMsgHtml()}</div>
       <div class="chips">${knownList.length ? knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('') : '<span class="meta">还没标过词</span>'}</div>
       <div class="hair"></div>
       ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有自定义释义</div>'}
       <div class="row" style="margin-top:18px">
         <button class="toolbtn" id="m-export">导出到文件</button>
         <button class="toolbtn" id="m-import">从文件导入</button>
-        <button class="toolbtn" id="m-push">同步到云端</button>
+        <button class="toolbtn" id="m-push">立即同步</button>
         <button class="toolbtn" id="m-pull">从云端拉回</button>
+        <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
         <button class="toolbtn" id="m-clear">清空进度</button>
-      </div>`;
+      </div>
+      <div class="meta" style="margin-top:10px;color:var(--ink2)">云端存的是你自己的记录（进度 / 自定义释义 / 导入的歌单），放在你自己的 OSS 里，不经过第三方。本机绑定的音频文件（大）不同步。</div>`;
     $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
     $('m-push').onclick = () => pushCloud();
     $('m-pull').onclick = () => pullCloud();
+    $('m-auto').onclick = () => {
+      S.autoSync = S.autoSync === false;
+      applying = true; save(); applying = false;
+      renderMine();
+      if (S.autoSync === false) toast('自动同步已关（改动只留在本机，可随时手动同步）');
+      else { toast('自动同步已开'); syncNow({ auto: true }); }
+    };
     $('m-export').onclick = () => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }));
@@ -945,7 +1074,7 @@
       inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, local: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
-    $('m-clear').onclick = () => { if (!confirm('清空本机进度？')) return; S.known = {}; S.notes = {}; save(); renderMine(); };
+    $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清（导入的歌保留）')) return; S.known = {}; S.notes = {}; S.clearedAt = Date.now(); save(); renderMine(); };
   }
 
   // ────────────── 词条详情 ──────────────
@@ -998,7 +1127,7 @@
     $('w-play').onclick = () => speak(v.word);
     $('w-known').onclick = () => { toggleKnown(v); showWord(v.id); };
     $('w-edit').onclick = () => { const r = $('w-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; $('w-editinput').focus(); };
-    const saveMean = () => { S.notes[v.id] = Object.assign({}, S.notes[v.id], { meaning: $('w-editinput').value.trim() }); save(); showWord(v.id); };
+    const saveMean = () => { S.notes[v.id] = Object.assign({}, S.notes[v.id], { meaning: $('w-editinput').value.trim(), u: Date.now() }); save(); showWord(v.id); };
     $('w-save').onclick = saveMean;
     $('w-editinput').onkeydown = (e) => { if (e.key === 'Enter') saveMean(); };
     $('view-word').querySelectorAll('[data-goto]').forEach((el) => (el.onclick = () => {
@@ -1173,7 +1302,7 @@
     curTrack = t; curLines = t.lines; loopLine = null;
     audio.pause();
     const zhN = t.lines.filter((l) => l.zh).length;
-    const knownN = (t.vocabIds || []).filter((i) => S.known[i]).length;
+    const knownN = (t.vocabIds || []).filter((i) => Number(S.known[i]) > 0).length;
     $('view-track').innerHTML = `
       <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">← 返回</button></div>
       <div class="item" style="border:0;padding:0 0 12px;cursor:default">
@@ -1364,7 +1493,7 @@
       const r = $('p-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none';
       $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus();
     };
-    $('p-editinput').onkeydown = (e) => { if (e.key !== 'Enter' || !popWord) return; S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: e.target.value.trim() }); save(); showPop(popWord); };
+    $('p-editinput').onkeydown = (e) => { if (e.key !== 'Enter' || !popWord) return; S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: e.target.value.trim(), u: Date.now() }); save(); showPop(popWord); };
     $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) renderLyrics($('plyric'), curTrack); };
     $('p-lines').onclick = () => {
       if (!popWord || !curTrack) return;
@@ -1409,6 +1538,8 @@
     window.addEventListener('hashchange', route);
     if (!location.hash) location.replace('#/learn');
     route();
+    // 打开页面先跟云端对一次：本机空的就自动恢复，本机有的就把新增的并上去
+    if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
   }
   boot();
 })();
