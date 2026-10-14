@@ -939,6 +939,16 @@ const delId2 = await page.evaluate(() => { const el = document.querySelector('#l
 if (delId2) { await page.locator(`#list [data-del="${delId2}"]`).first().click(); await page.waitForTimeout(4500); }
 check('删掉的导入曲目会记墓碑，不会被账号拉回来', !!delId2 && !!accData().del[delId2] && !accData().imp[delId2], delId2 ? `墓碑 ${accData().del[delId2] ? '有' : '无'} · 账号还留着 ${accData().imp[delId2] ? '是' : '否'}` : '没找到可删的导入曲目');
 
+// 收藏 / 会唱 也要跟着账号走（服务端合并白名单 + 客户端写回 S 两处都要对）
+await page.goto(BASE + '?acc=1#/songs', { waitUntil: 'load' });
+await page.waitForTimeout(1200);
+await page.locator('#list .track').first().click();
+await page.waitForSelector('#t-fav', { timeout: 15000 });
+await page.locator('#t-fav').click(); await page.waitForTimeout(300);
+await page.locator('#t-mark').click(); await page.waitForTimeout(4500);
+check('收藏/会唱会同步进账号', Object.keys(accData().fav || {}).length > 0 && Object.keys(accData().sing || {}).length > 0,
+  `账号 fav ${Object.keys(accData().fav || {}).length} · sing ${Object.keys(accData().sing || {}).length}`);
+
 // 清空进度：账号里也要清掉，否则重登又被顶回来
 await page.goto(BASE + '?acc=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#m-clear', { timeout: 15000 });
@@ -962,9 +972,12 @@ expect401 = false;
 await page.locator('#g-pass').fill('e2e-pass-123');
 await page.locator('#g-login').click();
 await page.waitForTimeout(6500);
-const afterLogin = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}'); return { imp: Object.keys(j.imp || {}).length, del: Object.keys(j.del || {}).length, acc: !!localStorage.getItem('thlyrics.account.v1') }; });
+const afterLogin = await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}');
+  const pos = (m) => Object.keys(m || {}).filter((k) => m[k] > 0).length;
+  return { imp: Object.keys(j.imp || {}).length, del: Object.keys(j.del || {}).length, fav: pos(j.fav), sing: pos(j.sing), acc: !!localStorage.getItem('thlyrics.account.v1') }; });
 // 前面刚把导入的歌删了、进度也清了，所以这里验的是「账号里那份状态确实被拉回来了」：删除墓碑（+账号登录态）在，就说明合并成功
-check('换设备登录同账号：账号里的记录（含删除墓碑）都回来了', afterLogin.acc && afterLogin.del > 0, `${afterLogin.del} 个墓碑 · ${afterLogin.imp} 首`);
+check('换设备登录同账号：记录全回来（墓碑 + 收藏 + 会唱）', afterLogin.acc && afterLogin.del > 0 && afterLogin.fav > 0 && afterLogin.sing > 0,
+  `${afterLogin.del} 个墓碑 · ${afterLogin.imp} 首 · ♥${afterLogin.fav} · 会唱${afterLogin.sing}`);
 check('登录后闸门放行，能正常用', (await page.locator('#gate').isVisible()) === false && (await page.locator('#m-push').count()) === 1, '已进入');
 
 // 管理员模式：只有第一个注册的账号（本次 e2e_user）能看到 OSS 文件管理

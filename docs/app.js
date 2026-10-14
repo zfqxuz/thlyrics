@@ -1198,7 +1198,8 @@
         await ensureReadings().catch(() => {});
         applying = true;
         S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
-        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.clearedAt = mergedAcc.clearedAt;
+        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing;
+        S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();
       }
@@ -1366,10 +1367,10 @@
     setLoad(true, '从云端拉取…');
     const ok = await syncNow({ manual: true });
     setLoad(false);
-    if (!ok) { toast('拉取失败：' + syncErr); renderMine(); return; }
+    if (!ok) { toast('拉取失败：' + syncErr); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); return; }
     const d1 = Object.keys(S.imp || {}).length - impB, d2 = knownCount() - kB;
     toast(d1 || d2 ? `已拉回：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '云端和本机一样');
-    renderMine();
+    if (location.hash.startsWith('#/me')) renderMe(); else renderMine();
   }
 
   // ── 歌单定期体检：一天查一次有没有新歌；也可以手动点 ──
