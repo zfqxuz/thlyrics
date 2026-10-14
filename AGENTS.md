@@ -151,3 +151,20 @@
   `docs/data/index.json` 的音频字段）。
 - 待办仍在：①账号级"阻止公共访问"（不关也能跑，现在是 10 年签名 URL）；
   ②剩下 34 首等音源；③QQ 发工作区文件报 ENOENT（容器没挂 thlyrics，两个修法待用户选）。
+
+### 曲库导入网易云歌单（2026-10-14 新增，已上线）
+
+- 入口在「曲库」页顶部的 details「导入网易云歌单」；粘 `playlist?id=…` 链接或数字 ID。
+- 纯前端，无后端：歌单/歌词/音频地址都走 `https://music-api.gdstudio.xyz/api.php`
+  （`types=playlist|lyric|url`，带 `access-control-allow-origin: *`，所以浏览器能直连）。
+  网易官方 `/api/song/lyric` 没有 CORS 头，不能用。
+- 收歌规则：**有带时间轴的歌词** + **能取到音频地址** 才入库；缺哪样就逐首报原因，不阻塞其它首。
+  已在内置曲库里的歌（同 nid 或同名）自动跳过。
+- 数据落在 `localStorage`（`S.imp`）：只存 `{nid,title,artist,album,cover,lines[{t,text,zh}],plId,plName}`，
+  约几十 KB/首；分词/分词性/罗马音是**加载时**用现有词表现算的（`segsFor()`），不落盘。
+- 分词链路：现有词表（1358 词 + 活用形）最长匹配 → 未收录的部分交给浏览器 `Intl.Segmenter('ja')`
+  切词 → 纯假名块用 `kanaRomaji()`（`scripts/kana-romaji.mjs` 的精简移植）补罗马音。
+  实测导入曲目的逐词罗马音覆盖约 80%；**词表里没有的汉字词没有读音**（已知限制，要全覆盖
+  就得在浏览器里挂 kuromoji 词典，约 17MB 一次性下载）。
+- 测试：`.e2e/run-e2e.mjs` 第 12 节（歌单/歌词全打桩，63/63）；
+  真网络下的手动验证曾用 737955 / 22645196 / 752043 这三首。
