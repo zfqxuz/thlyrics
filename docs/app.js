@@ -5,7 +5,7 @@
   const LS_KEY = 'thlyrics.tool.v1';
   const IDB_NAME = 'thlyrics';
   const GD = 'https://music-api.gdstudio.xyz/api.php';
-  const DATA_V = '20261014v';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
+  const DATA_V = '20261014w';                     // 和 index.html 里 app.js?v= 保持一致：改前端就把它一起推一位
   const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 API（阿里云函数计算）
   const ACC_KEY = 'thlyrics.account.v1';
 
