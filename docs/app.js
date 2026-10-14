@@ -173,15 +173,13 @@
         if (t != null) { jump(t); if (audio.paused) audio.play().catch(() => {}); }
       }
     } else loopLine = null;
-    $('p-loop').classList.toggle('on', mode === 'loop');
     highlight(true);
   }
 
   function setLoop(i, silent) {
     loopLine = i;
     if (i != null && mode !== 'loop') setMode('loop');
-    const btn = $('p-loop'), mb = $('mb-loop');
-    if (btn) btn.classList.toggle('on', i != null);
+    const mb = $('mb-loop');
     if (mb) mb.hidden = i == null || mode !== 'loop';
     highlight(true);
     if (i == null || !curLines[i]) return;
@@ -318,6 +316,54 @@
     if (by === 'az') return [...list].sort((a, b) => String(a.reading).localeCompare(String(b.reading), 'ja'));
     return [...list].sort((a, b) => a.diff - b.diff || a.id - b.id);
   }
+
+  /** 首页：只突出一条主路径——找歌 → 选歌 → 开始学唱；其他入口降级成小按钮 */
+  function renderHome() {
+    const last = (S.lastTrack && TRACK.get(S.lastTrack)) || null;
+    const due = deckList().slice(0, 8);
+    const knownN = VOCAB.filter(isKnown).length;
+    const withAudio = IDX.tracks.filter((t) => t.audio || t.audioOss).length;
+    $('view-home').innerHTML = `
+      <div class="herohead">
+        <div class="ht">东方同人曲 学唱机</div>
+        <div class="hs">把喜欢的东方同人曲，变成日语教材。</div>
+        <div class="homesearch">
+          <input id="h-q" placeholder="搜曲名、社团、原曲、词…" autocomplete="off">
+          <button id="h-go">搜索</button>
+        </div>
+        <div class="hln">
+          <button id="h-songs">曲库 ${IDX.tracks.length} 首</button>
+          <button id="h-words">学词</button>
+          <button id="h-mine">生词本 ${knownN}</button>
+        </div>
+      </div>
+      ${last ? `<div class="nowcard">
+        <div class="k">NOW LEARNING · 正在学习</div>
+        <div class="t">${esc(last.title)}</div>
+        <div class="a">${esc(last.artist)}${last.base ? ' · 原曲：' + esc(last.base) : ''}</div>
+        <div class="acts"><button class="btn-main" id="h-continue">继续学唱</button><button class="btn-ghost" id="h-pick">换一首</button></div>
+      </div>` : `<div class="nowcard">
+        <div class="k">开始</div>
+        <div class="t">先挑一首你想听的</div>
+        <div class="a">曲库里有 ${withAudio} 首能直接出声；也可以粘自己的网易云歌单进来。</div>
+        <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入歌单</button></div>
+      </div>`}
+      <div class="hair"></div>
+      <div class="sec-sub">今天可以从这几个词开始</div>
+      <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">词表还没准备好</span>'}</div>`;
+    const goHome = (h) => { location.hash = h; };
+    $('h-go').onclick = () => { const q = ($('h-q').value || '').trim(); if (q) goHome('#/search/' + encodeURIComponent(q)); };
+    $('h-q').onkeydown = (e) => { if (e.key === 'Enter') $('h-go').click(); };
+    $('h-q').oninput = (e) => { const v = e.target.value.trim(); if (v) { clearTimeout(homeQt); homeQt = setTimeout(() => goHome('#/search/' + encodeURIComponent(v)), 320); } };
+    $('h-songs').onclick = () => goHome('#/songs');
+    $('h-words').onclick = () => goHome('#/learn');
+    $('h-mine').onclick = () => goHome('#/mine');
+    if ($('h-continue')) $('h-continue').onclick = () => goHome('#/track/' + last.id);
+    if ($('h-pick')) $('h-pick').onclick = () => goHome('#/songs');
+    if ($('h-imp')) $('h-imp').onclick = () => { impState.open = true; goHome('#/songs'); };
+    $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => goHome('#/word/' + el.dataset.w)));
+  }
+  let homeQt = null;
 
   function renderLearn() {
     const known = VOCAB.filter(isKnown).length;
@@ -1094,7 +1140,7 @@
     return `<div class="implog">${impState.fails.map((x) => `<div class="improw bad">✗ <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`
       + `<div class="row" style="margin-top:8px"><button class="toolbtn" id="plretry">重试失败的 ${impState.fails.length} 首</button></div>`;
   }
-  const impState = { fails: [], failsRaw: [], ctx: null, msg: '' };
+  const impState = { fails: [], failsRaw: [], ctx: null, msg: '', open: false };
   async function startImport() {
     if (importing) return;
     const input = $('plinput') ? $('plinput').value : '';
@@ -1171,7 +1217,7 @@
         <button class="chip ${filter === 'imp' ? 'on' : ''}" data-f="imp">我导入的</button>
         <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">跳过已掌握</button>
       </div>
-      <details class="impbox" ${impState.fails.length || impState.msg ? 'open' : ''}>
+      <details class="impbox" ${impState.fails.length || impState.msg || impState.open ? 'open' : ''}>
         <summary>导入网易云歌单</summary>
         <div class="row" style="margin-top:10px">
           <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单链接 / 数字 ID / 分享文案">
@@ -1188,6 +1234,7 @@
       ${songView === 'list'
         ? `<div class="list" id="list">${list.map(trackRow).join('') || '<div class="empty">没有匹配的曲目</div>'}</div>`
         : (groupsHtml(list) || '<div class="empty">没有匹配的曲目</div>')}`;
+    impState.open = false;
     $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
     $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; renderSongs(); }));
     if ($('qs')) $('qs').oninput = (e) => {
@@ -1486,6 +1533,7 @@
     const t = TRACK.get(id);
     if (!t) { go('#/learn'); return; }
     curTrack = t; curLines = t.lines; loopLine = null;
+    S.lastTrack = t.id; save();
     audio.pause();
     const zhN = t.lines.filter((l) => l.zh).length;
     const knownN = (t.vocabIds || []).filter((i) => Number(S.known[i]) > 0).length;
@@ -1527,7 +1575,6 @@
     activeLine = -1; loopLine = null;
     $('m-all').classList.toggle('on', mode === 'all');
     $('m-loop').classList.toggle('on', mode === 'loop');
-    $('p-loop').classList.toggle('on', mode === 'loop');
     if (!raf) raf = requestAnimationFrame(frame);
     prepAudio(t);
     if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
@@ -1542,9 +1589,11 @@
   function applyDisplay() {
     document.body.classList.toggle('gloss', S.gloss !== false);
     document.body.classList.toggle('ruby', S.ruby !== false);
-    $('b-gloss').classList.toggle('on', S.gloss !== false);
-    $('b-zh').classList.toggle('on', S.zh !== false);
-    $('b-ruby').classList.toggle('on', S.ruby !== false);
+    // 三个开关现在收在「显示」抽屉里：状态用文字写明（开/关），不要让人猜
+    const set = (id, on) => { const el = $(id); if (!el) return; el.classList.toggle('on', !!on); el.textContent = on ? '开' : '关'; };
+    set('b-gloss', S.gloss !== false);
+    set('b-zh', S.zh !== false);
+    set('b-ruby', S.ruby !== false);
   }
   function openPlayer() {
     if (!curTrack) return;
@@ -1587,6 +1636,8 @@
   // ────────────── 路由 ──────────────
   const VIEWS = ['view-learn', 'view-songs', 'view-mine', 'view-word', 'view-track', 'view-search'];
   function show(which) {
+    // 首页已经自带次级入口了，全局 tab 行在首页收起来（别让两排入口抢注意力）
+    if ($('tabs')) $('tabs').hidden = (which === 'view-home');
     VIEWS.forEach((v) => { const el = $(v); if (el) el.hidden = v !== which; });
     const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine' };
     ['tab-learn', 'tab-songs', 'tab-mine'].forEach((t) => $(t).classList.toggle('on', map[which] === t));
@@ -1597,11 +1648,12 @@
     const raw = decodeURIComponent(String(location.hash || '').replace(/^#\/?/, ''));
     const [path, at] = raw.split('@');
     const parts = path.split('/');
-    const v = parts[0] || 'learn';
+    const v = parts[0] || 'home';
     if (v !== 'search') lastNonSearch = '#/' + path;
     if (v === 'word') { show('view-word'); return showWord(parts[1]); }
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
     if (v === 'search') { show('view-search'); $('searchwrap').classList.add('on'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
+    if (v === 'home') { show('view-home'); return renderHome(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
     if (v === 'mine') { show('view-mine'); return renderMine(); }
     show('view-learn'); renderLearn();
@@ -1633,6 +1685,7 @@
     const hs = $('headstat'); if (hs) hs.textContent = `${IDX.tracks.length} 首 · ${s.vocab} 词`;
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
+    if ($('brand')) $('brand').onclick = () => go('#/home');
     $('tab-learn').onclick = () => go('#/learn');
     $('tab-songs').onclick = () => go('#/songs');
     $('tab-mine').onclick = () => go('#/mine');
@@ -1656,9 +1709,9 @@
     $('p-play').onclick = () => togglePlay();
     $('p-prev').onclick = () => step(-1);
     $('p-next').onclick = () => step(1);
-    $('p-loop').onclick = () => setMode(mode === 'loop' ? 'all' : 'loop');
     $('m-all').onclick = () => setMode('all');
     $('m-loop').onclick = () => setMode('loop');
+    $('b-display').onclick = (e) => { e.stopPropagation(); const b = $('displaybox'); b.classList.toggle('on'); };
     $('b-gloss').onclick = () => { S.gloss = S.gloss === false; save(); applyDisplay(); };
     $('b-zh').onclick = () => { S.zh = S.zh === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
     $('b-ruby').onclick = () => { S.ruby = S.ruby === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
@@ -1693,7 +1746,7 @@
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
       if (e.key === 'ArrowDown') step(1);
       if (e.key === 'ArrowUp') step(-1);
-      if (e.key === 'l' || e.key === 'L') $('p-loop').click();
+      if (e.key === 'l' || e.key === 'L') setMode(mode === 'loop' ? 'all' : 'loop');
       if (e.key === 'Escape') { $('player').classList.remove('on'); hidePop(); }
     });
     $('p-nosrc').onclick = () => {
@@ -1722,7 +1775,7 @@
       if (audio.paused) { if (audio.error || audio.readyState === 0) playTrack(curTrack); else audio.play().catch(() => {}); }
       else audio.pause();
     }
-    if (!location.hash) history.replaceState(null, '', '#/learn');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
+    if (!location.hash) history.replaceState(null, '', '#/home');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
     window.addEventListener('hashchange', route);                     // 闸门也要挂：登录后靠它路由
     if (!ACC || !ACC.token) { showGate(); return; }   // 必须登录才能用
     route();

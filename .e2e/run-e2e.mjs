@@ -182,9 +182,15 @@ await page.locator('#g-pass').fill('e2e-pass-123');
 await page.locator('#g-reg').click();
 await page.waitForTimeout(3000);
 check('注册后放行，进入应用', (await page.locator('#gate').isVisible()) === false, '已进入');
-await page.waitForSelector('#deck .word', { timeout: 20000 });
+await page.waitForSelector('#view-home .nowcard', { timeout: 20000 });
 await page.waitForTimeout(400);
-check('默认进学词页', await page.locator('#view-learn').isVisible());
+check('默认进首页：一条主路径（搜索 / 挑一首 / 次级入口）', (await page.locator('#view-home').isVisible()) && (await page.locator('#h-q').count()) === 1 && (await page.locator('#h-songs').count()) === 1, ((await txt('#view-home .nowcard .t')) || '').slice(0, 26));
+check('首页不堆功能：学词/曲库/生词本降级成小入口', (await page.locator('#view-home .btn-main').count()) === 1, (await page.locator('#view-home .herohead .hln button').count()) + ' 个次入口');
+await shot('00-home');
+await page.locator('#h-words').click();
+await page.waitForSelector('#deck .word', { timeout: 20000 });
+await page.waitForTimeout(300);
+check('从首页能进学词页', await page.locator('#view-learn').isVisible());
 check('学词页有进度条', await page.locator('#view-learn .bar i').count() > 0, (await txt('#view-learn .sec-sub')) || '');
 const deckN = await page.locator('#deck .word').count();
 check('词卡列表渲染', deckN > 10, deckN + ' 张');
@@ -280,13 +286,26 @@ const rom = await page.evaluate(() => {
 check('罗马音改成逐词对齐（不再整行一串）', rom.ratio > 60 && rom.spaced, rom.ratio + '% 词带罗马音 · ' + rom.sample.slice(0, 3).join(' '));
 check('词级中文（实词下挂释义）', await page.locator('#plyric .g').count() > 5, (await page.locator('#plyric .g').count()) + ' 个');
 const g0 = await page.evaluate(() => document.body.classList.contains('gloss'));
+check('显示开关默认收起（不摊在页面上）', !(await page.locator('#displaybox').isVisible()) && (await txt('#b-display')) === '显示', await txt('#b-display'));
+await page.locator('#b-display').click();
+await page.waitForTimeout(250);
+check('点「显示」才展开三个开关，且状态写成开/关', await page.locator('#displaybox').isVisible() && /^(开|关)$/.test((await txt('#b-gloss')).trim()), `词义 ${await txt('#b-gloss')} · 中文 ${await txt('#b-zh')} · 罗马音 ${await txt('#b-ruby')}`);
 await page.locator('#b-gloss').click();
 await page.waitForTimeout(250);
 const g1 = await page.evaluate(() => document.body.classList.contains('gloss'));
 check('词义开关能切换（默认关：跟唱时只有当前句干净）', g0 !== g1, `默认 ${g0} → 点一下 ${g1}`);
 if (g1) await page.locator('#b-gloss').click();
 await page.waitForTimeout(250);
+await page.locator('#b-display').click();   // 收起抽屉，别挡歌词
+await page.waitForTimeout(200);
 await shot('05-lyric', true);
+
+// 换句不能把整屏顶上去：所有歌词块高度必须不变
+const hb = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock')].map((el) => Math.round(el.getBoundingClientRect().height)));
+await page.evaluate(() => { const els = document.querySelectorAll('#plyric .lblock'); if (els[3]) els[3].click(); });   // 直接点块本身（点词会弹词条层）
+await page.waitForTimeout(700);
+const ha = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock')].map((el) => Math.round(el.getBoundingClientRect().height)));
+check('切当前句时所有歌词块高度不变（不再上下跳）', hb.length === ha.length && hb.every((h, i) => h === ha[i]), `块数 ${hb.length}→${ha.length} · 切句前 ${[...new Set(hb)].join('/')} → 切句后 ${[...new Set(ha)].join('/')}`);
 
 // ═══════ 6 播放交互：点句=继续播、双击=单句循环 ═══════
 await page.locator('#m-all').click();          // 先切回「整首」，再验点句子的行为
@@ -337,7 +356,7 @@ const r0 = await page.evaluate(() => document.querySelector('audio').playbackRat
 await page.locator('#p-rate').click();
 const r1 = await page.evaluate(() => document.querySelector('audio').playbackRate);
 check('倍速切换生效', r0 !== r1, r0 + 'x → ' + r1 + 'x');
-await page.locator('#p-loop').click();
+await page.locator('#m-loop').click();          // 单句循环现在只有播放条上那一个分段控件
 await page.waitForTimeout(200);
 const i0 = await idxOf();
 await page.locator('#p-next').click(); await page.waitForTimeout(350);
