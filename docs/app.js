@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl } from './platform/index.js?v=20261015d';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession } from './platform/index.js?v=20261015e';
 
 (() => {
   'use strict';
@@ -187,6 +187,33 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   const audio = createAudioEl();
   const mountAudio = () => { if (document.body && !audio.isConnected) document.body.appendChild(audio); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAudio); else mountAudio();
+
+  // ── 媒体会话：通知栏/锁屏/耳机线控；原生壳里顺带把前台服务起起来（后台播放靠它保命）──
+  let mediaPushedAt = 0;
+  function pushMediaState(force) {
+    if (!mediaSession.available) return;
+    const now = Date.now();
+    if (!force && now - mediaPushedAt < 3000) return;      // timeupdate 很密，3 秒推一次就够
+    mediaPushedAt = now;
+    mediaSession.update({
+      title: (curTrack && curTrack.title) || '',
+      artist: (curTrack && curTrack.artist) || '',
+      playing: !!audio.src && !audio.paused,
+      position: audio.currentTime || 0,
+      duration: isFinite(audio.duration) ? audio.duration : 0,
+    });
+  }
+  ['play', 'pause', 'loadedmetadata', 'seeked', 'ended'].forEach((ev) => audio.addEventListener(ev, () => pushMediaState(true)));
+  audio.addEventListener('timeupdate', () => pushMediaState(false));
+  mediaSession.onAction((a) => {
+    const act = (a && a.action) || '';
+    if (act === 'play') audio.play().catch(() => {});
+    else if (act === 'pause') audio.pause();
+    else if (act === 'next') step(1);
+    else if (act === 'prev') step(-1);
+    else if (act === 'seek') jump(Number(a.position) || 0);
+    else if (act === 'stop') { audio.pause(); mediaSession.stop(); }
+  });
 
   const urlCache = new Map();
   const URL_TTL = 18 * 60 * 1000;
@@ -1530,7 +1557,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (i >= 0) IDX.tracks.splice(i, 1);
     TRACK.delete(id);
     indexLibrary();
-    if (curTrack && curTrack.id === id) { audio.pause(); audio.removeAttribute('src'); curTrack = null; }
+    if (curTrack && curTrack.id === id) { audio.pause(); audio.removeAttribute('src'); curTrack = null; mediaSession.stop(); }
     renderSongs();
   }
   function impRowsHtml() {
