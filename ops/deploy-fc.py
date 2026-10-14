@@ -61,7 +61,7 @@ def main():
         'OSS_BUCKET': 'thlyrics-audio',
         'OSS_HOST': 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com',
         'TOKEN_SECRET': secret(),
-        'ALLOW_ORIGINS': 'https://zfqxuz.github.io,http://127.0.0.1:8848,http://localhost:8848',
+        'ALLOW_ORIGINS': 'https://zfqxuz.github.io,https://localhost,capacitor://localhost,http://127.0.0.1:8848,http://localhost:8848',
     }
     body = {
         'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 60, 'memorySize': 1024,

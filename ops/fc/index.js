@@ -27,7 +27,7 @@ const OSS_HOST = ENV.OSS_HOST || 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com';
 const OSS_BUCKET = ENV.OSS_BUCKET || 'thlyrics-audio';
 const PREFIX = 'sync/users/';
 const TOKEN_DAYS = 180;
-const ALLOW = (ENV.ALLOW_ORIGINS || 'https://zfqxuz.github.io,http://127.0.0.1:8848,http://localhost:8848').split(',');
+const ALLOW = (ENV.ALLOW_ORIGINS || 'https://zfqxuz.github.io,https://localhost,capacitor://localhost,http://127.0.0.1:8848,http://localhost:8848').split(',');
 const ADMINS = (ENV.ADMINS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);   // 管理员用户名（环境变量，可选）
 const MAX_BODY = 8 * 1024 * 1024;      // 单次请求体上限
 const AVATAR_MAX = 80000;              // 头像 data URL 上限（前端会压到 128×128 jpeg，约 6~12KB）
