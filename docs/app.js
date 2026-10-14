@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015q';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015t';
 
 (() => {
   'use strict';
@@ -996,12 +996,16 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   let DICT = null, DICT_MAX = 1, importing = false;
   let RDL = new Map(), RDL_MAX = 1;   // 读音兜底表（内置曲目里出现过的词 → 罗马音/读音/词性）
   const SEG = ('Segmenter' in Intl) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+  /** 分词结果版本：1 = 旧（假名读音当表面形）· 2 = 修好同音撞车之后（改分词逻辑就 +1，老记录会自动重算） */
+  const SEG_V = 2;
   function buildDict() {
     DICT = new Map();
     const put = (k, v, form) => { if (k && !DICT.has(k)) DICT.set(k, { v, form }); };
     for (const v of VOCAB) {
       put(v.word, v, v.word);
-      for (const f of Object.keys(v.forms || {})) put(f, v, f);
+      // 只收含汉字的活用形：纯假名的 forms 是「读音」，当表面形建索引会把
+      // 「は/た/から/し/な」认成「歯/田/空/詩/名」（逐词中文错乱的根因，SURF 同款）
+      for (const f of Object.keys(v.forms || {})) if (/[\u4e00-\u9fff]/.test(f)) put(f, v, f);
     }
     DICT_MAX = 1;
     for (const k of DICT.keys()) if (k.length > DICT_MAX) DICT_MAX = k.length;
@@ -1097,10 +1101,17 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const s = String((t && t[0]) || ''); if (!s) continue;
       const base = String(t[1] || s), rd = String(t[2] || ''), pos = String(t[3] || ''), detail = String(t[4] || '');
       if (!pos || pos === '記号') { out.push([s, '', 'sym', '']); continue; }
-      const hit = DICT.get(s) || DICT.get(base) || (rd ? DICT.get(rd) : null);
-      const code = hit ? (hit.rd ? (hit.rd[2] || posKind({ pos, detail })) : posKind(hit.v)) : posKind({ pos, detail });
-      const word = (hit && !hit.rd) ? hit.v.word : '';
-      const reading = ((hit && !hit.rd && ((hit.v.forms || {})[hit.form] || {}).reading) || (hit && hit.rd && hit.rd[1]) || rd || '');
+      const kCode = posKind({ pos, detail });
+      let hit = DICT.get(s) || DICT.get(base) || null;
+      let word = hit ? hit.v.word : '';
+      let reading = hit ? ((((hit.v.forms || {})[hit.form] || {}).reading) || rd || '') : '';
+      if (!hit && rd) {
+        // 读音兜底：只有词性也对得上才认。真机踩过——「は(助詞)」按读音撞上「歯(名詞)」，
+        // 于是助词被当成名词，「牙齿」挂在每个「は」下面（用户说的「中文对照不准」）
+        const h = DICT.get(rd);
+        if (h && posKind(h.v) === kCode) { word = h.v.word; reading = rd; }
+      }
+      const code = hit ? posKind(hit.v) : kCode;
       out.push([s, reading, code, word]);
     }
     return out;
@@ -1241,8 +1252,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       if (why) { fail.push({ nid, title, why, tr }); report(title, why, 'fail'); return; }
       let segs = null;                       // 服务端 kuromoji 分词（失败就退回前端贪心匹配）
       try { segs = (await segmentLines(lines.map((l) => l.text))).map(segsCompact); } catch {}
-      S.imp['i' + nid] = { id: 'i' + nid, nid, src: source, title, artist, album, cover, lines, segs, noAudio: noAudio ? 1 : 0,
-        plId: pid, plName: plName || '', at: Date.now() };
+      S.imp['i' + nid] = { id: 'i' + nid, nid, src: source, title, artist, album, cover, lines, segs, segV: SEG_V,
+        noAudio: noAudio ? 1 : 0, plId: pid, plName: plName || '', at: Date.now() };
       if (noAudio) noAudioN++;
       try { save(); } catch { delete S.imp['i' + nid]; quota = true; return; }
       ok.push({ nid, title });
@@ -1289,18 +1300,20 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const res = await importTracks(list, meta.name || '', pid, onStep, source);
     return Object.assign(res, { plName: meta.name || '', total: tracks.length, done: list.length, pid, kind: meta.type, src: source });
   }
-  /** 老记录补分词：以前导入的歌没有 segs（只有前端贪心匹配），后台慢慢补上服务端的 */
+  /** 老记录补分词：以前导入的歌没有 segs（只有前端贪心匹配），后台慢慢补上服务端的。
+   *  另外 segV < SEG_V 的老分词结果是「假名读音当表面形」时代算的（は→歯），也要重算一遍。 */
   let segBackfilling = false;
   async function backfillSegs() {
     if (segBackfilling) return;
-    const need = Object.values(S.imp || {}).filter((r) => r && r.lines && r.lines.length && !(r.segs && r.segs.length));
+    const need = Object.values(S.imp || {}).filter((r) => r && r.lines && r.lines.length
+      && (!(r.segs && r.segs.length) || Number(r.segV || 0) < SEG_V));
     if (!need.length) return;
     segBackfilling = true;
     let done = 0;
     for (const rec of need.slice(0, 40)) {
       try {
         const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
-        rec.segs = segs;
+        rec.segs = segs; rec.segV = SEG_V;
         const t = TRACK.get(rec.id);
         if (t) { const nt = impTrack(rec); t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds; }
         done++;
@@ -1312,6 +1325,30 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (location.hash.startsWith('#/songs')) renderSongs();
     if (location.hash.startsWith('#/learn')) renderLearn();
     if (location.hash.startsWith('#/home')) renderHome();
+  }
+
+  /** 单曲懒迁移：老分词（segV < SEG_V）在这首歌被打开时后台重算一次。
+   *  比开机一口气重算 200 首温和得多（老用户曲库可能上百首），界面先按老数据渲染、
+   *  结果回来再刷一遍。 */
+  const segRefreshing = new Set();
+  async function refreshSegsFor(id) {
+    const rec = S.imp && S.imp[id];
+    if (!rec || !rec.lines || !rec.lines.length || segRefreshing.has(id)) return;
+    if (Number(rec.segV || 0) >= SEG_V) return;
+    segRefreshing.add(id);
+    try {
+      const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
+      rec.segs = segs; rec.segV = SEG_V; save();
+      const t = TRACK.get(id);
+      if (t) {
+        const nt = impTrack(rec);
+        t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds;
+        if (curTrack && curTrack.id === id) {          // 正看着这首歌就把歌词重画一遍
+          curLines = t.lines;
+          renderLyrics($('plyric'), t); bindLyrics($('plyric')); highlight(false);
+        }
+      }
+    } catch { /* 接口不通就下次打开再试 */ } finally { segRefreshing.delete(id); }
   }
 
   /** 导入 + 把新歌并进内存（供 UI 与测试用） */
@@ -2312,6 +2349,9 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
           toast('已切到这一句 · 再点词看释义');
           return;
         }
+        // 还没有「当前句」（歌没在放 / 音源没准备好）：这一下先把这一句定成当前句，再开词条。
+        // 不然一暂停就退回「随便点哪句的词都弹」——用户要的是「词只对当前句可选」。
+        if (li != null && cur < 0) { activeLine = li; highlight(false); }
         // 同一句里点别的词 = 直接切过去看那个词（查词顺手）；要关就点抽屉外、下拉、或 ✕
         const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
         showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '', li,
@@ -2344,6 +2384,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const t = TRACK.get(id);
     if (!t) { go('#/learn'); return; }
     curTrack = t; curLines = t.lines; loopLine = null;
+    if (t.imp) refreshSegsFor(t.id);            // 老分词结果按需重算（只算这一首）
     S.lastTrack = t.id; save();
     audio.pause();
     const zhN = t.lines.filter((l) => l.zh).length;
