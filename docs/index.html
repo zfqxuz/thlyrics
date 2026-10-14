@@ -70,6 +70,22 @@ main{padding:10px 16px 132px}
 .dots b{color:var(--accent);font-weight:400}
 .tick{width:34px;height:34px;border-radius:11px;border:1px solid var(--line);color:var(--ink3);font-size:13px;display:grid;place-items:center}
 .tick.on{border-color:rgba(78,201,138,.5);color:var(--ok);background:rgba(78,201,138,.1)}
+/* ── 导入网易云歌单 ── */
+.tick.del{color:#ff8a7a}
+.tick.del:hover{border-color:rgba(255,95,69,.5);background:var(--accent-soft)}
+.impbox{border:1px solid var(--line);border-radius:13px;padding:11px 14px;margin:2px 0 14px;background:var(--surface)}
+.impbox summary{font-size:13px;color:var(--ink2);cursor:pointer;list-style:none}
+.impbox summary::-webkit-details-marker{display:none}
+.impbox summary::before{content:'＋ ';color:var(--ink3)}
+.impbox[open] summary::before{content:'－ '}
+.impbox .sel{background:var(--surface2)}
+.implog{margin-top:10px;max-height:240px;overflow:auto}
+.improw{display:flex;gap:6px;align-items:baseline;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink2)}
+.improw:last-child{border-bottom:0}
+.improw b{font-weight:500;color:var(--ink);flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.improw span{color:var(--ink3);font-size:11.5px;margin-left:auto;flex:0 0 auto}
+.improw.bad span{color:#ff9f90}
+.improw.ok span{color:var(--ok)}
 .mini{width:34px;height:34px;border-radius:11px;border:1px solid var(--line);color:var(--ink3);font-size:12px;display:grid;place-items:center}
 
 /* 曲目封面 */

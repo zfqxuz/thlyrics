@@ -34,14 +34,40 @@ const browser = await chromium.launch({
 });
 const page = await (await browser.newContext({ viewport: { width: 400, height: 850 }, isMobile: true, hasTouch: true })).newPage();
 
-await page.route('**/*', (route) => {
+// 歌单导入的桩：两张假歌单 + 两首"能过"的歌词（真歌词接口在浏览器里会被 CORS 抽风影响，
+// 所以这一节全走桩；时间轴/译文/失败原因都是真实解析路径）
+const E2E_PLAYLIST = {
+  code: 200,
+  playlist: { id: 999000123, name: 'E2E 测试歌单', tracks: [
+    { id: 737955, name: 'Thank you for dears.', ar: [{ name: 'GET IN THE RING' }], al: { name: 'E2E', picUrl: '' } },
+    { id: 22645196, name: 'Bad Apple!!', ar: [{ name: 'のみこ' }], al: { name: 'E2E', picUrl: '' } },
+    { id: 999999999, name: '这首歌没有歌词', ar: [{ name: 'Nobody' }], al: { name: 'E2E', picUrl: '' } },
+  ] },
+};
+const E2E_LYRIC = {
+  lyric: '[00:00.00] 作词 : E2E\n[00:00.50] 作曲 : E2E\n[00:01.00] おいでよ　此処まで\n[00:03.00] 誰もいない場所で気ままに\n[00:05.00] 踊る憂鬱と\n',
+  tlyric: '[00:01.00] 到这儿来\n[00:03.00] 在没有人的地方\n[00:05.00] 随心所欲地起舞\n',
+};
+const baseRoute = (route) => {
   const u = route.request().url();
+  if (/gdstudio/.test(u) && /types=playlist/.test(u)) {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(E2E_PLAYLIST) });
+  }
+  if (/gdstudio/.test(u) && /types=lyric/.test(u)) {
+    const id = (u.match(/[?&]id=(\d+)/) || [])[1];
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(id === '999999999' ? {} : E2E_LYRIC),
+    });
+  }
   if (/gdstudio/.test(u) && /types=url/.test(u)) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://m8.music.126.net/e2e-stub.mp3' }) });
   }
   if (/music\.126\.net/.test(u)) return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'ID3' });
   return route.continue();
-});
+};
+await page.route('**/*', baseRoute);
+page.on('dialog', (d) => d.accept());   // 删除导入曲目要确认
 const errors = [];
 const netReqs = [];
 page.on('response', (r) => { if (/gdstudio|music\.126/.test(r.url())) netReqs.push(r.status() + ' ' + r.url().slice(0, 50)); });
@@ -270,6 +296,51 @@ await page.waitForSelector('#deck .word', { timeout: 8000 });
 const restored = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').known || {}).length);
 check('刷新后本地进度保留', restored > 0, restored + ' 个词');
 await shot('08-restored');
+
+// ═══════ 12 网易云歌单导入（失败逐首报原因） ═══════
+await page.locator('#tab-songs').click();
+await page.waitForTimeout(400);
+check('曲库页有「导入网易云歌单」入口', (await page.locator('.impbox summary').count()) === 1, await txt('.impbox summary'));
+await page.locator('.impbox summary').click();
+await page.waitForTimeout(250);
+await page.locator('#plinput').fill('随便写点什么');
+await page.locator('#plgo').click();
+await page.waitForTimeout(400);
+check('非法输入 → 直接报「没识别出歌单 ID」', /没识别出歌单\s*ID/.test(await txt('#plstat')), (await txt('#plstat')).slice(0, 40));
+await page.locator('#plinput').fill('https://music.163.com/playlist?id=999000123');
+await page.locator('#plgo').click();
+await page.waitForFunction(() => !document.querySelector('#plgo').disabled, null, { timeout: 90000 });
+await page.waitForTimeout(500);
+const impStat = await txt('#plstat');
+check('导入汇总：成功 2 首、失败 1 首', /成功 2 首/.test(impStat) && /失败 1 首/.test(impStat), impStat.slice(0, 70));
+check('失败逐首给原因（不阻塞其它）', /没有带时间轴的歌词/.test(await page.locator('#pllist').textContent()));
+check('导入的歌进 localStorage', (await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('thlyrics.tool.v1')).imp || {}).length)) === 2);
+await page.locator('#view-songs .chip[data-f="imp"]').click();
+await page.waitForTimeout(300);
+check('「我导入的」能筛出 2 首', (await page.locator('#list .track').count()) === 2);
+await page.locator('#list .track').first().click();
+await page.waitForTimeout(700);
+const impHead = await page.locator('#view-track .l3').first().textContent();
+check('导入曲目单曲页可打开（标明来自歌单）', /来自歌单/.test(impHead || ''), (impHead || '').slice(0, 46));
+check('导入曲目也用现有词表分词（有词汇列表）', (await page.locator('#view-track .word').count()) > 0, (await page.locator('#view-track .word').count()) + ' 个');
+await page.locator('#t-sing').click();
+await page.waitForTimeout(1600);
+const impPly = await page.evaluate(() => {
+  const w = [...document.querySelectorAll('#plyric .w')];
+  return { blocks: document.querySelectorAll('#plyric .lblock').length, w: w.length, withR: w.filter((x) => (x.querySelector('.r') || {}).textContent?.trim()).length };
+});
+check('导入曲目能进跟唱页（歌词块 + 逐词罗马音）', impPly.blocks >= 3 && impPly.w > 3 && impPly.withR > 3, JSON.stringify(impPly));
+await page.locator('#p-close').click();
+await page.waitForTimeout(300);
+await page.goto(BASE + '#/songs');
+await page.waitForTimeout(500);
+await page.locator('#view-songs .chip[data-f="imp"]').click();
+await page.waitForTimeout(300);
+check('刷新后导入的歌还在', (await page.locator('#list .track').count()) === 2);
+await page.locator('#list .track [data-del]').first().click();
+await page.waitForTimeout(500);
+check('导入的歌可以删掉', (await page.locator('#list .track').count()) === 1, (await page.locator('#list .track').count()) + ' 首');
+await shot('09-import', true);
 
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 

@@ -23,7 +23,7 @@
 
   // ────────────── 本地状态 ──────────────
   let S = { known: {}, notes: {}, audio: {}, local: {}, rate: 1, ruby: true, gloss: true, zh: true, mode: 'all' };
-  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; }
+  function loadLS() { try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign(S, JSON.parse(r)); } catch {} S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.local = S.local || {}; S.imp = S.imp || {}; }
   const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
   const isKnown = (w) => !!(w && S.known[w.id]);
   const meaningOf = (w) => (w && ((S.notes[w.id] && S.notes[w.id].meaning) || w.meaning)) || '';
@@ -350,24 +350,338 @@
 
   function trackRow(t) {
     const tags = [];
+    if (t.imp) tags.push('导入' + (t.plName ? '·' + t.plName : ''));
     if (t.audioOss) tags.push('自建音频');
     else if (t.audio || S.audio[t.id] || S.local[t.id]) tags.push('音频');
     if (t.lines.some((l) => l.zh)) tags.push('中文');
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
     if (brN) tags.push(`标日词 ${brN}`);
     return `<div class="item track" data-id="${t.id}">
-      ${t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">` : '<div class="cover"></div>'}
+      ${t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
+        : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(t.coverUrl)}" alt="">` : '<div class="cover"></div>')}
       <div class="col">
         <div class="l1">${esc(t.title)}</div>
         <div class="l2">${esc(t.artist)}</div>
         <div class="l3">${esc(t.album)} · ${t.lineCount} 行 · ${(t.vocabIds || []).length} 词${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
-      <span class="mini">›</span>
+      ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">✕</button>` : '<span class="mini">›</span>'}
     </div>`;
   }
+  // ────────────── 网易云歌单导入（纯前端，失败逐首报错） ──────────────
+  // 歌单详情 / 歌词 / 音频地址都走 music-api.gdstudio.xyz（它带 CORS 头，浏览器能直连）。
+  // 收进来的歌存在本机 localStorage：歌词只有「时间轴 + 原文 + 译文」，
+  // 分词用现有词表（1358 词 + 活用形）做最长匹配，所以导入的曲目同样有
+  // 词性配色 / 逐词罗马音 / 释义 / 点词弹层 / 单句循环，和内置曲目一致。
+  const IMP_LIMIT = 60;
+  // 假名 → 罗马音（scripts/kana-romaji.mjs 的精简移植；导入曲目里没进词表的部分靠它给读音）
+  const DIGRAPHS = {
+    'きゃ': 'kya', 'きゅ': 'kyu', 'きょ': 'kyo', 'きぇ': 'kye',
+    'ぎゃ': 'gya', 'ぎゅ': 'gyu', 'ぎょ': 'gyo',
+    'しゃ': 'sha', 'しゅ': 'shu', 'しょ': 'sho', 'しぇ': 'she',
+    'じゃ': 'ja', 'じゅ': 'ju', 'じょ': 'jo', 'じぇ': 'je',
+    'ちゃ': 'cha', 'ちゅ': 'chu', 'ちょ': 'cho', 'ちぇ': 'che',
+    'にゃ': 'nya', 'にゅ': 'nyu', 'にょ': 'nyo',
+    'ひゃ': 'hya', 'ひゅ': 'hyu', 'ひょ': 'hyo',
+    'びゃ': 'bya', 'びゅ': 'byu', 'びょ': 'byo',
+    'ぴゃ': 'pya', 'ぴゅ': 'pyu', 'ぴょ': 'pyo',
+    'みゃ': 'mya', 'みゅ': 'myu', 'みょ': 'myo',
+    'りゃ': 'rya', 'りゅ': 'ryu', 'りょ': 'ryo',
+    'ふぁ': 'fa', 'ふぃ': 'fi', 'ふぇ': 'fe', 'ふぉ': 'fo', 'ふゅ': 'fyu',
+    'てぃ': 'ti', 'てゅ': 'tyu', 'でぃ': 'di', 'でゅ': 'dyu',
+    'とぅ': 'tu', 'どぅ': 'du',
+    'うぃ': 'wi', 'うぇ': 'we', 'うぉ': 'wo',
+    'ゔぁ': 'va', 'ゔぃ': 'vi', 'ゔぇ': 've', 'ゔぉ': 'vo', 'ゔ': 'vu',
+    'きぇ': 'kye', 'くぁ': 'kwa', 'くぃ': 'kwi', 'くぇ': 'kwe', 'くぉ': 'kwo',
+    'ぐぁ': 'gwa', 'すぃ': 'si', 'ずぃ': 'zi', 'つぁ': 'tsa', 'つぃ': 'tsi',
+    'つぇ': 'tse', 'つぉ': 'tso', 'しぃ': 'syi', 'じぃ': 'jyi', 'ちぃ': 'cyi',
+    'いぇ': 'ye',
+  };
+  const MONO = {
+    あ: 'a', い: 'i', う: 'u', え: 'e', お: 'o',
+    か: 'ka', き: 'ki', く: 'ku', け: 'ke', こ: 'ko',
+    が: 'ga', ぎ: 'gi', ぐ: 'gu', げ: 'ge', ご: 'go',
+    さ: 'sa', し: 'shi', す: 'su', せ: 'se', そ: 'so',
+    ざ: 'za', じ: 'ji', ず: 'zu', ぜ: 'ze', ぞ: 'zo',
+    た: 'ta', ち: 'chi', つ: 'tsu', て: 'te', と: 'to',
+    だ: 'da', ぢ: 'ji', づ: 'zu', で: 'de', ど: 'do',
+    な: 'na', に: 'ni', ぬ: 'nu', ね: 'ne', の: 'no',
+    は: 'ha', ひ: 'hi', ふ: 'fu', へ: 'he', ほ: 'ho',
+    ば: 'ba', び: 'bi', ぶ: 'bu', べ: 'be', ぼ: 'bo',
+    ぱ: 'pa', ぴ: 'pi', ぷ: 'pu', ぺ: 'pe', ぽ: 'po',
+    ま: 'ma', み: 'mi', む: 'mu', め: 'me', も: 'mo',
+    や: 'ya', ゆ: 'yu', よ: 'yo',
+    ら: 'ra', り: 'ri', る: 'ru', れ: 're', ろ: 'ro',
+    わ: 'wa', ゐ: 'wi', ゑ: 'we', を: 'o',
+    ん: 'n',
+    ぁ: 'a', ぃ: 'i', ぅ: 'u', ぇ: 'e', ぉ: 'o',
+    ゃ: 'ya', ゅ: 'yu', ょ: 'yo', ゎ: 'wa',
+    ゔ: 'vu',
+    '　': ' ', ' ': ' ', '・': ' ',
+  };
+  const KANA_RE = /[\u3041-\u309f\u30a0-\u30ff]/;
+  function kanaRomaji(input) {
+    const s = norm(String(input == null ? '' : input));
+    let out = '', i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (c === 'っ') {
+        const nxt = DIGRAPHS[s.slice(i + 1, i + 3)] || MONO[s[i + 1]] || '';
+        if (nxt) out += nxt[0] === 'c' ? 't' : nxt[0];
+        i++; continue;
+      }
+      if (c === 'ー') {
+        const last = out.match(/[aeiou](?!.*[aeiou])/);
+        if (last) out += last[0];
+        i++; continue;
+      }
+      const pair = s.slice(i, i + 2);
+      if (DIGRAPHS[pair]) { out += DIGRAPHS[pair]; i += 2; continue; }
+      if (MONO[c] !== undefined) { out += MONO[c]; i++; continue; }
+      out += c; i++;
+    }
+    return out;
+  }
+  let DICT = null, DICT_MAX = 1, importing = false;
+  const SEG = ('Segmenter' in Intl) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+  function buildDict() {
+    DICT = new Map();
+    const put = (k, v, form) => { if (k && !DICT.has(k)) DICT.set(k, { v, form }); };
+    for (const v of VOCAB) {
+      put(v.word, v, v.word);
+      for (const f of Object.keys(v.forms || {})) put(f, v, f);
+    }
+    DICT_MAX = 1;
+    for (const k of DICT.keys()) if (k.length > DICT_MAX) DICT_MAX = k.length;
+    DICT_MAX = Math.min(DICT_MAX, 8);
+  }
+  const jpText = (s) => /[\u3041-\u30ff\u4e00-\u9fff]/.test(String(s || ''));
+  /** 用词表给一句话分词（最长匹配）；命中的词带上词性/罗马音，没命中的按普通文本 */
+  function segsFor(text) {
+    const out = [];
+    if (!text) return out;
+    let plain = '';
+    // 没进词表的片段：先用浏览器自带的分词器切词（ICU，认得日语），
+    // 假名串补上罗马音（跟唱要看），汉字串单独成块，标点/英文按纯文本。
+    const flush = () => {
+      if (!plain) return;
+      const buf = plain; plain = '';
+      const parts = [];
+      if (SEG) for (const x of SEG.segment(buf)) parts.push(x.segment);
+      else parts.push(...buf.split(/([\u3041-\u309f\u30a0-\u30ff]+)/));
+      for (const part of parts) {
+        if (!part) continue;
+        const kanaOnly = /^[\u3041-\u309f\u30a0-\u30ff]+$/.test(part);
+        if (kanaOnly) { out.push({ s: part, k: 'oth', y: kanaRomaji(part) }); continue; }
+        if (/[\u4e00-\u9fff]/.test(part)) {
+          for (const piece of part.split(/([\u3041-\u309f\u30a0-\u30ff]+)/)) {
+            if (!piece) continue;
+            if (/^[\u3041-\u309f\u30a0-\u30ff]+$/.test(piece)) out.push({ s: piece, k: 'oth', y: kanaRomaji(piece) });
+            else out.push({ s: piece, k: 'oth' });
+          }
+          continue;
+        }
+        out.push({ s: part });
+      }
+    };
+    for (let i = 0; i < text.length;) {
+      let hit = null, len = 0;
+      for (let n = Math.min(DICT_MAX, text.length - i); n >= 1; n--) {
+        const e = DICT.get(text.substr(i, n));
+        if (e) { hit = e; len = n; break; }
+      }
+      if (!hit) { plain += text[i]; i++; continue; }
+      flush();
+      const surf = text.substr(i, len);
+      const f = hit.v.forms && hit.v.forms[hit.form];
+      out.push({
+        s: surf, k: posKind(hit.v), w: true, b: hit.v.word,
+        y: (f && f.romaji) || hit.v.romaji || '', r: (f && f.reading) || hit.v.reading || '',
+      });
+      i += len;
+    }
+    flush();
+    return out;
+  }
+  /** 本机存的导入记录 → 和内置曲目同构的 track */
+  function impTrack(rec) {
+    const lines = (rec.lines || []).map((l) => {
+      const segs = segsFor(l.text);
+      return {
+        t: l.t, text: l.text, zh: l.zh || '', jp: jpText(l.text), segs,
+        romaji: segs.map((s) => s.y || s.s).join(' ').replace(/\s+/g, ' ').trim(),
+      };
+    });
+    const ids = new Set();
+    for (const l of lines) for (const sg of l.segs) if (sg.w && sg.b) ids.add(sg.b);
+    return {
+      id: rec.id, imp: true, title: rec.title, artist: rec.artist, album: rec.album,
+      base: '', coverUrl: rec.cover || '', plName: rec.plName || '', plId: rec.plId || '',
+      audio: { type: 'netease', nid: rec.nid }, timing: 'netease',
+      lineCount: lines.filter((l) => l.text.trim()).length,
+      vocabIds: [...ids].map((w) => VBY.get(w)).filter(Boolean).map((v) => v.id), lines,
+    };
+  }
+  const LRC_META = /^\s*(作词|作曲|编曲|制作人|混音|母带|吉他|贝斯|鼓|录音|和声|歌词来源|校对|翻译|调校|曲绘|PV|原曲|社团|专辑|演唱|Vocals|Lyrics|Composer|Arranger|Album|Producer)\s*[:：]/i;
+  /** LRC → 行数组（只保留唱出来的行；翻译按时间就近配对） */
+  function parseLrc(lyric, tlyric) {
+    const rows = (txt) => [...String(txt || '').matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]\s*(.*)/g)]
+      .map((m) => ({ t: Number(m[1]) * 60 + Number(String(m[2]).replace(':', '.')), text: m[3].trim() }));
+    const trs = rows(tlyric).filter((r) => r.text).map((r) => ({ t: r.t, text: r.text, used: false }));
+    const out = [];
+    for (const r of rows(lyric)) {
+      if (!r.text || LRC_META.test(r.text) || /歌词来源|THB\s?WIKI|纯音乐/i.test(r.text)) continue;
+      const hit = trs.find((x) => !x.used && Math.abs(x.t - r.t) < .35);
+      if (hit) hit.used = true;
+      out.push({ t: Math.round(r.t * 100) / 100, text: r.text, zh: hit ? hit.text : '' });
+    }
+    out.sort((a, b) => a.t - b.t);
+    const seen = new Set();
+    return out.filter((l) => (seen.has(l.t) ? false : (seen.add(l.t), true)));
+  }
+  // 这个中转站偶尔会抽风（限流 / 少 CORS 头），所以网络层失败重试两次
+  async function gdJson(q, tries = 3) {
+    let lastErr = null;
+    for (let i = 0; i < tries; i++) {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 20000);
+      try {
+        const r = await fetch(`${GD}?${q}`, { signal: ac.signal });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return await r.json();
+      } catch (e) {
+        lastErr = (e && e.name === 'AbortError') ? new Error('接口超时') : new Error('接口暂时不可用（可能被限流）');
+        if (i < tries - 1) await new Promise((r2) => setTimeout(r2, 600 * (i + 1)));
+      } finally { clearTimeout(timer); }
+    }
+    throw lastErr;
+  }
+  /** 从链接/分享文案里抠歌单 ID */
+  function plIdOf(input) {
+    const s = String(input || '').trim();
+    const m = s.match(/[?&#]id=(\d{3,})/) || s.match(/playlist\/?[^\d]{0,8}(\d{3,})/) || s.match(/^(\d{3,})$/);
+    return m ? m[1] : '';
+  }
+  /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
+  async function importPlaylist(input, limit, onStep) {
+    const pid = plIdOf(input);
+    if (!pid) return { error: '没识别出歌单 ID：请用 playlist?id=… 的完整链接，或直接填数字 ID' };
+    let pl = null;
+    try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
+    catch (e) { return { error: '拉取歌单失败：' + (e.name === 'AbortError' ? '超时' : e.message) }; }
+    if (!pl) return { error: '歌单不存在或读不到（私密歌单不行）' };
+    const all = (pl.tracks || []).filter((x) => x && x.id);
+    if (!all.length) return { error: '这张歌单里没有歌' };
+    const cap = Math.max(1, Math.min(Number(limit) || IMP_LIMIT, all.length));
+    const list = all.slice(0, cap);
+    const ok = [], fail = [];
+    const report = (title, mark) => { if (onStep) onStep(ok.length + fail.length, list.length, title, mark); };
+    const one = async (tr) => {
+      const nid = String(tr.id);
+      const title = String(tr.name || '').trim() || ('歌曲 ' + nid);
+      const artist = ((tr.ar || tr.artists || []).map((a) => a && a.name).filter(Boolean)).join(' / ');
+      const album = (tr.al && tr.al.name) || '';
+      const cover = (tr.al && tr.al.picUrl) || '';
+      if (S.imp['i' + nid]) { ok.push({ nid, title, skip: true }); report(title, '已在库里'); return; }
+      const builtin = IDX.tracks.find((t) => !t.imp && ((t.audio && String(t.audio.nid) === nid) || norm(t.title) === norm(title)));
+      if (builtin) { ok.push({ nid, title, skip: true }); report(title, `内置曲库已有《${builtin.title}》`); return; }
+      try {
+        const ly = await gdJson(`types=lyric&source=netease&id=${nid}`);
+        const lines = parseLrc(ly && ly.lyric, ly && ly.tlyric);
+        if (lines.length < 3 || lines[lines.length - 1].t <= 0) throw new Error('没有带时间轴的歌词');
+        const u = await gdJson(`types=url&source=netease&id=${nid}&br=320`);
+        if (!u || !u.url) throw new Error('取不到音频（可能下架／VIP／地区限定）');
+        S.imp['i' + nid] = { id: 'i' + nid, nid, title, artist, album, cover, lines, plId: pid, plName: pl.name || '', at: Date.now() };
+        save();
+        ok.push({ nid, title });
+        report(title, '导入成功');
+      } catch (e) {
+        const why = e.name === 'AbortError' ? '接口超时' : (e.message || '导入失败');
+        fail.push({ nid, title, why });
+        report(title, '导入失败：' + why);
+      }
+    };
+    const queue = [...list];
+    await Promise.all([0, 1, 2].map(async () => {
+      while (queue.length) { const tr = queue.shift(); await one(tr); }
+    }));
+    return { ok, fail, plName: pl.name || '', total: all.length, done: list.length };
+  }
+  /** 导入 + 把新歌并进内存（供 UI 与测试用） */
+  async function importInto(input, limit, onStep) {
+    const res = await importPlaylist(input, limit, onStep);
+    if (!res.error) for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+    return res;
+  }
+  window.__tlImport = (input, limit) => importInto(input, limit);
+  window.__tlSegs = (t) => segsFor(t);   // 测试用
+  function impPlaylists() {
+    const m = new Map();
+    for (const rec of Object.values(S.imp || {})) {
+      const k = rec.plId || 'unknown';
+      if (!m.has(k)) m.set(k, { id: k, name: rec.plName || '未命名歌单', n: 0 });
+      m.get(k).n++;
+    }
+    return [...m.values()];
+  }
+  function delImpTrack(id) {
+    const rec = S.imp[id];
+    if (!rec) return;
+    if (!confirm(`删除导入的《${rec.title}》？`)) return;
+    delete S.imp[id]; save();
+    const i = IDX.tracks.findIndex((t) => t.id === id);
+    if (i >= 0) IDX.tracks.splice(i, 1);
+    TRACK.delete(id);
+    if (curTrack && curTrack.id === id) { audio.pause(); audio.removeAttribute('src'); curTrack = null; }
+    renderSongs();
+  }
+  function impRowsHtml() {
+    const log = impState.log;
+    if (!log.length) return '';
+    const head = impState.done ? '' : `<div class="meta">正在导入 ${log.length}/${impState.total} …</div>`;
+    return `<div class="implog">${head}${log.map((x) => `<div class="improw ${x.ok ? 'ok' : 'bad'}">${x.ok ? '✓' : '✗'} <b>${esc(x.title)}</b> <span>${esc(x.mark)}</span></div>`).join('')}</div>`;
+  }
+  const impState = { log: [], total: 0, done: false, msg: '' };
+  async function startImport(limit) {
+    if (importing) return;
+    const box = $('plinput');
+    const input = box ? box.value : '';
+    const stat = $('plstat');
+    impState.log = []; impState.total = 0; impState.done = false;
+    if (!plIdOf(input)) {
+      impState.msg = '没识别出歌单 ID：请用 playlist?id=… 的完整链接，或直接填数字 ID';
+      if (stat) stat.textContent = impState.msg;
+      if ($('pllist')) $('pllist').innerHTML = '';
+      return;
+    }
+    importing = true;
+    if (stat) stat.textContent = '正在拉取歌单…';
+    if ($('plgo')) $('plgo').disabled = true;
+    const res = await importInto(input, limit, (n, total, title, mark) => {
+      impState.total = total;
+      impState.log.push({ title, mark, ok: /成功|已在库里/.test(mark) });
+      if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
+      if (stat) stat.textContent = `正在导入 ${n}/${total} …`;
+    });
+    importing = false;
+    if ($('plgo')) $('plgo').disabled = false;
+    impState.done = true;
+    if (res.error) { impState.msg = res.error; if (stat) stat.textContent = res.error; if ($('pllist')) $('pllist').innerHTML = ''; return; }
+    // 新导入的进内存
+    for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const t = impTrack(rec); IDX.tracks.push(t); TRACK.set(id, t); }
+    impState.msg = `歌单《${res.plName}》共 ${res.total} 首，本次处理 ${res.done} 首：成功 ${res.ok.length} 首，失败 ${res.fail.length} 首`;
+    if (res.total > res.done) impState.msg += `（这张歌单还有 ${res.total - res.done} 首没导，一次最多 ${limit || IMP_LIMIT} 首）`;
+    const head = `${impState.msg}`;
+    renderSongs();
+    if ($('plstat')) $('plstat').textContent = head;
+    if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
+    if (res.ok.length) toast(`导入完成：${res.ok.length} 首成功${res.fail.length ? `，${res.fail.length} 首失败` : ''}`);
+    else toast(`导入失败：${res.fail[0] ? res.fail[0].why : '没有可导入的歌'}`);
+  }
+
   function renderSongs() {
     const list = IDX.tracks.filter((t) => {
       if (filter === 'audio' && !(t.audioOss || t.audio || S.audio[t.id] || S.local[t.id])) return false;
+      if (filter === 'imp' && !t.imp) return false;
       if (filter === 'zh' && !t.lines.some((l) => l.zh)) return false;
       if (filter === 'known') {
         const k = (t.vocabIds || []).filter((i) => S.known[i]).length;
@@ -381,11 +695,29 @@
         <button class="chip ${filter === 'all' ? 'on' : ''}" data-f="all">全部</button>
         <button class="chip ${filter === 'audio' ? 'on' : ''}" data-f="audio">有音频</button>
         <button class="chip ${filter === 'zh' ? 'on' : ''}" data-f="zh">有中文</button>
+        <button class="chip ${filter === 'imp' ? 'on' : ''}" data-f="imp">我导入的</button>
         <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">隐藏已掌握词多的</button>
       </div>
+      <details class="impbox" ${impState.log.length || impState.msg ? 'open' : ''}>
+        <summary>导入网易云歌单</summary>
+        <div class="row" style="margin-top:10px">
+          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单链接（含 id=…）或数字 ID">
+          <button class="toolbtn on" id="plgo">${importing ? '导入中…' : '导入'}</button>
+        </div>
+        <div class="meta" id="plstat" style="margin-top:8px">${esc(impState.msg || `把歌单里的歌收进来：有带时间轴的歌词 + 能取到音频的才收，取不到的逐首报原因。一次最多 ${IMP_LIMIT} 首，词性/罗马音/释义会用现有词表自动对齐。`)}</div>
+        <div id="pllist">${impRowsHtml()}</div>
+        ${impPlaylists().length ? `<div class="meta" style="margin-top:10px">已导入：${impPlaylists().map((p) => `${esc(p.name)}（${p.n} 首）`).join('、')}</div>` : ''}
+      </details>
       <div class="list" id="list">${list.map(trackRow).join('') || '<div class="empty">没有匹配的曲目</div>'}</div>`;
     $('view-songs').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
-    $('view-songs').querySelectorAll('.track').forEach((el) => (el.onclick = () => go('#/track/' + el.dataset.id)));
+    $('view-songs').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
+      if (e.target.closest('[data-del]')) return;
+      go('#/track/' + el.dataset.id);
+    }));
+    $('view-songs').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); }));
+    if ($('plgo')) $('plgo').onclick = () => startImport();
+    if ($('plinput')) $('plinput').onkeydown = (e) => { if (e.key === 'Enter') startImport(); };
+    if (importing) setTimeout(() => { if (!importing) renderSongs(); }, 800);
   }
 
   function renderMine() {
@@ -491,7 +823,11 @@
       ${r.originals.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">原曲</div><div class="chips">${r.originals.map((o) => `<span class="chip" data-base="${esc(o.name)}">${esc(o.name)} · ${o.tracks.length}</span>`).join('')}</div>` : ''}
       ${!r.words.length && !r.tracks.length && !r.originals.length ? '<div class="empty">没有匹配的内容</div>' : ''}`;
     wireWords($('view-search'));
-    $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = () => go('#/track/' + el.dataset.id)));
+    $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
+      if (e.target.closest('[data-del]')) return;
+      go('#/track/' + el.dataset.id);
+    }));
+    $('view-search').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); if (!IDX.tracks.some((t) => t.id === el.dataset.del)) showSearch(q); }));
     $('view-search').querySelectorAll('[data-base]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.base; go('#/search/' + encodeURIComponent(el.dataset.base)); }));
   }
 
@@ -612,11 +948,12 @@
     $('view-track').innerHTML = `
       <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">← 返回</button></div>
       <div class="item" style="border:0;padding:0 0 12px;cursor:default">
-        ${t.coverFile ? `<img class="cover big" src="data/${t.coverFile}" alt="">` : '<div class="cover big"></div>'}
+        ${t.coverFile ? `<img class="cover big" src="data/${t.coverFile}" alt="">`
+          : (t.coverUrl ? `<img class="cover big" src="${esc(t.coverUrl)}" alt="">` : '<div class="cover big"></div>')}
         <div class="col">
           <div class="l1" style="font-size:17px">${esc(t.title)}</div>
           <div class="l2">${esc(t.artist)} · ${esc(t.album)}</div>
-          <div class="l3">原曲：${esc(t.base)} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''} · 已掌握 ${knownN}/${(t.vocabIds || []).length}</div>
+          <div class="l3">${t.imp ? `来自歌单：${esc(t.plName || '导入')} · 网易云 ${esc(String(t.audio.nid))}` : `原曲：${esc(t.base)}`} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''}${t.imp ? '' : ` · 已掌握 ${knownN}/${(t.vocabIds || []).length}`}</div>
         </div>
       </div>
       <div class="row" style="margin:2px 0 10px">
@@ -735,8 +1072,13 @@
     VBYID = new Map(VOCAB.map((w) => [w.id, w]));
     for (const w of VOCAB) { SURF.set(w.word, w); for (const f of Object.keys(w.forms || {})) if (!SURF.has(f)) SURF.set(f, w); }
     TRACK = new Map(data.tracks.map((t) => [t.id, t]));
+    buildDict();
+    for (const rec of Object.values(S.imp || {})) {
+      if (!rec || !rec.id || TRACK.has(rec.id)) continue;
+      const t = impTrack(rec); data.tracks.push(t); TRACK.set(t.id, t);
+    }
     const s = data.stats || {};
-    $('headstat').textContent = `${s.tracks} 首 · ${s.vocab} 词 · 有音频 ${data.tracks.filter((t) => t.audioOss || t.audio).length} 首`;
+    $('headstat').textContent = `${IDX.tracks.length} 首 · ${s.vocab} 词 · 有音频 ${IDX.tracks.filter((t) => t.audioOss || t.audio).length} 首`;
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     $('tab-learn').onclick = () => go('#/learn');
