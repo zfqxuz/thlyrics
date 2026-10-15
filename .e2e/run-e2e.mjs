@@ -1364,6 +1364,58 @@ const lineTap = await page.evaluate(async () => {
 check('抽屉开着时点别的歌词行 → 只关抽屉，不跳句（不穿透）', lineTap.on === false && lineTap.before === lineTap.after,
   `抽屉开=${lineTap.on} · 当前句 ${lineTap.before} → ${lineTap.after}（点的是第 ${lineTap.tapped} 句）`);
 
+// ═══════ 13.12 原生壳专属分支：伪造成 App 跑一遍「我的」页 ═══════
+// 真机踩过：app.js 里用了版本号 V 但没 import，网页端 IS_NATIVE=false 走不到那段，
+// E2E 全绿也发现不了 —— 一装到手机上「我的」页就整页空白（ReferenceError）。
+// 这里把 window.Capacitor 伪造出来，专门守「只有 App 里才会跑」的那些分支。
+{
+  const nCtx = await browser.newContext({ viewport: { width: 400, height: 850 }, isMobile: true, hasTouch: true });
+  await nCtx.addInitScript(() => {
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      getPlatform: () => 'android',
+      Plugins: {
+        AppUpdater: {
+          install: (o) => { window.__apkInstall = o; return Promise.resolve(); },
+          addListener: () => Promise.resolve({ remove() {} }),
+        },
+      },
+    };
+  });
+  const nErrors = [];
+  const np = await nCtx.newPage();
+  np.on('pageerror', (e) => nErrors.push(String(e.message).slice(0, 120)));
+  await np.route('**/*', (route) => {
+    if (/\/apk\.json/.test(route.request().url())) {
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ version: '29990101a', url: 'https://example.com/a.apk', notes: 'E2E 假新版本' }) });
+    }
+    return baseRoute(route);
+  });
+  await np.goto(BASE, { waitUntil: 'load', timeout: 30000 });
+  await np.waitForSelector('#g-reg', { timeout: 25000 });
+  await np.locator('#g-name').fill('e2e_native');
+  await np.locator('#g-pass').fill('native-pass-123');
+  await np.locator('#g-reg').click();
+  await np.waitForSelector('#view-home .nowcard', { timeout: 20000 });
+  await np.evaluate(() => { location.hash = '#/me'; });
+  await np.waitForTimeout(1500);
+  const meLen = await np.evaluate(() => ((document.getElementById('view-me') || {}).innerHTML || '').length);
+  check('App（原生壳）里「我的」页能正常渲染（不是空白）', meLen > 200, meLen + ' 字符');
+  const updEnt = await np.evaluate(() => ({ has: !!document.getElementById('me-upd'), txt: ((document.querySelector('#view-me') || {}).textContent || '').replace(/\s+/g, ' ').slice(0, 46) }));
+  check('App 里有「更新 → 检查更新」入口', updEnt.has, updEnt.txt);
+  await np.locator('#me-upd').click();
+  await np.waitForTimeout(2500);
+  const afterChk = await np.evaluate(() => ({ go: !!document.getElementById('me-upd-go'), state: (document.getElementById('p-state') || {}).textContent || '' }));
+  check('App 检查更新：发现新版本后给出「下载并安装」', afterChk.go, '状态「' + afterChk.state + '」');
+  await np.locator('#me-upd-go').click();
+  await np.waitForTimeout(900);
+  const installCall = await np.evaluate(() => window.__apkInstall || null);
+  check('点「下载并安装」：把远端地址交给原生插件', !!installCall && /example\.com\/a\.apk/.test(String(installCall.url || '')), JSON.stringify(installCall || {}).slice(0, 64));
+  check('App 分支没有未捕获错误', nErrors.length === 0, nErrors.slice(0, 2).join(' || '));
+  await nCtx.close();
+}
+
 // 退出 → 回到闸门（本机记录保留）
 await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#acc-out', { timeout: 15000 });

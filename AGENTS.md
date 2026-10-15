@@ -770,3 +770,16 @@ gh release create v<版本> <apk>#thlyrics.apk        # 4) 顺手传 GitHub Rele
 - 自更新要求**签名一致**：现在是 Android debug 签名，已备份到
   `~/.dsh/thlyrics-signing/debug.keystore`（不进仓库）。**别换签名**；换正式签名必须卸载重装一次，
   之后也不能再用 debug 签名覆盖安装（两条线）。
+
+#### 十一、「只有 App 里才跑」的分支怎么测（2026-10-15 加）
+
+真机踩过：`app.js` 里用版本号 `V` 做自更新比对，但 `V` 只在 `platform/net.js` import 过——
+网页端 `IS_NATIVE=false` 走不到那段，**E2E 178 条全绿也发现不了**，一装到手机上「我的」页整页空白。
+
+现在 E2E 里加了 **13.12 原生壳分支**：新开一个 context，`addInitScript` 把 `window.Capacitor`
+伪造成 `{ isNativePlatform: () => true, Plugins: { AppUpdater: {…} } }`，再跑一遍「我的」页
++ 检查更新 + 下载并安装（假插件记下调用参数）。以后凡是 `IS_NATIVE ? … : …` 里的代码，
+都要在这里至少盖一条断言。
+
+- 平台模块都做了「插件不在就退回网页实现」的保护，所以只伪造 AppUpdater 是安全的。
+- apk.json 的请求在测试里被 route 拦成假数据（`29990101a`），不碰真网络。
