@@ -736,3 +736,37 @@ App 里页面 origin 是 **`https://localhost`**（iOS 是 `capacitor://localhos
 - 顺手做了播放器布局：头部加封面 `#p-cover`，进度条触摸区加高，导航按钮 `上一句/下一句` 定宽，
   控件行 `[全曲|单句] [顺序|循环|随机] [⋯]`（`#b-display` 靠右），所有控件 ≥ 34px 高。
 - E2E 里点 `#m-all/#m-loop` 现在是「点一下换边」，别再写「点它就等于切到那一档」的断言。
+
+#### 十、发版 / 下载 / App 内自更新（2026-10-15）
+
+**两个入口（都只在对应端显示）**
+
+| 入口 | 在哪 | 判断 |
+|---|---|---|
+| 下载 APK | 我的 → 安卓 App（**只有网页版**） | `IS_NATIVE`（`window.Capacitor.isNativePlatform()`） |
+| 检查更新 | 我的 → 更新（**只有原生壳**） | `appUpdater.available`（插件在不在） |
+
+- 下载主地址 `docs/dl/thlyrics.apk`（**跟站点同域名**：能打开网页就一定下得动；GitHub Releases 的
+  objects.githubusercontent.com 在国内常被墙），备用地址是 GitHub Release。
+- App 内自更新：`docs/apk.json` 版本清单 → 原生 `AppUpdaterPlugin` 下载 → FileProvider 交系统安装器。
+  ⚠️ 清单**必须读线上绝对地址**（`https://zfqxuz.github.io/thlyrics/apk.json`）：原生壳里相对路径
+  读的是打进 APK 的那份，永远等于当前版本 → 自更新永远不触发（踩过）。
+  Android 8+ 没有「安装未知应用」授权时，插件会跳设置页并 reject，提示用户回来再点一次。
+- 为什么不用阿里云 OSS 直接给 APK：OSS 默认域名禁止分发 APK（实测 `ApkDownloadForbidden`，
+  要求用 CNAME 自定义域名 = 得先有备案域名）。
+
+**发版流程（每次都要走完，少一步客户端就不提示更新）**
+
+```bash
+node scripts/bump-version.mjs                       # 1) 推前端版本号
+cd app && npx cap sync android && cd android && ./gradlew assembleDebug --no-daemon   # 2) 出包
+#   JAVA_HOME=~/tools/jdk-21.0.12.1+1  ANDROID_HOME=~/android-sdk
+cp ../../app/android/app/build/outputs/apk/debug/app-debug.apk ../../docs/dl/thlyrics.apk   # 3) 镜像到站点
+gh release create v<版本> <apk>#thlyrics.apk        # 4) 顺手传 GitHub Release（asset 名固定 thlyrics.apk）
+# 5) 改 docs/apk.json 的 version = 这次 APK 里打包的前端版本（不是站点版本！）
+```
+
+- `docs/dl/thlyrics.apk` 是二进制，**每次覆盖同名文件**（工作树只留最新一份；git 历史里会累积 ~8MB/版）。
+- 自更新要求**签名一致**：现在是 Android debug 签名，已备份到
+  `~/.dsh/thlyrics-signing/debug.keystore`（不进仓库）。**别换签名**；换正式签名必须卸载重装一次，
+  之后也不能再用 debug 签名覆盖安装（两条线）。

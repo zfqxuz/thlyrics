@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater } from './platform/index.js?v=20261015v';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater } from './platform/index.js?v=20261015w';
 
 (() => {
   'use strict';
@@ -17,7 +17,9 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   const POSNAME = { n: '名词', v: '动词', a: '形容词', na: '形容动词', adv: '副词', prt: '助词', aux: '助动词', conj: '接续词', int: '感叹词', rent: '连体词', pref: '接头词', oth: '其他' };
   // 原生壳（Capacitor）里不显示「下载 App」；网页版才显示
   const IS_NATIVE = !!(typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
-  const APK_URL = 'https://github.com/zfqxuz/thlyrics/releases/latest/download/thlyrics.apk';   // 每次发版都传同名 asset，latest 永远指向最新
+  // 主下载：和本站同域名（能打开网页就一定下得动；GitHub Releases 的 objects.githubusercontent.com 在国内常被墙）
+  const APK_URL = 'https://zfqxuz.github.io/thlyrics/dl/thlyrics.apk';
+  const APK_URL_BACKUP = 'https://github.com/zfqxuz/thlyrics/releases/latest/download/thlyrics.apk';
   const POS_KIND = { '名詞': 'n', '動詞': 'v', '形容詞': 'a', '形容動詞': 'na', '副詞': 'adv',
     '助詞': 'prt', '助動詞': 'aux', '接続詞': 'conj', '連体詞': 'rent', '感動詞': 'int', '接頭詞': 'pref', '記号': 'sym' };
   const posKind = (w) => {
@@ -2050,7 +2052,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <button class="toolbtn on" id="me-upd-go">下载并安装</button></div>` : ''}` : `<div class="sect">安卓 App</div>
       <div class="setrow"><div class="k">装到手机上<small>后台播放 · 锁屏控制 · 本机音源；网页版数据可登录同一账号同步</small></div>
         <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">下载 APK</a></div>
-      <div class="meta" style="margin-top:6px">下载后点开安装即可（首次需要在系统里允许「安装未知来源应用」）。</div>`}
+      <div class="meta" style="margin-top:6px">下载后点开安装即可（首次需要在系统里允许「安装未知来源应用」）。
+        下不动就用<a href="${APK_URL_BACKUP}" rel="noopener">备用地址</a>。</div>`}
       <div class="sect">数据</div>
       <div class="setrow"><div class="k">导出 / 导入<small>JSON 文件，备份或换设备</small></div>
         <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
