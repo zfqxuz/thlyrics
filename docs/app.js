@@ -1,6 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261016b';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, tts } from './platform/index.js?v=20261016b';
+import { V } from './version.js?v=20261016c';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, tts } from './platform/index.js?v=20261016c';
+import { icon } from './icons.js?v=20261016c';
 
 (() => {
   'use strict';
@@ -156,11 +157,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       <div class="sep"></div>
       <button class="mi" id="av-theme"><span style="flex:1">${light ? '暖白（白天）' : '深色'}</span><span class="sw ${light ? 'on' : ''}"><i></i></span></button>
       <div class="sep"></div>
-      <button class="mi" id="av-home">首页</button>
-      <button class="mi" id="av-songs">曲库</button>
-      <button class="mi" id="av-search">搜索</button>
-      <button class="mi" id="av-me">我的</button>
-      ${ACC && ACC.admin ? '<button class="mi" id="av-admin">管理员</button>' : ''}
+      <button class="mi" id="av-home">${icon('home','in')}首页</button>
+      <button class="mi" id="av-songs">${icon('library','in')}曲库</button>
+      <button class="mi" id="av-search">${icon('search','in')}搜索</button>
+      <button class="mi" id="av-me">${icon('user','in')}我的</button>
+      ${ACC && ACC.admin ? `<button class="mi" id="av-admin">${icon('settings','in')}管理员</button>` : ''}
       <div class="sep"></div>
       <button class="mi" id="av-out">退出登录</button>`;
     const close = () => { d.hidden = true; };
@@ -247,8 +248,16 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // 踩过：WebView 不支持 Web Speech API，壳里点「发音」永远没声音 → 走 platform/tts.js
   async function speak(t) {
     const r = await tts.speak(t);
-    if (!r || !r.ok) toast('读不出来：' + ((r && r.error) || '这个环境不支持朗读'));
-    else if (r.ja === false) toast('没有日语语音包：设置 → 语音与输入 → 文字转语音');
+    if (!r || !r.ok) { toast('读不出来：' + ((r && r.error) || '这个环境不支持朗读')); return; }
+    if (r.ja === false) {
+      showDialog({
+        title: '没有日语语音包',
+        actions: [
+          { label: '去安装', kind: 'main', onClick: async () => { const ok = await tts.openInstall(); if (!ok) toast('请到系统设置 → 语音与输入 → 文字转语音里装日语'); } },
+          { label: '取消' },
+        ],
+      });
+    }
   }
 
   // ────────────── 音频 ──────────────
@@ -382,9 +391,9 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   function setLoad(on, text) {
     document.body.classList.toggle('loading', !!on);
     const b = $('playbtn');
-    if (on) { if (text) setState(text); if (b) b.textContent = '⋯'; }
-    else if (b) b.textContent = audio.paused ? '▶' : '❚❚';
-    const pb = $('p-play'); if (pb) pb.textContent = on ? '⋯' : (audio.paused ? '▶' : '❚❚');
+    if (on) { if (text) setState(text); if (b) b.innerHTML = icon('loader', 'spin'); }
+    else if (b) b.innerHTML = audio.paused ? icon('play') : icon('pause');
+    const pb = $('p-play'); if (pb) pb.innerHTML = on ? icon('loader', 'spin') : (audio.paused ? icon('play') : icon('pause'));
   }
   function jump(t) { if (t == null || !isFinite(t)) return; if (audio.readyState >= 1) { try { audio.currentTime = t; } catch {} } else seekTime = t; }
   function applySeek() { if (seekTime == null || audio.readyState < 1) return; const t = seekTime; seekTime = null; try { audio.currentTime = t; } catch {} }
@@ -561,8 +570,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     audio.addEventListener('loadedmetadata', () => { applySeek(); if (audio.duration) { $('p-dur').textContent = fmt(audio.duration); $('p-seek').value = String(Math.round((audio.currentTime / audio.duration) * 1000)); } });
     audio.addEventListener('loadeddata', applySeek);
     audio.addEventListener('playing', () => { setLoad(false); $('minibar').classList.add('on'); markCurRows(); });
-    audio.addEventListener('play', () => { $('playbtn').textContent = '❚❚'; $('p-play').textContent = '❚❚'; markCurRows(); });
-    audio.addEventListener('pause', () => { $('playbtn').textContent = '▶'; $('p-play').textContent = '▶'; markCurRows(); });
+    audio.addEventListener('play', () => { $('playbtn').innerHTML = icon('pause'); $('p-play').innerHTML = icon('pause'); markCurRows(); });
+    audio.addEventListener('pause', () => { $('playbtn').innerHTML = icon('play'); $('p-play').innerHTML = icon('play'); markCurRows(); });
     audio.addEventListener('error', () => {
       if (stationNid) urlCache.delete(String(stationNid));
       setLoad(false);
@@ -620,12 +629,12 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // ── 播放顺序：顺序 / 循环 / 随机（用户要求补的三档；跟「单句/全曲」是两个维度）──
   const ORDERS = ['seq', 'loop', 'shuffle'];
   const ORDER_NAME = { seq: '顺序', loop: '循环', shuffle: '随机' };
-  const ORDER_ICON = { seq: '→', loop: '↻', shuffle: '⤨' };
+  const ORDER_ICON = { seq: 'order', loop: 'repeat', shuffle: 'shuffle' };
   let playOrder = ORDERS.includes(S.order) ? S.order : 'seq';
   function applyOrder(quiet) {
     if (S.order !== playOrder) { S.order = playOrder; save(); }
     const t = $('p-order-t'); if (t) t.textContent = ORDER_NAME[playOrder];
-    const ic = $('p-order-ic'); if (ic) ic.textContent = ORDER_ICON[playOrder];
+    const ic = $('p-order-ic'); if (ic) ic.innerHTML = icon(ORDER_ICON[playOrder]);
     const b = $('p-order'); if (b) { b.classList.toggle('on', playOrder !== 'seq'); b.title = '播放顺序：' + ORDER_NAME[playOrder] + '（点一下换下一档）'; }
     if (!quiet) setState('播放顺序：' + ORDER_NAME[playOrder]);
   }
@@ -788,7 +797,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · ${st ? st.tracks.size : 0} 首歌 / ${st ? st.n : 0} 次</div>
       </div>
       ${dotsHtml(v)}
-      <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握">✓</button>
+      <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握">${icon('check','in')}</button>
     </div>`;
   }
   function wireWords(root) {
@@ -1029,7 +1038,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const tags = [];
     if (t.imp) tags.push('导入');
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push('有声'); else tags.push('无音源');
-    if (isFav(t.id)) tags.push('♥ 收藏');
+    if (isFav(t.id)) tags.push(icon('heart', 'in') + '收藏');
     if (isSing(t.id)) tags.push('会唱');
     if (t.imp && t.audio && t.audio.type === 'tencent') tags.push('QQ音乐');
     if ((S.audio[t.id] && S.audio[t.id].trial) || (t.audio && t.audio.trial)) tags.push('试听片段');
@@ -1046,8 +1055,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <div class="l2">${esc(t.artist)}${t.base ? ' · ' + esc(t.base) : (t.album ? ' · ' + esc(t.album) : '')}</div>
         <div class="l3">${t.lineCount} 行歌词${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
-      ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">▶</button>` : ''}
-      ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">✕</button>` : '<span class="mini">›</span>'}
+      ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">${icon('play')}</button>` : ''}
+      ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">${icon('close')}</button>` : `<span class="mini">${icon('chevron-right')}</span>`}
     </div>`;
   }
   // ────────────── 网易云歌单导入（纯前端，失败逐首报错） ──────────────
@@ -2019,7 +2028,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       </div>
       <div class="row" style="margin:2px 0 0">
         <input id="qs" class="sel" style="flex:1;min-width:150px;height:34px" placeholder="搜曲名 / 社团 / 专辑" value="${esc(songQ)}">
-        ${curTrack ? '<button class="toolbtn on" id="jump-cur">正在播放</button>' : ''}
+        ${curTrack ? `<button class="toolbtn on" id="jump-cur">${icon('play','in')}正在播放</button>` : ''}
         <select id="tsort" class="sel" style="height:34px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
       </div>
       <div class="chips">
@@ -2027,7 +2036,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <button class="chip ${filter === 'audio' ? 'on' : ''}" data-f="audio">有音频</button>
         <button class="chip ${filter === 'zh' ? 'on' : ''}" data-f="zh">有中文</button>
         <button class="chip ${filter === 'imp' ? 'on' : ''}" data-f="imp">我导入的</button>
-        <button class="chip ${filter === 'fav' ? 'on' : ''}" data-f="fav">♥ 收藏</button>
+        <button class="chip ${filter === 'fav' ? 'on' : ''}" data-f="fav">${icon('heart','in')}收藏</button>
         <button class="chip ${filter === 'sing' ? 'on' : ''}" data-f="sing">会唱</button>
         <button class="chip ${filter === 'known' ? 'on' : ''}" data-f="known">跳过已掌握</button>
       </div>
@@ -2212,7 +2221,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       ${apkNewer() && S.updSkip !== apkRemote.version ? `<div class="updrow"><div class="k"><b>新版本 ${esc(apkRemote.version)}</b><small>${esc(apkRemote.notes || '')}</small></div>
         <button class="toolbtn on" id="me-upd-go">下载并安装</button></div>` : ''}` : `<div class="sect">安卓 App</div>
       <div class="setrow"><div class="k">装到手机上</div>
-        <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">下载 APK</a>
+        <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">${icon('download','in')}下载 APK</a>
         <a class="toolbtn" href="${APK_URL_BACKUP}" rel="noopener">备用</a></div>`}
       <div class="sect">数据</div>
       <div class="setrow"><div class="k">导出 / 导入</div>
@@ -2329,16 +2338,16 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const exs = examplesFor(v, 6);
     $('view-word').innerHTML = `
       <div class="row" style="margin-bottom:14px">
-        <button class="toolbtn" id="w-back">← 返回</button>
-        ${prev ? `<button class="toolbtn" data-go-word="${prev.id}">← ${esc(prev.word)}</button>` : ''}
-        ${next ? `<button class="toolbtn" data-go-word="${next.id}">${esc(next.word)} →</button>` : ''}
+        <button class="toolbtn" id="w-back">${icon('chevron-left','in')}返回</button>
+        ${prev ? `<button class="toolbtn" data-go-word="${prev.id}">${icon('chevron-left','in')}${esc(prev.word)}</button>` : ''}
+        ${next ? `<button class="toolbtn" data-go-word="${next.id}">${esc(next.word)}${icon('chevron-right','in')}</button>` : ''}
       </div>
       <div class="sec-title" style="font-size:30px">${esc(v.word)}</div>
       <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
       <div class="bar" style="margin:14px 0 0"><i style="width:${level(v) * 20}%"></i></div>
       <div style="font-size:17px;margin-top:14px;color:#ffe9df" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
       <div class="row" style="margin-top:14px">
-        <button class="btn-primary" id="w-play">🔊 发音</button>
+        <button class="btn-primary" id="w-play">${icon('volume','in')}发音</button>
         <button class="toolbtn ${isKnown(v) ? 'on' : ''}" id="w-known">${isKnown(v) ? '已掌握' : '标为已掌握'}</button>
         <button class="toolbtn" id="w-edit">改释义</button>
       </div>
@@ -2434,7 +2443,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
           <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · 本曲 ${n} 次</div>
         </div>
         ${dotsHtml(v)}
-        ${li >= 0 ? `<button class="tick" data-line="${li}" title="跳到这句">↦</button>` : ''}
+        ${li >= 0 ? `<button class="tick" data-line="${li}" title="跳到这句">${icon('arrow-turn')}</button>` : ''}
       </div>`;
     }).join('') : '<div class="empty">这个筛选下没有词</div>';
     host.querySelectorAll('[data-line]').forEach((el) => (el.onclick = (e) => {
@@ -2580,7 +2589,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     S.lastTrack = t.id; save();
     const zhN = t.lines.filter((l) => l.zh).length;
     $('view-track').innerHTML = `
-      <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">← 返回</button></div>
+      <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">${icon('chevron-left','in')}返回</button></div>
       <div class="item" style="border:0;padding:0 0 12px;cursor:default">
         ${t.coverFile ? `<img class="cover big" src="data/${t.coverFile}" alt="">`
           : (t.coverUrl ? `<img class="cover big" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover big"></div>')}
@@ -2591,8 +2600,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         </div>
       </div>
       <div class="row" style="margin:2px 0 10px">
-        <button class="btn-primary" id="t-sing">▶ 进入跟唱</button>
-        <button class="toolbtn ${isFav(t.id) ? 'on' : ''}" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
+        <button class="btn-primary" id="t-sing">${icon('play','in')}进入跟唱</button>
+        <button class="toolbtn ${isFav(t.id) ? 'on' : ''}" id="t-fav">${isFav(t.id) ? icon('heart-fill','in') + '已收藏' : icon('heart','in') + '收藏'}</button>
         <button class="toolbtn ${isSing(t.id) ? 'on' : ''}" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
       </div>
       <div id="t-vocab-pane">
@@ -2789,6 +2798,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   function armAllowLeave() { allowLeaveGuard = true; clearTimeout(leaveT); leaveT = setTimeout(() => { allowLeaveGuard = false; }, 900); }
   const LEAVING_TABS = /^#\/(home|learn|songs|mine|me|search|review|admin)(\/|$)/;
   if (typeof window !== 'undefined') window.__tlGuard = () => ({ navFrom, allow: allowLeaveGuard, noGuard: !!window.__NO_GUARD });
+  const DETAIL_ROUTE = /^#\/(track|word)\//;
   function onNavGuard(e) {
     const to = location.hash || '#/home';
     if (typeof window !== 'undefined' && window.__NO_GUARD) { navFrom = to; return; }   // 自动化测试用：关掉二次确认
@@ -2797,25 +2807,62 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     navFrom = to;
     if (to === from) return;
     const pl = $('player');
-    if (from.startsWith('#/track/') && pl && pl.classList.contains('on')) {
-      // 全屏跟唱页开着：返回手势只收播放器，不离开学词页
+    if (DETAIL_ROUTE.test(from) && pl && pl.classList.contains('on')) {
+      // 全屏跟唱页开着：返回/侧滑先收播放器，不离开详情页
       pl.classList.remove('on');
       allowLeaveGuard = true; go(from);
       return;
     }
-    if (from.startsWith('#/track/') && LEAVING_TABS.test(to)) {
-      const tr = curTrack;
+    if (DETAIL_ROUTE.test(from) && LEAVING_TABS.test(to)) {
+      const isTrack = from.startsWith('#/track/');
+      const tr = isTrack ? curTrack : null;
       showDialog({
-        title: '要退出学词页吗？',
+        title: isTrack ? '要退出学词页吗？' : '要返回上一页吗？',
         body: tr ? esc(tr.title) : '',
         actions: [
-          { label: '继续听', kind: 'main', onClick: () => { go(from); } },   // 回学词页；播放没被动过
+          { label: isTrack ? '继续听' : '留在本页', kind: 'main', onClick: () => { go(from); } },
           { label: '退出', onClick: () => {} },                              // 已经离开，保持现状
         ],
       });
       return;
     }
   }
+
+  // ── 侧滑返回：详情页/播放器里，从左缘往右划 = 返回上一页（和系统返回走同一套确认）──
+  function swipeBack() {
+    const pl = $('player');
+    if (pl && pl.classList.contains('on')) { pl.classList.remove('on'); return; }   // 全屏播放器：先收播放器
+    if (DETAIL_ROUTE.test(location.hash || '')) { history.back(); return; }          // 不设放行标记 → 守卫弹确认
+    if (history.length > 1) history.back(); else go('#/home');
+  }
+  if (typeof window !== 'undefined') window.__tlSwipe = () => swipeBack();   // 测试钩子：等价于左缘右划
+  (function edgeSwipeBack() {
+    let x0 = null, y0 = null;
+    const active = () => {
+      const pl = $('player');
+      if (pl && pl.classList.contains('on')) return true;
+      const vt = $('view-track'), vw = $('view-word');
+      return !!((vt && !vt.hidden) || (vw && !vw.hidden));
+    };
+    document.addEventListener('touchstart', (e) => {
+      const t = e.touches && e.touches[0]; if (!t) return;
+      if (t.clientX > 30 || !active()) return;
+      x0 = t.clientX; y0 = t.clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (x0 == null) return;
+      const t = e.touches && e.touches[0]; if (!t) return;
+      const dx = t.clientX - x0, dy = t.clientY - y0;
+      if (dx > 72 && Math.abs(dy) < 60 && dx > Math.abs(dy) * 1.4) {
+        x0 = null;
+        if (e.cancelable) { try { e.preventDefault(); } catch {} }
+        swipeBack();
+      }
+    }, { passive: false });
+    const end = () => { x0 = null; y0 = null; };
+    document.addEventListener('touchend', end, { passive: true });
+    document.addEventListener('touchcancel', end, { passive: true });
+  })();
 
   function route() {
     const raw = decodeURIComponent(String(location.hash || '').replace(/^#\/?/, ''));
@@ -2925,7 +2972,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
-    $('p-speak').onclick = () => speak(popWord ? popWord.word : popFallback);
+    if ($('p-speak')) $('p-speak').innerHTML = icon('volume', 'in') + '发音';
+    $('p-speak').onclick = () => speak((popSeg && popSeg.r) || (popWord && (popWord.reading || popWord.word)) || popFallback);
     $('p-close2').onclick = hidePop;
     $('p-detail').onclick = () => { if (popWord) { const id = popWord.id; hidePop(); go('#/word/' + id); } };
     $('p-edit').onclick = () => {

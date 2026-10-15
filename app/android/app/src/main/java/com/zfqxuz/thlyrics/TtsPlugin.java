@@ -1,5 +1,7 @@
 package com.zfqxuz.thlyrics;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.speech.tts.TextToSpeech;
 
 import com.getcapacitor.JSObject;
@@ -61,6 +63,33 @@ public class TtsPlugin extends Plugin {
         out.put("ja", jaOk);
         speakNow(text);
         call.resolve(out);
+    }
+
+    /** 打开系统语音数据安装入口：系统 TTS 安装页 → TTS 设置 → 应用商店（App 不能静默装语音包） */
+    @PluginMethod
+    public void openInstall(PluginCall call) {
+        try {
+            Intent i = new Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+            return;
+        } catch (Throwable ignored) { /* 换下一种入口 */ }
+        try {
+            Intent i = new Intent("com.android.settings.TTS_SETTINGS");
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+            return;
+        } catch (Throwable ignored) { /* 换下一种入口 */ }
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.tts"));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Throwable e) {
+            call.reject("打不开语音包安装页");
+        }
     }
 
     private void speakNow(String text) {

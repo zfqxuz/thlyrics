@@ -32,6 +32,14 @@ export const tts = {
   available: !!(plugin || web),
 
   /** 读一段日文。ja=false 表示系统没装日语语音包（前端提示去系统设置里装） */
+  /** 打开系统「安装日语语音数据」入口（App 不能静默装；网页端没有这个能力） */
+  async openInstall() {
+    if (plugin && plugin.openInstall) {
+      try { await plugin.openInstall(); return true; } catch { return false; }
+    }
+    return false;
+  },
+
   async speak(text, lang = 'ja-JP') {
     const t = String(text == null ? '' : text).trim();
     if (!t) return { ok: false, error: '没有要读的内容' };

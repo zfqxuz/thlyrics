@@ -489,7 +489,7 @@ const rom = await page.evaluate(() => {
 check('罗马音改成逐词对齐（不再整行一串）', rom.ratio > 60 && rom.spaced, rom.ratio + '% 词带罗马音 · ' + rom.sample.slice(0, 3).join(' '));
 check('词级中文（实词下挂释义）', await page.locator('#plyric .g').count() > 5, (await page.locator('#plyric .g').count()) + ' 个');
 const g0 = await page.evaluate(() => document.body.classList.contains('gloss'));
-check('显示开关默认收起（不摊在页面上）', !(await page.locator('#displaybox').isVisible()) && (await txt('#b-display')) === '⋯', await txt('#b-display'));
+check('显示开关默认收起（不摊在页面上）', !(await page.locator('#displaybox').isVisible()) && (await page.locator('#b-display svg').count()) === 1, '⋯ 图标');
 await page.locator('#b-display').click();
 await page.waitForTimeout(250);
 check('点「显示」才展开三个开关，且状态写成开/关', await page.locator('#displaybox').isVisible() && /^(开|关)$/.test((await txt('#b-gloss')).trim()), `词义 ${await txt('#b-gloss')} · 中文 ${await txt('#b-zh')} · 罗马音 ${await txt('#b-ruby')}`);
@@ -602,6 +602,9 @@ await page.waitForTimeout(400);
 CUR_GROUP = 'minibar';
 await e2eMaybeDone();
 // ═══════ 7 迷你播放条 + 全屏跟唱页 ═══════
+check('播放器图标都是 SVG（不再拿 ▶ ⏮ ⏭ ⋯ 文字拼）',
+  (await page.locator('#playbtn svg, #mb-prev svg, #mb-next svg, #p-ptrack svg, #p-ntrack svg, #p-close svg, #b-display svg').count()) >= 7,
+  '迷你条/全屏页 7 个图标');
 check('迷你播放条已出现', await page.locator('#minibar.on').count() > 0);
 check('迷你条上有曲名与状态', ((await txt('#p-now')) || '').length > 2, ((await txt('#p-now')) || '').slice(0, 26));
 const tidMb0 = await page.evaluate(() => String(location.hash).replace('#/track/', '').split('@')[0]);
@@ -622,7 +625,7 @@ check('点迷你条播放键：进入播放/缓冲', mbHasSrc, (await txt('#p-st
 await page.locator('#mb-meta').click();
 await page.waitForTimeout(600);
 check('点迷你条展开全屏跟唱页', await page.locator('#player.on').count() > 0);
-check('全屏播放器有「上一首/下一首」（跟「上一句/下一句」并存）', (await page.locator('#p-ptrack').count()) === 1 && (await page.locator('#p-ntrack').count()) === 1, '⏮/⏭');
+check('全屏播放器有「上一首/下一首」（跟「上一句/下一句」并存）', (await page.locator('#p-ptrack').count()) === 1 && (await page.locator('#p-ntrack').count()) === 1, 'SVG 图标');
 check('全屏页有聚焦歌词（当前句更亮）', await page.locator('#plyric .lblock').count() > 5, (await page.locator('#plyric .lblock').count()) + ' 块');
 await shot('06-player', true);
 await page.locator('#p-close').click();
@@ -1552,8 +1555,13 @@ await page.waitForSelector('#pop.on', { timeout: 8000 });
 const speakLabel = await page.evaluate(() => { const b = document.getElementById('p-speak'); return b ? b.textContent.trim() : ''; });
 const errBefore = errors.length;
 await page.evaluate(() => { const b = document.getElementById('p-speak'); if (b) b.click(); });
-await page.waitForTimeout(600);
-check('抽屉里叫「发音」，点了不报错', speakLabel === '发音' && errors.length === errBefore, `按钮「${speakLabel}」· 错误 +${errors.length - errBefore}`);
+await page.waitForTimeout(1900);   // 浏览器可能要等 voiceschanged，最多 1.2s 才判定「没有日语包」
+const speakDlg = await page.evaluate(() => { const d = document.getElementById('dlg'); return d && !d.hidden ? d.textContent.replace(/\s+/g, ' ') : ''; });
+check('抽屉里叫「发音」；没日语包时给「去安装」入口',
+  speakLabel === '发音' && errors.length === errBefore && (!speakDlg || /没有日语语音包/.test(speakDlg)),
+  `按钮「${speakLabel}」· 弹窗「${speakDlg || '未出现（有日语包）'}」`);
+if (speakDlg) { await page.locator('#dlg [data-di="1"]').click(); await page.waitForTimeout(300); }
+await page.evaluate(() => { const d = document.getElementById('dlg'); if (d) d.hidden = true; });   // 兜底：别让弹窗挡住后面的用例
 await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
 
 // (c) 词表没收录的词：说清为什么 + 能自己补一条释义（补完歌词下面就有中文）
@@ -1605,7 +1613,7 @@ if (!unknown.none) {
 
 CUR_GROUP = 'guard';
 await e2eMaybeDone();
-// ═══════ 13.14 误触退出保护：左划/返回 → 二次确认；播放不中断 ═══════
+// ═══════ 13.14 误触退出保护：侧滑/返回 → 二次确认；播放不中断 ═══════
 {
   await page.evaluate(() => {
     window.__NO_GUARD = true;
@@ -1613,18 +1621,31 @@ await e2eMaybeDone();
     location.hash = '#/track/t1';
   });
   await page.waitForTimeout(900);
-  await page.evaluate(() => { const b = document.getElementById('playbtn'); if (b) b.click(); const p = document.getElementById('player'); if (p) p.classList.remove('on'); });   // 收掉全屏播放器（它在时返回手势只收播放器，是另一条契约）
+  await page.evaluate(() => { const b = document.getElementById('playbtn'); if (b) b.click(); const p = document.getElementById('player'); if (p) p.classList.remove('on'); });
   await page.waitForTimeout(800);
   const playBefore = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: !!a.src, hash: location.hash }; });
-  await page.evaluate(() => { window.__NO_GUARD = false; location.hash = '#/home'; });   // 模拟误触：离开学词页
+  await page.evaluate(() => {
+    window.__NO_GUARD = false;
+    try {
+      const target = document.getElementById('view-track') || document.body;
+      const mk = (type, x, y) => new TouchEvent(type, {
+        bubbles: true, cancelable: true,
+        touches: type === 'touchend' ? [] : [new Touch({ identifier: 1, target, clientX: x, clientY: y })],
+        changedTouches: [new Touch({ identifier: 1, target, clientX: x, clientY: y })],
+      });
+      target.dispatchEvent(mk('touchstart', 8, 300));
+      target.dispatchEvent(mk('touchmove', 132, 304));
+      target.dispatchEvent(mk('touchend', 132, 304));
+    } catch (e) { if (window.__tlSwipe) window.__tlSwipe(); }
+  });
   await page.waitForTimeout(800);
   const guardHit = await page.evaluate(() => { const d = document.getElementById('dlg'); return { hash: location.hash, open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
-  check('误触退出：弹二次确认', guardHit.open && /退出学词页/.test(guardHit.text), JSON.stringify(guardHit).slice(0, 80));
+  check('侧滑返回：弹二次确认', guardHit.open && /退出学词页/.test(guardHit.text), JSON.stringify(guardHit).slice(0, 90));
   await page.locator('#dlg [data-di="0"]').click();                       // 继续听
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(700);
   const playAfter = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: !!a.src, hash: location.hash, paused: a.paused }; });
   check('「继续听」：回到学词页，播放不被打断', playAfter.hash === '#/track/t1' && playAfter.src === playBefore.src, JSON.stringify(playAfter));
-  await page.evaluate(() => { location.hash = '#/home'; });               // 再误触一次
+  await page.evaluate(() => { location.hash = '#/home'; });               // 再退出一次
   await page.waitForTimeout(800);
   await page.locator('#dlg [data-di="1"]').click();                       // 退出
   await page.waitForTimeout(600);

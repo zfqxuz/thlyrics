@@ -43,6 +43,10 @@ body.warm{
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none !important}   /* 防止 display:inline-flex 这类规则把 hidden 覆盖掉 */
+.ic{width:1em;height:1em;display:block;flex:0 0 auto;pointer-events:none}
+.ic.in{display:inline-block;vertical-align:-.14em;width:1.05em;height:1.05em}
+.ic.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);line-height:1.6;
   font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
@@ -438,7 +442,7 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
 <div class="topbar">
   <div class="brand" id="brand" style="cursor:pointer">TH Lyrics <small id="headstat"></small></div>
   <div class="row" style="gap:8px;flex-wrap:nowrap">
-    <button class="iconbtn" id="btn-search" title="搜索">搜</button>
+    <button class="iconbtn" id="btn-search" title="搜索"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /> <path d="m21 21-4.3-4.3" /></svg></button>
     <div class="avwrap">
       <button class="avbtn" id="btn-av" title="我的"></button>
       <div class="avdrop" id="avdrop" hidden></div>
@@ -504,17 +508,17 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
       <div class="t1" id="p-now">—</div>
       <div class="t2" id="p-state"></div>
     </div>
-    <button class="modechip" id="mb-loop" hidden>单句循环 ✕</button>
-    <button class="nbtn" id="mb-prev" title="上一首">⏮</button>
-    <button id="playbtn">▶</button>
-    <button class="nbtn" id="mb-next" title="下一首">⏭</button>
+    <button class="modechip" id="mb-loop" hidden>单句循环<svg class="ic in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
+    <button class="nbtn" id="mb-prev" title="上一首"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20" /> <line x1="5" x2="5" y1="19" y2="5" /></svg></button>
+    <button id="playbtn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon fill="currentColor" points="6 3 20 12 6 21 6 3" /></svg></button>
+    <button class="nbtn" id="mb-next" title="下一首"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4" /> <line x1="19" x2="19" y1="5" y2="19" /></svg></button>
   </div>
 </div>
 
 <!-- 全屏跟唱页 -->
 <div id="player">
   <div class="phead">
-    <button class="round" id="p-close" title="收起">⌄</button>
+    <button class="round" id="p-close" title="收起"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></button>
     <img class="pcover" id="p-cover" alt="" hidden>
     <div class="t"><div class="a" id="p-title">—</div><div class="b" id="p-artist"></div></div>
     <button class="toolbtn" id="p-nosrc" hidden>绑定音频</button>
@@ -528,20 +532,20 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
       <span class="time" id="p-dur">0:00</span>
     </div>
     <div class="btnrow">
-      <button class="tracknav" id="p-ptrack" title="上一首">⏮</button>
+      <button class="tracknav" id="p-ptrack" title="上一首"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20" /> <line x1="5" x2="5" y1="19" y2="5" /></svg></button>
       <button class="toolbtn navbtn" id="p-prev" title="上一句歌词">上一句</button>
-      <button class="big" id="p-play">▶</button>
+      <button class="big" id="p-play"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon fill="currentColor" points="6 3 20 12 6 21 6 3" /></svg></button>
       <button class="toolbtn navbtn" id="p-next" title="下一句歌词">下一句</button>
-      <button class="tracknav" id="p-ntrack" title="下一首">⏭</button>
+      <button class="tracknav" id="p-ntrack" title="下一首"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4" /> <line x1="19" x2="19" y1="5" y2="19" /></svg></button>
     </div>
     <div class="ctlrow">
       <button class="scope2" id="p-scope" role="switch" aria-checked="false" title="点一下切换：全曲 / 单句">
         <span class="half on" id="m-all">全曲</span><span class="half" id="m-loop">单句</span>
       </button>
       <button class="chipcycle" id="p-order" title="播放顺序：点一下换下一档">
-        <span class="ic" id="p-order-ic">→</span><span id="p-order-t">顺序</span>
+        <span class="ic" id="p-order-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1" /> <circle cx="19" cy="12" r="1" /> <circle cx="5" cy="12" r="1" /></svg></span><span id="p-order-t">顺序</span>
       </button>
-      <button class="chipcycle" id="b-display" title="更多设置">⋯</button>
+      <button class="chipcycle" id="b-display" title="更多设置"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12h11" /> <path d="M10 18h11" /> <path d="M10 6h11" /> <path d="M4 10h2" /> <path d="M4 6h1v4" /> <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" /></svg></button>
     </div>
     <div id="displaybox">
       <div class="dr"><span>倍速</span><button id="p-rate">1.0x</button></div>
@@ -588,7 +592,7 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
       <input id="p-editinput" placeholder="写你自己的释义，回车保存">
     </div>
     <div class="row" style="margin-top:10px">
-      <button class="toolbtn" id="p-speak">发音</button>
+      <button class="toolbtn" id="p-speak"><svg class="ic in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg>发音</button>
       <button class="toolbtn" id="p-detail">词条详情</button>
       <button class="toolbtn" id="p-lines">出现的句子</button>
       <button class="toolbtn" id="p-edit">改释义</button>
@@ -596,6 +600,6 @@ details.src summary{font-size:12px;color:var(--ink3);cursor:pointer;padding:6px 
   </div>
 </div>
 
-<script type="module" src="app.js?v=20261016b"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261016c"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

@@ -1,5 +1,5 @@
 {
-  "version": "20261016b",
+  "version": "20261016c",
   "url": "https://zfqxuz.github.io/thlyrics/dl/thlyrics.apk",
-  "notes": "例句行内试听 · 点学词页不自动播 · 播放器上一首/下一首 · 误触退出二次确认"
+  "notes": "图标换成 Lucide 素材 · 侧滑返回+二次确认 · 没日语语音包可一键去装"
 }

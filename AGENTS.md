@@ -869,3 +869,36 @@ node .e2e/run-e2e.mjs                              # 全量（所有 check 都�
 - 新增/改过的用例：`word` 例句试听三连；`track` 不自动出声 + 跟唱才播；
   `minibar` 上一首下一首 + 当前行动效；`guard` 二次确认；`native` 更新公告三选项；
   `misc` 开屏播放条 + 音频来源无解释文案；`fixes` 未收录词不做解释性文案。
+
+### 2026-10-16 下午：图标换 Lucide / 侧滑返回 / 语音包安装入口（c 版）
+
+用户三条真机反馈，逐条落地：
+
+#### 一、图标：禁止再用文字符号拼
+
+- 以前 `▶ ❚❚ ⏮ ⏭ ⋯ ✕ ⌄ ✓ ♥ ↦` 这些是字符拼的图标，真机上大小/基线/风格都不对。
+- 现在统一用 **Lucide v0.468.0（ISC）官方 SVG**，子集离线内联在 `docs/icons.js`（`?v=` 跟版本走），
+  许可证 `docs/LICENSE-lucide.txt`。**不挂 CDN**，App 断网也有图标。
+- `index.html` 里的静态图标（搜索/迷你条/全屏播放器/⋯/发音）直接写 Lucide 的 `<svg>` 子元素；
+  JS 渲染的用 `icon('name', 'in')`（`in`=行内，`spin`=转圈加载）。
+- 想加图标：先去 Lucide 找同名图标，把 `<svg>` 里的子元素抄进 `docs/icons.js` 的 `ICONS`，
+  不要在业务代码里手写 path，也不要再退回文字符号。
+
+#### 二、侧滑返回（用户原话：我想从详情页回到列表页）
+
+- `edgeSwipeBack()`：在详情页（`#/track/*`、`#/word/*`）或全屏播放器打开时，
+  从**左缘 30px 内**往右划超过 72px 触发 `swipeBack()`。
+- 行为：播放器开着 → 先收播放器；否则走 `history.back()`（**不设放行标记**，和系统返回一样过守卫）。
+- `onNavGuard` 覆盖范围从「只 track」扩到 `#/(track|word)/` → 主 tab：
+  详情页退出弹二次确认；track 是「继续听 / 退出」，word 是「留在本页 / 退出」。
+- `go()`/`goBack()`（自己点的按钮）仍会放行一次，不弹窗。E2E `guard` 组用真实 `TouchEvent` 模拟侧滑。
+
+#### 三、语音包：不能静默下载，但可以一键去装
+
+- Android 不允许 App 静默安装 TTS 语音数据，所以“没包”时给入口，不硬读中文。
+- 新增 `TtsPlugin.openInstall()`：按顺序尝试
+  ① `TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA`（系统 TTS 数据安装页）
+  ② `com.android.settings.TTS_SETTINGS`（TTS 设置）
+  ③ `market://details?id=com.google.android.tts`（Play 商店）
+  都打不开才 reject。
+- 前端 `speak()`：`ja:false` 时弹「没有日语语音包 / 去安装 / 取消」；网页端没有这个能力就提示去系统设置装。
