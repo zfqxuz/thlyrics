@@ -1,6 +1,6 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261015x';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater } from './platform/index.js?v=20261015x';
+import { V } from './version.js?v=20261015y';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater } from './platform/index.js?v=20261015y';
 
 (() => {
   'use strict';
