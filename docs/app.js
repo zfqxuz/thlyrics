@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015t';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015u';
 
 (() => {
   'use strict';
@@ -15,6 +15,9 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   const fmt = (s) => (!s || !isFinite(s)) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const norm = (s) => String(s || '').toLowerCase().replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
   const POSNAME = { n: '名词', v: '动词', a: '形容词', na: '形容动词', adv: '副词', prt: '助词', aux: '助动词', conj: '接续词', int: '感叹词', rent: '连体词', pref: '接头词', oth: '其他' };
+  // 原生壳（Capacitor）里不显示「下载 App」；网页版才显示
+  const IS_NATIVE = !!(typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  const APK_URL = 'https://github.com/zfqxuz/thlyrics/releases/latest/download/thlyrics.apk';   // 每次发版都传同名 asset，latest 永远指向最新
   const POS_KIND = { '名詞': 'n', '動詞': 'v', '形容詞': 'a', '形容動詞': 'na', '副詞': 'adv',
     '助詞': 'prt', '助動詞': 'aux', '接続詞': 'conj', '連体詞': 'rent', '感動詞': 'int', '接頭詞': 'pref', '記号': 'sym' };
   const posKind = (w) => {
@@ -179,28 +182,15 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // ── 逐词中文（词级对照）──
   // 踩过的坑：助词/助动词不能用词表兜底。词表里为「汉字词」都建了假名活用形索引，
   // 纯假名的「は/から/た/し/な」于是被认成「歯/空/田/詩/名」——用户看到的逐词中文全错。
-  // 现在：实词查词表（只认含汉字的活用形 + 词典形），助词/助动词改查下面这张人工语法小表。
-  const GRAM = {
-    'の': '的；所属', 'に': '朝向・时间・对象', 'を': '提示宾语', 'て': '连接（并列/继续）',
-    'は': '提示主题', 'た': '过去・完成', 'が': '提示主语', 'も': '也', 'で': '地点・手段',
-    'ない': '否定', 'なく': '不…（否定连用）', 'な': '啊（感叹/禁止）', 'と': '和；引用',
-    'よ': '提示对方', 'だ': '是（断定）', 'う': '意志・推量', 'か': '疑问',
-    'から': '从…；因为', 'まで': '到…为止', 'さ': '语气（随意）', 'や': '和（列举）',
-    'だけ': '只，仅', 'へ': '朝向', 'ね': '吧（求认同）', 'ば': '如果…就', 'ぬ': '不（＝ない）',
-    'なら': '如果是…', 'じゃ': '那么；不是', 'ず': '不…（书面）', 'でも': '可是；连…也',
-    'たい': '想…', 'さえ': '连…都', 'すら': '连…都', 'として': '作为…', 'だろ': '大概…吧',
-    'だろう': '大概…吧', 'でしょ': '大概…吧', 'でしょう': '大概…吧', 'より': '比…；从…',
-    'だって': '因为；就连…', 'なんて': '之类的', 'など': '等等', 'こそ': '正是',
-    'ます': '礼貌体', 'わ': '语气（柔和）', 'たら': '如果…就', 'れば': '如果…就',
-    'だっ': '是（过去）', 'のに': '明明…却', 'けど': '虽然…但', 'って': '引用；主题',
-    'しか': '只（接否定）', 'ましょ': '礼貌意志', 'たり': '又…又…', 'かしら': '…吧',
-    'という': '叫做…', 'べき': '应该…', 'ほど': '程度；越…越…', 'ちゃ': '…了（口语）',
-    'なきゃ': '必须…', 'なくちゃ': '必须…', 'ん': '说明语气', 'ても': '即使…也',
-    'ながら': '一边…一边', 'ので': '因为', 'みたい': '像…一样', 'らしい': '好像…',
-    'よう': '意志・推量', 'そう': '好像；那样', 'てる': '正在…', 'ている': '正在…',
-    'れる': '被动・可能', 'られる': '被动・可能', 'せる': '使役', 'させる': '使役',
-  };
+  // 现在：实词查词表（只认含汉字的活用形 + 词典形），功能词（助词/助动词/接续词/形式名词）一律不显示。
   const CONTENT_KIND = { n: 1, v: 1, a: 1, na: 1, adv: 1, int: 1, conj: 1, rent: 1, pref: 1 };
+  // 逐词中文只翻「实词」。助词/助动词/接续词/连体词/词缀/形式名词都不翻：
+  // 中文里没有一一对应的词，硬翻只会得到「提示主题」这种噪音（用户明确反馈看着不舒服）。
+  const GLOSS_KIND = { n: 1, v: 1, a: 1, na: 1, adv: 1 };
+  const KANA_ONLY = /^[\u3041-\u309f\u30a0-\u30ff]+$/;
+  // 形式名词 / 补助动词：写假名的是语法零件（てみる・ている・こと・もの…），写汉字的算实词照翻（見る・居る）
+  const GLOSS_SKIP = { 'こと': 1, 'もの': 1, 'ため': 1, 'わけ': 1, 'はず': 1, 'つもり': 1, 'ほう': 1, 'ところ': 1, 'とおり': 1, 'よう': 1, 'そう': 1,
+    'いる': 1, 'ある': 1, 'くる': 1, 'いく': 1, 'おく': 1, 'しまう': 1, 'みる': 1, 'くれる': 1, 'もらう': 1, 'あげる': 1, 'やる': 1, 'いただく': 1, 'くださる': 1 };
   /** 这个词位配哪个词条：先按词典形查（最准），查不到再按表面形兜底（只认实词） */
   function wordForSeg(sg) {
     if (!sg || !sg.s || sg.k === 'sym') return null;
@@ -215,12 +205,14 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (r && want && want !== r && !want.startsWith(r) && !r.startsWith(want)) return null;
     return v;
   }
-  /** 词下那一行中文：实词=词表释义（人工改过的优先），助词/助动词=语法小表；都没有就不占位 */
+  /** 词下那一行中文：只有「实词」才有。助词、助动词、接续词、形式名词一律留白（见 GLOSS_KIND / GLOSS_SKIP） */
   const glossOf = (sg, w) => {
-    const g = (w && meaningOf(w)) || '';
-    if (g && g.length <= 14 && !(w && w.meaningCheck)) return g;
-    const gram = (sg && (sg.k === 'prt' || sg.k === 'aux')) ? GRAM[sg.s] : '';
-    return (gram && gram.length <= 12) ? gram : '';
+    if (!sg || !w || !GLOSS_KIND[sg.k]) return '';
+    const base = sg.b || w.word || '';
+    if (GLOSS_SKIP[base] && KANA_ONLY.test(sg.s || '')) return '';
+    const g = meaningOf(w) || '';
+    if (!g || g.length > 14 || w.meaningCheck) return '';
+    return g;
   };
   const toggleKnown = (w) => { if (!w) return; if (isKnown(w)) S.known[w.id] = -Date.now(); else S.known[w.id] = Date.now(); save(); };
 
@@ -2028,6 +2020,10 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <button class="toolbtn" id="m-pull">从云端拉回</button>
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
       </div>
+      ${IS_NATIVE ? '' : `<div class="sect">安卓 App</div>
+      <div class="setrow"><div class="k">装到手机上<small>后台播放 · 锁屏控制 · 本机音源；网页版数据可登录同一账号同步</small></div>
+        <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">下载 APK</a></div>
+      <div class="meta" style="margin-top:6px">下载后点开安装即可（首次需要在系统里允许「安装未知来源应用」）。</div>`}
       <div class="sect">数据</div>
       <div class="setrow"><div class="k">导出 / 导入<small>JSON 文件，备份或换设备</small></div>
         <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
@@ -2311,12 +2307,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
           if (ruby) { const ri = document.createElement('i'); ri.className = 'r'; ri.textContent = y; span.appendChild(ri); }
           span.appendChild(document.createTextNode(sg.s));
           const g = glossOf(sg, w);
-          if (g) {
-            const gi = document.createElement('i');
-            gi.className = 'g' + (w ? '' : ' g-gram');        // 语法小表来的单独标一下（视觉上能区分）
-            gi.textContent = g;
-            span.appendChild(gi);
-          }
+          if (g) { const gi = document.createElement('i'); gi.className = 'g'; gi.textContent = g; span.appendChild(gi); }
           line.appendChild(span);
           flat.push(y || sg.s);
         }
