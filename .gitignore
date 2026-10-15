@@ -20,3 +20,4 @@ app/android/app/build/
 app/android/local.properties
 app/android/.idea/
 app/ios/App/Pods/
+.tmp/

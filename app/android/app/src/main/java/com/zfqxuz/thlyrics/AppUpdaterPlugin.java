@@ -54,6 +54,8 @@ public class AppUpdaterPlugin extends Plugin {
                 conn.setInstanceFollowRedirects(true);
                 conn.setConnectTimeout(20000);
                 conn.setReadTimeout(30000);
+                // OSS 桶开了来源白名单：原生下载默认不带 Referer 会被 403，这里带一个白名单内的来源
+                conn.setRequestProperty("Referer", "https://zfqxuz.github.io/");
                 conn.connect();
                 int code = conn.getResponseCode();
                 if (code != 200) throw new Exception("下载失败 HTTP " + code);

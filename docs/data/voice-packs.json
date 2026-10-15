@@ -1,0 +1,16 @@
+{
+  "packs": [
+    {
+      "id": "espeak-ng",
+      "name": "eSpeak NG",
+      "pkg": "com.reecedunn.espeak",
+      "version": "1.52.0",
+      "versionCode": 22,
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/espeak-ng-1.52.0.bin?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107463985&Signature=%2BuEtUhYKW7RyYlSesyupKv11FAY%3D",
+      "size": 10446659,
+      "sha256": "0a7822fec54d7f7ae759ffedc9afeaa77f809587b171fb2101998787821ec790",
+      "source": "https://f-droid.org/packages/com.reecedunn.espeak/",
+      "license": "GPL-3.0"
+    }
+  ]
+}

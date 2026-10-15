@@ -13,7 +13,7 @@
     "build": "node scripts/build-web.mjs",
     "all": "node scripts/build-index.mjs && node scripts/fetch-netease.mjs --lyrics && node scripts/build-web.mjs",
     "serve": "node scripts/serve.mjs 8848",
-    "check": "node scripts/check-layers.mjs",
+    "check": "node scripts/check-layers.mjs && node scripts/check-copy.mjs",
     "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {

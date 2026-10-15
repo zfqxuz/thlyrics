@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261016c';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, tts } from './platform/index.js?v=20261016c';
-import { icon } from './icons.js?v=20261016c';
+import { V } from './version.js?v=20261016e';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, tts, nativeBack } from './platform/index.js?v=20261016e';
+import { icon } from './icons.js?v=20261016e';
 
 (() => {
   'use strict';
@@ -46,12 +46,13 @@ import { icon } from './icons.js?v=20261016c';
 
   // ────────────── 本地状态 ──────────────
   let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, rate: 1, ruby: true, gloss: false, zh: true,
-    mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
+    mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new', ttsEngine: '', ttsVoice: '', ttsFallback: '' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
   function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {};
-    S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new'; }
+    S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
+    if (!S.ttsEngine) S.ttsEngine = ''; if (!S.ttsVoice) S.ttsVoice = ''; if (!['online', 'pack'].includes(S.ttsFallback)) S.ttsFallback = ''; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   let saveN = 0;
   const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); queueSync(); };
@@ -244,21 +245,54 @@ import { icon } from './icons.js?v=20261016c';
   // 旧版本往 IndexedDB 绑过本机音频文件，功能已下线：开机清一次，别留垃圾
   dropLegacyDB('thlyrics');
 
-  // ────────────── 发音朗读（网页=浏览器 TTS；原生壳=安卓系统 TTS）──────────────
-  // 踩过：WebView 不支持 Web Speech API，壳里点「发音」永远没声音 → 走 platform/tts.js
-  async function speak(t) {
-    const r = await tts.speak(t);
-    if (!r || !r.ok) { toast('读不出来：' + ((r && r.error) || '这个环境不支持朗读')); return; }
-    if (r.ja === false) {
-      showDialog({
-        title: '没有日语语音包',
-        actions: [
-          { label: '去安装', kind: 'main', onClick: async () => { const ok = await tts.openInstall(); if (!ok) toast('请到系统设置 → 语音与输入 → 文字转语音里装日语'); } },
-          { label: '取消' },
-        ],
-      });
-    }
+  // ────────────── 发音朗读 ──────────────
+  // 原生壳：系统 TTS（本地语音包）。只认真实日语发音；没有 → 跳 App 内「语音包」页引导安装。
+  // 网页版：在线日语（经自己的函数计算代理），不需要装任何东西。
+  let speakAudio = null;
+  const getSpeakAudio = () => {                       // 懒加载：别插在主 audio 前面（很多逻辑取第一个 audio）
+    if (speakAudio && speakAudio.isConnected) return speakAudio;
+    speakAudio = createAudioEl();
+    speakAudio.id = 'speak-audio';
+    speakAudio.preload = 'auto';
+    if (document.body) document.body.appendChild(speakAudio);
+    return speakAudio;
+  };
+  const speakCache = new Map();
+  async function speakOnline(text) {
+    try {
+      let url = speakCache.get(text);
+      if (!url) {
+        const j = await fcJson('/tts?text=' + encodeURIComponent(text.slice(0, 60)));
+        if (!j || !j.url) throw new Error('没有音频');
+        url = j.url;
+        if (speakCache.size >= 200) speakCache.delete(speakCache.keys().next().value);
+        speakCache.set(text, url);
+      }
+      const el = getSpeakAudio();
+      try { el.pause(); } catch {}
+      el.src = url;
+      el.currentTime = 0;
+      await el.play();
+    } catch (e) { toast('发音失败'); }
   }
+  async function speak(t) {
+    const text = String(t == null ? '' : t).trim();
+    if (!text) return;
+    if (!IS_NATIVE) { await speakOnline(text); return; }   // 网页版：在线
+    const r = await tts.speak(text, { engine: S.ttsEngine || '', voice: S.ttsVoice || '' });
+    if (r && r.ja) return;                                  // 本地有真日语引擎：优先本地
+    if (S.ttsFallback === 'online') { await speakOnline(text); return; }
+    if (S.ttsFallback === 'pack') { go('#/voicepack'); return; }
+    // 第一次遇到“没装日语语音”：给两条国内可走的路，记住选择
+    showDialog({
+      title: '未安装日语语音包',
+      actions: [
+        { label: '在线发音', kind: 'main', onClick: async () => { S.ttsFallback = 'online'; save(); await speakOnline(text); } },
+        { label: '语音包', onClick: () => { S.ttsFallback = 'pack'; save(); go('#/voicepack'); } },
+      ],
+    });
+  }
+  if (typeof window !== 'undefined') window.__tlSpeak = (t) => speak(t);   // 真机/CDP 测试钩子
 
   // ────────────── 音频 ──────────────
   const audio = createAudioEl();
@@ -426,7 +460,7 @@ import { icon } from './icons.js?v=20261016c';
     if (!st) return null;
     if (st.type === 'local') {                                       // 本机文件：没有直链要解析，也没有过期一说
       const u = await mediaStore.url(st);
-      if (!u) throw new Error('本机音频找不到了（可能被清理过）');
+      if (!u) throw new Error('本机音频不可用');
       return u;
     }
     if (!st.nid) return null;
@@ -522,8 +556,8 @@ import { icon } from './icons.js?v=20261016c';
       try {
         const u = await mediaStore.url(st0);
         if (my !== prepToken) return;
-        if (u) attach(u); else setState('本机音频找不到了');
-      } catch { if (my === prepToken) setState('本机音频找不到了'); }
+        if (u) attach(u); else setState('本机音频不可用');
+      } catch { if (my === prepToken) setState('本机音频不可用'); }
       return;
     }
     const nid = (st0 && st0.nid) || (track.audio && track.audio.nid) || null;
@@ -1730,7 +1764,7 @@ import { icon } from './icons.js?v=20261016c';
     document.body.classList.add('gated');
     g.innerHTML = `<div class="gatecard">
       <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">TH Lyrics</div>
-      <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选，注册后也能换）</span></label>
+      <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选）</span></label>
       <input type="file" id="g-av" accept="image/*" hidden>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
       <input class="sel" id="g-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
@@ -1786,7 +1820,7 @@ import { icon } from './icons.js?v=20261016c';
   async function pushCloud() {
     if (importing) return;
     if (!ACC || !ACC.token) { toast('先登录才能同步'); return; }
-    if (syncBusy) { toast('正在同步中，稍等一下'); return; }
+    if (syncBusy) { toast('同步中'); return; }
     setLoad(true, '同步到云端…');
     const ok = await syncNow({ manual: true, force: true });
     setLoad(false);
@@ -1797,7 +1831,7 @@ import { icon } from './icons.js?v=20261016c';
   async function pullCloud() {
     if (importing) return;
     if (!ACC || !ACC.token) { toast('先登录才能同步'); return; }
-    if (syncBusy) { toast('正在同步中，稍等一下'); return; }
+    if (syncBusy) { toast('同步中'); return; }
     const impB = Object.keys(S.imp || {}).length, kB = knownCount();
     setLoad(true, '从云端拉取…');
     const ok = await syncNow({ manual: true });
@@ -2192,6 +2226,33 @@ import { icon } from './icons.js?v=20261016c';
     } catch (e) { toast('更新失败：' + ((e && e.message) || e)); }
   }
 
+  /** 「我的 → 发音」：列已装引擎 + 真日语发音，让用户选；不装在线，不走假 ja */
+  async function loadTtsSettings() {
+    const eSel = $('tts-engine'), vSel = $('tts-voice');
+    if (!eSel || !vSel) return;
+    let engines = [];
+    try { const r = await tts.engines(); engines = (r && r.engines) || []; } catch { engines = []; }
+    eSel.innerHTML = `<option value="">自动（系统默认）</option>` + engines.map((x) => `<option value="${esc(x.name)}">${esc(x.label || x.name)}${x.def ? ' · 默认' : ''}</option>`).join('');
+    eSel.value = S.ttsEngine || '';
+    const loadVoices = async () => {
+      let vs = [];
+      let trusted = false;
+      try { const r = await tts.voices(S.ttsEngine || ''); vs = ((r && r.voices) || []).filter((x) => x.genuine); trusted = !!(r && r.trusted); } catch { vs = []; }
+      const usable = vs.length || trusted;
+      vSel.innerHTML = usable
+        ? `<option value="">自动</option>` + vs.map((x) => `<option value="${esc(x.name)}">${esc(x.locale || '')} · ${esc(x.name)}</option>`).join('')
+        : `<option value="">日语未安装</option>`;
+      vSel.disabled = !usable;
+      vSel.value = S.ttsVoice && vs.some((x) => x.name === S.ttsVoice) ? S.ttsVoice : '';
+    };
+    await loadVoices();
+    eSel.onchange = () => { S.ttsEngine = eSel.value; S.ttsVoice = ''; save(); loadVoices(); };
+    vSel.onchange = () => { S.ttsVoice = vSel.value; save(); };
+    if ($('tts-packs')) $('tts-packs').onclick = () => go('#/voicepack');
+    if ($('tts-online')) $('tts-online').onclick = () => { S.ttsFallback = S.ttsFallback === 'pack' ? 'online' : 'pack'; save(); renderMe(); };
+    if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
+  }
+
   function renderMe() {
     const favN = Object.keys(S.fav || {}).filter((k) => Number(S.fav[k]) > 0).length;
     const singN = Object.keys(S.sing || {}).filter((k) => Number(S.sing[k]) > 0).length;
@@ -2209,6 +2270,12 @@ import { icon } from './icons.js?v=20261016c';
       <div class="setrow"><div class="k">逐词罗马音</div><button class="toolbtn ${S.ruby !== false ? 'on' : ''}" id="me-ruby">${S.ruby !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">整句中文</div><button class="toolbtn ${S.zh !== false ? 'on' : ''}" id="me-zh">${S.zh !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">逐词中文</div><button class="toolbtn ${S.gloss !== false ? 'on' : ''}" id="me-gloss">${S.gloss !== false ? '开' : '关'}</button></div>
+      ${IS_NATIVE ? `<div class="sect">发音</div>
+      <div class="setrow"><div class="k">发音引擎</div><select class="sel" id="tts-engine" style="max-width:62%"></select></div>
+      <div class="setrow"><div class="k">日语发音</div><select class="sel" id="tts-voice" style="max-width:62%"></select></div>
+      <div class="setrow"><div class="k">无本地语音时</div><button class="toolbtn ${S.ttsFallback !== 'pack' ? 'on' : ''}" id="tts-online">${S.ttsFallback === 'pack' ? '语音包页' : '在线发音'}</button></div>
+      <div class="setrow"><div class="k">日语语音包</div>
+        <div class="row"><button class="toolbtn" id="tts-packs">语音包</button><button class="toolbtn" id="tts-test">试听</button></div></div>` : ''}
       <div class="sect">同步</div>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">立即同步</button>
@@ -2256,6 +2323,7 @@ import { icon } from './icons.js?v=20261016c';
     const disp = (key, id) => { const el = $(id); if (el) el.onclick = () => { S[key] = S[key] === false; save(); applyDisplay(); renderMe(); }; };
     disp('ruby', 'me-ruby'); disp('zh', 'me-zh'); disp('gloss', 'me-gloss');
     if ($('me-admin')) $('me-admin').onclick = () => go('#/admin');
+    if ($('tts-engine')) loadTtsSettings();
     $('m-push').onclick = () => pushCloud();
     $('m-pull').onclick = () => pullCloud();
     $('m-auto').onclick = () => {
@@ -2301,6 +2369,103 @@ import { icon } from './icons.js?v=20261016c';
   }
 
   // ────────────── 管理员（OSS 文件） ──────────────
+  /** App 内「语音包」页：检测系统已装 TTS 引擎 + 官方安装/更新/卸载入口（不托管任何安装包） */
+  async function renderVoicepack() {
+    const host = $('view-voicepack'); if (!host) return;
+    host.innerHTML = `<div class="row" style="margin-bottom:12px"><button class="toolbtn" id="vp-back">${icon('chevron-left','in')}返回</button></div>
+      <div class="sec-head"><div><div class="sec-title">语音包</div><div class="sec-sub">发音引擎</div></div></div>
+      <div id="vp-list"><div class="meta">检查中…</div></div>
+      ${IS_NATIVE ? `<div class="sect">离线日语引擎</div><div id="vp-packs"><div class="meta">加载中…</div></div>` : ''}
+      <div class="sect">安装</div>
+      <div class="setrow"><div class="k">系统文字转语音</div>
+        <div class="row"><button class="toolbtn on" id="vp-settings">去设置</button></div></div>`;
+    $('vp-back').onclick = () => goBack('#/me');
+    $('vp-settings').onclick = async () => { const ok = await tts.openSettings(); if (!ok) toast('打开失败'); };
+    const box = $('vp-list');
+    let engines = [];
+    try { const r = await tts.engines(); engines = (r && r.engines) || []; } catch { engines = []; }
+    if (!engines.length) { box.innerHTML = '<div class="empty">无发音引擎</div>'; return; }
+    const rows = [];
+    for (const e of engines) {
+      let vs = [];
+      let trusted = false;
+      try { const r = await tts.voices(e.name); vs = ((r && r.voices) || []).filter((x) => x.genuine); trusted = !!(r && r.trusted); } catch { vs = []; }
+      const usable = vs.length || trusted;
+      const on = (S.ttsEngine || '') === e.name;
+      rows.push(`<div class="item" style="align-items:flex-start">
+        <div class="col"><div class="l1">${esc(e.label || e.name)}${e.def ? '<span class="rd">系统默认</span>' : ''}</div>
+          <div class="l2">${usable ? '日语可用' : '日语未安装'}</div></div>
+        <div class="row" style="flex:0 0 auto">
+          ${usable ? `<button class="toolbtn ${on ? 'on' : ''}" data-use="${esc(e.name)}">${on ? '已启用' : '启用'}</button>` : ''}
+          <button class="toolbtn" data-app="${esc(e.name)}">应用信息</button>
+          <button class="toolbtn" data-del="${esc(e.name)}">卸载</button>
+        </div></div>`);
+    }
+    box.innerHTML = rows.join('');
+    box.querySelectorAll('[data-use]').forEach((el) => (el.onclick = () => { S.ttsEngine = el.dataset.use; S.ttsVoice = ''; save(); toast('已启用：' + el.dataset.use); renderVoicepack(); }));
+    box.querySelectorAll('[data-app]').forEach((el) => (el.onclick = async () => { const ok = await tts.appInfo(el.dataset.app); if (!ok) toast('打开失败'); }));
+    box.querySelectorAll('[data-del]').forEach((el) => (el.onclick = async () => { const ok = await tts.uninstall(el.dataset.del); if (!ok) toast('打开失败'); }));
+    if (IS_NATIVE) loadVoicePacks();
+  }
+
+  /** App 内下载我们 OSS 上的离线日语引擎（非静默：交给系统安装器），支持更新/卸载 */
+  async function loadVoicePacks() {
+    const box = $('vp-packs'); if (!box) return;
+    let packs = [];
+    try { const j = await getJson(dataUrl('voice-packs.json')); packs = (j && j.packs) || []; } catch { packs = []; }
+    if (!packs.length) { box.innerHTML = '<div class="meta">暂无</div>'; return; }
+    const rows = [];
+    for (const p of packs) {
+      let info = { installed: false, versionName: '', versionCode: 0 };
+      try { info = (await tts.packInfo(p.pkg)) || info; } catch { /* 查不到当未装 */ }
+      const hasUp = info.installed && Number(info.versionCode || 0) < Number(p.versionCode || 0);
+      rows.push(`<div class="item" data-pack="${esc(p.id)}">
+        <div class="col"><div class="l1">${esc(p.name)}</div>
+          <div class="l2">${info.installed ? '已安装 ' + esc(info.versionName || p.version) : fmtSize(p.size)}</div>
+          <div class="bar" id="vp-bar-${esc(p.id)}" hidden><i style="width:0"></i></div></div>
+        <div class="row" style="flex:0 0 auto">
+          ${info.installed ? '' : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载并安装</button>`}
+          ${hasUp ? `<button class="toolbtn on" data-dl="${esc(p.id)}">更新</button>` : ''}
+          ${info.installed ? `<button class="toolbtn" data-rm="${esc(p.id)}">卸载</button>` : ''}
+        </div></div>`);
+    }
+    box.innerHTML = rows.join('');
+    const byId = new Map(packs.map((x) => [x.id, x]));
+    box.querySelectorAll('[data-dl]').forEach((el) => (el.onclick = () => {
+      const p = byId.get(el.dataset.dl); if (!p) return;
+      const bar = document.getElementById('vp-bar-' + p.id);
+      const fill = bar ? bar.querySelector('i') : null;
+      if (bar) bar.hidden = false;
+      appUpdater.install(p.url, p.version, (type, d) => {
+        if (type === 'progress' && fill) fill.style.width = (d && d.pct != null ? d.pct : 0) + '%';
+        else if (type === 'done') toast('下载完成，请安装');
+        else if (type === 'error') toast('下载失败');
+      }).catch(() => toast('下载失败'));
+    }));
+    box.querySelectorAll('[data-rm]').forEach((el) => (el.onclick = async () => { const ok = await tts.uninstall(byId.get(el.dataset.rm).pkg); if (!ok) toast('打开失败'); }));
+    // 装好了就自动启用（当前引擎没有日语能力时）
+    for (const p of packs) {
+      try {
+        const info = await tts.packInfo(p.pkg);
+        if (!info || !info.installed) continue;
+        const v = await tts.voices(p.pkg);
+        const usable = (v && v.trusted) || (((v && v.voices) || []).some((x) => x.genuine));
+        if (!usable) continue;
+        let curOk = false;
+        if (S.ttsEngine) {
+          const cur = await tts.voices(S.ttsEngine);
+          curOk = !!(cur && cur.trusted) || (((cur && cur.voices) || []).some((x) => x.genuine));
+        }
+        if (!curOk) { S.ttsEngine = p.pkg; S.ttsVoice = ''; save(); }
+      } catch { /* 忽略 */ }
+    }
+  }
+  let vpVisBound = false;
+  function bindVoicepackRefresh() {
+    if (vpVisBound) return; vpVisBound = true;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && location.hash.startsWith('#/voicepack')) loadVoicePacks(); });
+  }
+
   function renderAdmin() {
     if (!ACC || !ACC.admin) {
       $('view-admin').innerHTML = emptyBox('没有管理员权限', '', [['a-home', '回首页']]);
@@ -2361,7 +2526,7 @@ import { icon } from './icons.js?v=20261016c';
       <div class="list">${exs.length ? exs.map(exRowHtml).join('') : '<div class="meta">曲库里还没有这个词的例句</div>'}</div>`;
     $('w-back').onclick = () => goBack('#/learn');
     $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.goWord)));
-    $('w-play').onclick = () => speak(v.word);
+    $('w-play').onclick = () => speak(v.reading || v.word);
     $('w-known').onclick = () => { toggleKnown(v); showWord(v.id); };
     $('w-edit').onclick = () => { const r = $('w-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; $('w-editinput').focus(); };
     const saveMean = () => { S.notes[v.id] = Object.assign({}, S.notes[v.id], { meaning: $('w-editinput').value.trim(), u: Date.now() }); save(); showWord(v.id); };
@@ -2775,7 +2940,7 @@ import { icon } from './icons.js?v=20261016c';
   }
 
   // ────────────── 路由 ──────────────
-  const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-me', 'view-admin', 'view-word', 'view-track', 'view-search', 'view-review'];
+  const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-me', 'view-admin', 'view-word', 'view-track', 'view-search', 'view-review', 'view-voicepack'];
   function show(which) {
     try { pvStop(); } catch {}
     const avd = $('avdrop'); if (avd) avd.hidden = true;
@@ -2799,6 +2964,43 @@ import { icon } from './icons.js?v=20261016c';
   const LEAVING_TABS = /^#\/(home|learn|songs|mine|me|search|review|admin)(\/|$)/;
   if (typeof window !== 'undefined') window.__tlGuard = () => ({ navFrom, allow: allowLeaveGuard, noGuard: !!window.__NO_GUARD });
   const DETAIL_ROUTE = /^#\/(track|word)\//;
+  let lastMainHash = '#/home';                       // 最近一次非详情页：退出详情时的兜底
+
+  /** 离开详情页的二次确认：onStay/onLeave 由调用方按「URL 有没有先走」决定 */
+  function showExitConfirm(from, onStay, onLeave) {
+    const isTrack = String(from).startsWith('#/track/');
+    const tr = isTrack ? curTrack : null;
+    showDialog({
+      title: isTrack ? '要退出学词页吗？' : '要返回上一页吗？',
+      body: tr ? esc(tr.title) : '',
+      actions: [
+        { label: isTrack ? '继续听' : '留在本页', kind: 'main', onClick: onStay || (() => {}) },
+        { label: '退出', onClick: onLeave || (() => {}) },
+      ],
+    });
+  }
+
+  /** 详情页“退出”：优先按历史退回列表，没历史就回最近的主 tab */
+  function leaveDetail() {
+    const fallback = lastMainHash || '#/home';
+    if (history.length > 1) goBack(fallback); else go(fallback);
+  }
+
+  // 原生 BACK 键/侧滑返回：MainActivity 把事件交给这里，网页决定怎么退（不然原生壳直接 finish 到桌面）
+  window.__tlOnBackPressed = () => {
+    try {
+      const d = $('dlg'); if (d && !d.hidden) { d.hidden = true; return; }
+      const p = $('pop'); if (p && p.classList.contains('on')) { hidePop(); return; }
+      const pl = $('player'); if (pl && pl.classList.contains('on')) { pl.classList.remove('on'); return; }
+      const g = $('gate'); if (g && !g.hidden) { nativeBack.exit(); return; }
+      const h = location.hash || '#/home';
+      if (DETAIL_ROUTE.test(h)) { showExitConfirm(h, () => {}, leaveDetail); return; }
+      if (h === '#/home' || h === '') { nativeBack.exit(); return; }
+      if (history.length > 1) { history.back(); return; }
+      nativeBack.exit();
+    } catch (e) { /* 退不出去也别崩 */ }
+  };
+
   function onNavGuard(e) {
     const to = location.hash || '#/home';
     if (typeof window !== 'undefined' && window.__NO_GUARD) { navFrom = to; return; }   // 自动化测试用：关掉二次确认
@@ -2808,32 +3010,23 @@ import { icon } from './icons.js?v=20261016c';
     if (to === from) return;
     const pl = $('player');
     if (DETAIL_ROUTE.test(from) && pl && pl.classList.contains('on')) {
-      // 全屏跟唱页开着：返回/侧滑先收播放器，不离开详情页
+      // 全屏跟唱页开着：先收播放器，不离开详情页
       pl.classList.remove('on');
       allowLeaveGuard = true; go(from);
       return;
     }
     if (DETAIL_ROUTE.test(from) && LEAVING_TABS.test(to)) {
-      const isTrack = from.startsWith('#/track/');
-      const tr = isTrack ? curTrack : null;
-      showDialog({
-        title: isTrack ? '要退出学词页吗？' : '要返回上一页吗？',
-        body: tr ? esc(tr.title) : '',
-        actions: [
-          { label: isTrack ? '继续听' : '留在本页', kind: 'main', onClick: () => { go(from); } },
-          { label: '退出', onClick: () => {} },                              // 已经离开，保持现状
-        ],
-      });
+      // 这里 URL 已经到目标页了：继续听 = 回详情；退出 = 保持现状
+      showExitConfirm(from, () => go(from), () => {});
       return;
     }
   }
 
-  // ── 侧滑返回：详情页/播放器里，从左缘往右划 = 返回上一页（和系统返回走同一套确认）──
+  // ── 侧滑返回：详情页/播放器里左缘右划（真机边缘手势多被系统截走，最终仍走原生 BACK → __tlOnBackPressed）──
   function swipeBack() {
     const pl = $('player');
     if (pl && pl.classList.contains('on')) { pl.classList.remove('on'); return; }   // 全屏播放器：先收播放器
-    if (DETAIL_ROUTE.test(location.hash || '')) { history.back(); return; }          // 不设放行标记 → 守卫弹确认
-    if (history.length > 1) history.back(); else go('#/home');
+    window.__tlOnBackPressed();
   }
   if (typeof window !== 'undefined') window.__tlSwipe = () => swipeBack();   // 测试钩子：等价于左缘右划
   (function edgeSwipeBack() {
@@ -2869,6 +3062,7 @@ import { icon } from './icons.js?v=20261016c';
     const [path, at] = raw.split('@');
     const parts = path.split('/');
     const v = parts[0] || 'home';
+    if (v !== 'track' && v !== 'word') lastMainHash = location.hash || '#/home';
     if (v !== 'search') lastNonSearch = '#/' + path;
     if (v === 'word') { show('view-word'); return showWord(parts[1]); }
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
@@ -2879,6 +3073,7 @@ import { icon } from './icons.js?v=20261016c';
     if (v === 'mine') { show('view-mine'); return renderMine(); }
     if (v === 'me') { show('view-me'); return renderMe(); }
     if (v === 'admin') { show('view-admin'); return renderAdmin(); }
+    if (v === 'voicepack') { show('view-voicepack'); return renderVoicepack(); }
     show('view-learn'); renderLearn();
   }
 
@@ -2942,6 +3137,7 @@ import { icon } from './icons.js?v=20261016c';
     $('q-clear').onclick = () => { $('q').value = ''; if (location.hash.startsWith('#/search')) go(lastNonSearch); };
 
     bindAudio();
+    bindVoicepackRefresh();
     setupKeyboardAwareSheet();
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();

@@ -6,6 +6,7 @@
  * 「地址链路 / 预缓冲 / 状态机 / 交互」，真出声必须在真浏览器上验收。
  */
 import { chromium } from 'playwright';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -166,6 +167,9 @@ const apiStub = (route) => {
     const segs = lines.map((l) => E2E_SEG[String(l).trim()] || String(l).trim().split('').map((c) => [c, c, '', '名詞', '一般']));
     return send(200, { ok: true, segs });
   }
+  if (path === '/tts') {                     // 网页版在线日语发音：返回 data URL
+    return send(200, { ok: true, mime: 'audio/mpeg', url: 'data:audio/mpeg;base64,' + Buffer.from('ID3').toString('base64') });
+  }
   if (path === '/audio') {                   // 自己的后端：可播地址（前端优先走它，失败了才回落公共接口）
     const u = new URL(req.url());
     const id = u.searchParams.get('id') || '', src = u.searchParams.get('source') || 'netease';
@@ -288,6 +292,8 @@ await page.addInitScript(() => { window.__NO_PLCHECK = true; window.__NO_GUARD =
 page.on('dialog', (d) => d.accept());   // 删除导入曲目要确认
 const errors = [];
 const netReqs = [];
+const ttsReqs = [];
+page.on('request', (r) => { if (/\/api\/tts\?/.test(r.url())) ttsReqs.push(r.url()); });
 page.on('response', (r) => { if (/gdstudio|music\.126/.test(r.url())) netReqs.push(r.status() + ' ' + r.url().slice(0, 50)); });
 let expect401 = false;   // 故意用错密码那一步会打一条 401 控制台错误，不算 bug
 let expect400 = false;   // 故意喂非法输入那两步：解析接口会回 400，也不算 bug
@@ -1554,14 +1560,19 @@ await tapCurWord(0);
 await page.waitForSelector('#pop.on', { timeout: 8000 });
 const speakLabel = await page.evaluate(() => { const b = document.getElementById('p-speak'); return b ? b.textContent.trim() : ''; });
 const errBefore = errors.length;
+const ttsN0 = ttsReqs.length;
 await page.evaluate(() => { const b = document.getElementById('p-speak'); if (b) b.click(); });
-await page.waitForTimeout(1900);   // 浏览器可能要等 voiceschanged，最多 1.2s 才判定「没有日语包」
-const speakDlg = await page.evaluate(() => { const d = document.getElementById('dlg'); return d && !d.hidden ? d.textContent.replace(/\s+/g, ' ') : ''; });
-check('抽屉里叫「发音」；没日语包时给「去安装」入口',
-  speakLabel === '发音' && errors.length === errBefore && (!speakDlg || /没有日语语音包/.test(speakDlg)),
-  `按钮「${speakLabel}」· 弹窗「${speakDlg || '未出现（有日语包）'}」`);
-if (speakDlg) { await page.locator('#dlg [data-di="1"]').click(); await page.waitForTimeout(300); }
-await page.evaluate(() => { const d = document.getElementById('dlg'); if (d) d.hidden = true; });   // 兜底：别让弹窗挡住后面的用例
+await page.waitForTimeout(1500);
+const spokenText = (() => { const u = ttsReqs[ttsReqs.length - 1] || ''; const m = u.match(/[?&]text=([^&]*)/); try { return decodeURIComponent(m ? m[1] : ''); } catch { return ''; } })();
+check('网页版「发音」走在线日语 TTS（无需语音包）',
+  speakLabel === '发音' && errors.length === errBefore && ttsReqs.length > ttsN0 && spokenText && !/[\u4e00-\u9fff]/.test(spokenText),
+  `按钮「${speakLabel}」· 送读「${spokenText}」· /tts 请求 +${ttsReqs.length - ttsN0}`);
+await page.evaluate(() => { const d = document.getElementById('dlg'); if (d) d.hidden = true; });
+await page.goto(BASE + '#/voicepack');
+await page.waitForSelector('#vp-settings', { timeout: 8000 });
+check('语音包页：提供系统设置入口（不托管安装包）',
+  (await page.locator('#vp-settings').count()) === 1 && /语音包/.test((await txt('#view-voicepack .sec-title')) || ''),
+  (await txt('#view-voicepack .sec-title')) || '');
 await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
 
 // (c) 词表没收录的词：说清为什么 + 能自己补一条释义（补完歌词下面就有中文）
@@ -1670,6 +1681,17 @@ await e2eMaybeDone();
           install: (o) => { window.__apkInstall = o; return Promise.resolve(); },
           addListener: () => Promise.resolve({ remove() {} }),
         },
+        Tts: {
+          engines: () => Promise.resolve({ ok: true, default: 'com.google.android.tts', engines: [{ name: 'com.google.android.tts', label: 'Google 文字转语音', def: true }] }),
+          voices: () => Promise.resolve({ ok: true, voices: [{ name: 'ja-jp-e2e', locale: 'ja_JP', quality: 400, latency: 300, network: false, features: [], ja: true, genuine: true }] }),
+          speak: (o) => { window.__ttsSpeak = Object.assign({}, o, { voice: o.voice || 'ja-jp-e2e' }); return Promise.resolve({ ok: true, ja: true, voice: o.voice || 'ja-jp-e2e', engine: o.engine || '' }); },
+          openInstall: () => { window.__ttsInstall = 1; return Promise.resolve(); },
+          openSettings: () => { window.__ttsSettings = 1; return Promise.resolve(); },
+          appInfo: (o) => { window.__ttsAppInfo = o.pkg; return Promise.resolve(); },
+          packInfo: () => Promise.resolve({ ok: true, installed: false, versionName: '', versionCode: 0 }),
+          uninstall: (o) => { window.__ttsUninstall = o.pkg; return Promise.resolve(); },
+          openStore: (o) => { window.__ttsStore = o.pkg; return Promise.resolve(); },
+        },
       },
     };
   });
@@ -1701,6 +1723,24 @@ await e2eMaybeDone();
   await np.locator('#dlg [data-di="1"]').click();          // 忽略这次
   await np.waitForTimeout(300);
   check('「忽略这次」：弹窗关掉', await np.evaluate(() => document.getElementById('dlg').hidden));
+  // 发音设置：多声源（引擎 + 日语嗓子 + 去安装 + 试听）
+  await np.waitForTimeout(900);
+  const ttsSet = await np.evaluate(() => ({
+    engine: document.getElementById('tts-engine') ? [...document.getElementById('tts-engine').options].map((o) => o.textContent).join('|') : '',
+    voice: document.getElementById('tts-voice') ? [...document.getElementById('tts-voice').options].map((o) => o.textContent).join('|') : '',
+    online: !!document.getElementById('tts-online'), packs: !!document.getElementById('tts-packs'), test: !!document.getElementById('tts-test'),
+  }));
+  check('App 发音设置：列引擎与日语嗓子，带在线开关/语音包/试听',
+    /Google 文字转语音/.test(ttsSet.engine) && /ja_JP/.test(ttsSet.voice) && ttsSet.online && ttsSet.packs && ttsSet.test, JSON.stringify(ttsSet).slice(0, 120));
+  await np.locator('#tts-test').click();
+  await np.waitForTimeout(400);
+  const ttsSpoke = await np.evaluate(() => window.__ttsSpeak || null);
+  check('点「试听」：按选中的引擎/嗓子发音', !!ttsSpoke && /こんにちは/.test(String(ttsSpoke.text || '')) && /ja-jp-e2e/.test(String(ttsSpoke.voice || '')), JSON.stringify(ttsSpoke || {}).slice(0, 90));
+  const fbBefore = await np.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').ttsFallback || '');
+  await np.locator('#tts-online').click();
+  await np.waitForTimeout(300);
+  const fbAfter = await np.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').ttsFallback || '');
+  check('点「无本地语音时」：在线发音/语音包页可切换', fbBefore !== fbAfter && ['online', 'pack'].includes(fbAfter), `${fbBefore || '未选'} → ${fbAfter}`);
   await np.locator('#me-upd').click();
   await np.waitForTimeout(2000);
   check('手动检查更新：即使忽略过也弹公告', await np.evaluate(() => !document.getElementById('dlg').hidden));
@@ -1714,6 +1754,31 @@ await e2eMaybeDone();
   await np.waitForTimeout(900);
   const installCall = await np.evaluate(() => window.__apkInstall || null);
   check('点「下载并安装」：把远端地址交给原生插件', !!installCall && /example\.com\/a\.apk/.test(String(installCall.url || '')), JSON.stringify(installCall || {}).slice(0, 64));
+  // 语音包页：列引擎 + 官方安装/卸载入口
+  await np.evaluate(() => { location.hash = '#/voicepack'; });
+  await np.waitForSelector('#vp-settings', { timeout: 8000 });
+  await np.waitForTimeout(900);
+  const vp = await np.evaluate(() => ({
+    row: (document.querySelector('#vp-list .item .l2') || {}).textContent || '',
+    del: !!document.querySelector('#vp-list [data-del]'),
+    app: !!document.querySelector('#vp-list [data-app]'),
+    settings: !!document.getElementById('vp-settings'),
+  }));
+  check('App 语音包页：列出引擎日语状态 + 应用信息/卸载/系统设置入口', /日语可用/.test(vp.row) && vp.del && vp.app && vp.settings, JSON.stringify(vp));
+  await np.locator('#vp-list [data-del]').first().click();
+  await np.waitForTimeout(300);
+  check('语音包页「卸载」：走系统卸载入口', (await np.evaluate(() => window.__ttsUninstall || '')) === 'com.google.android.tts', 'Tts.uninstall 已调用');
+  await np.locator('#vp-settings').click();
+  await np.waitForTimeout(300);
+  check('语音包页「去设置」：打开文字转语音设置', (await np.evaluate(() => window.__ttsSettings || 0)) === 1, 'Tts.openSettings 已调用');
+  // 离线引擎：App 内从 OSS 下载、交系统安装器
+  await np.waitForSelector('#vp-packs .item', { timeout: 8000 });
+  const packInfo = await np.evaluate(() => ({ text: (document.querySelector('#vp-packs .item .l2') || {}).textContent || '', dl: !!document.querySelector('#vp-packs [data-dl]') }));
+  check('语音包页：离线日语引擎可下载（来自 OSS）', /9\.96|10|MB/.test(packInfo.text) && packInfo.dl, JSON.stringify(packInfo));
+  await np.locator('#vp-packs [data-dl]').first().click();
+  await np.waitForTimeout(600);
+  const packCall = await np.evaluate(() => window.__apkInstall || {});
+  check('点「下载并安装」：把 OSS 地址交给原生下载器', /espeak-ng/.test(String(packCall.url || '')) && packCall.version === '1.52.0', JSON.stringify(packCall).slice(0, 90));
   check('App 分支没有未捕获错误', nErrors.length === 0, nErrors.slice(0, 2).join(' || '));
   await nCtx.close();
 }
@@ -1736,6 +1801,14 @@ check('线上曲库数据不含内置曲目（曲库=自己导入的）', (shipp
 
 CUR_GROUP = 'base';
 await e2eMaybeDone();
+let copyGateOk = true, copyGateMsg = '';
+try {
+  copyGateMsg = execFileSync(process.execPath, [path.join(HERE, '..', 'scripts', 'check-copy.mjs')], { encoding: 'utf8' }).trim();
+} catch (e) {
+  copyGateOk = false;
+  copyGateMsg = String((e.stdout || '') + (e.stderr || '')).replace(/\s+/g, ' ').slice(0, 160);
+}
+check('交付前门禁：用户页面文案无描述性/解释性内容', copyGateOk, copyGateMsg.slice(0, 90));
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 
 const judged = results.filter((r) => !r.skip);

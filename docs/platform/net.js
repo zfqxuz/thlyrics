@@ -3,7 +3,7 @@
  * 分开的三个来源：自己的后端（函数计算）、第三方中继（gdstudio）、站内静态数据。
  * 原生壳里不需要 CORS，行为一致，所以也不需要分实现。
  */
-import { V } from '../version.js?v=20261016c';
+import { V } from '../version.js?v=20261016e';
 
 export const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 / 解析 / 分词
 export const GD = 'https://music-api.gdstudio.xyz/api.php';                             // 第三方中继（仅网易云）
@@ -74,7 +74,7 @@ export async function gdJson(q, tries = 3) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return await r.json();
     } catch (e) {
-      lastErr = (e && e.name === 'AbortError') ? new Error('接口超时') : new Error('接口暂时不可用（可能被限流）');
+      lastErr = (e && e.name === 'AbortError') ? new Error('接口超时') : new Error('接口不可用');
       if (i < tries - 1) await new Promise((r2) => setTimeout(r2, 600 * (i + 1)));
     } finally { clearTimeout(timer); }
   }

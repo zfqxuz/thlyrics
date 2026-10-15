@@ -9,6 +9,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# 交付前门禁：分层/语法 + 用户页面文案（描述性/解释性文案直接失败，别等用户再纠一次）
+node "$ROOT/scripts/check-layers.mjs"
+node "$ROOT/scripts/check-copy.mjs"
 export JAVA_HOME="${JAVA_HOME:-$HOME/tools/jdk-21.0.12.1+1}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
 APK="$ROOT/app/android/app/build/outputs/apk/debug/app-debug.apk"

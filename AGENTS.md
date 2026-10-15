@@ -902,3 +902,36 @@ node .e2e/run-e2e.mjs                              # 全量（所有 check 都�
   ③ `market://details?id=com.google.android.tts`（Play 商店）
   都打不开才 reject。
 - 前端 `speak()`：`ja:false` 时弹「没有日语语音包 / 去安装 / 取消」；网页端没有这个能力就提示去系统设置装。
+
+### 2026-10-16 晚：国内可用发音方案 + 语音包自管理 + 文案门禁
+
+用户确认：**国内用不了 Google 商店**。定的方案是：网页版走在线；原生 App 本地真日语引擎优先、没有就走国内在线兜底；同时提供 App 内语音包页（引擎从我们 OSS 下载、系统安装器非静默安装、可更新/卸载）。
+
+#### 一、发音链路（区分端）
+
+- **网页版**：`speakOnline()` → `GET /api/tts?text=`（函数计算代理，百度日语优先、有道兜底，返回 data URL，本机缓存 200 条）。FC 里 `japaneseTts()` 只给网页用，原生不走。
+- **原生 App**：先 `Tts.speak({engine,voice})` 走系统 TTS。只认“真日语”：
+  - 普通引擎要求 locale=ja 且国家 JP / 名字含 ja-jp；
+  - 信任引擎（`com.reecedunn.espeak`）用 `probeJa()` 实际 `setVoice("ja")`，成功才算可用；
+  - 没有可用本地语音时：首次弹「未安装日语语音包 → 在线发音 / 语音包」，选择存 `S.ttsFallback`（online|pack）；之后按选择走，不再重复问。
+- 语音包页 `#/voicepack`：列已装引擎、日语状态、应用信息、卸载；「系统文字转语音」入口；离线引擎包下载/更新/卸载。
+
+#### 二、App 内语音包（我们 OSS 托管，APK 不自带）
+
+- 清单 `docs/data/voice-packs.json`：`{id,name,pkg,version,versionCode,url,size,sha256,source,license}`。
+- 首个包：**eSpeak NG 1.52.0**（GPL-3.0，F-Droid 官方 APK，带 `jpx/ja` 日语数据），上传到 OSS：
+  `thlyrics-audio/tts/espeak-ng-1.52.0.bin`（**故意用 .bin**：阿里云 OSS 默认域名禁止分发 `.apk`，这是绕开限制的灰度做法；10 年签名 URL 写在清单里）。
+- 下载/安装：复用 `AppUpdaterPlugin.install`（后台下载 → FileProvider → 系统安装器，**非静默**；装未知来源权限也复用它）。
+  - ⚠️ OSS 桶有 **Referer 白名单**（zfqxuz.github.io / localhost:8848），原生 HttpURLConnection 默认不带 Referer 会被 403；`AppUpdaterPlugin` 里已固定加 `Referer: https://zfqxuz.github.io/`。
+- 更新：清单 versionCode > 本机 `Tts.packInfo(pkg).versionCode` 时显示「更新」；卸载走 `Tts.uninstall(pkg)`（系统卸载确认页）。
+- 引擎选型注意：eSpeak NG 的 Android 端 `getVoices()` 不报 `ja`（7 个嗓子只有 zh/en…），所以 `probeJa()` 是必须的；如果探测失败，UI 不会说“日语可用”，发音走在线兜底。
+- 页面文案：`已安装 1.52.0` / `下载并安装` / `更新` / `卸载` / `在线发音` / `语音包页`，没有描述性句子。
+
+#### 三、文案门禁（交付前强制）
+
+- `scripts/check-copy.mjs`：剥 JS 注释后，扫 `docs/**/*.{js,html}` 里会渲染的字符串/模板/HTML 文本与属性；
+  - 禁用词表：`嗓子/教程/科普/其实/也就是说/意思是/指的是/说明/解释/可能/建议/提醒/例如/比如/会自动/会复制/用来/用于/你可以/如果需要/因为/所以/为了/断网也能/放不了/请稍/系统里已装/未检测到/没有检测到/词表未收录/我们提供/稍等…`
+  - 过长说明句：中文字数 ≥16 且像句子的直接失败。
+  - 白名单 `scripts/copy-allow.txt`（只给确实必要的功能错误开小口）。
+- 已接入：`npm run check`（layers + copy）和 `scripts/build-apk.sh` 开头；`.e2e/run-e2e.mjs` 末尾也有「交付前门禁」断言。
+- 这次清掉的典型：`没有日语嗓子` → `日语未安装`；`请到系统设置…` → `打开失败`；`本机音频找不到了（可能被清理过）` → `本机音频不可用`；`接口暂时不可用（可能被限流）` → `接口不可用`；`头像（可选，注册后也能换）` → `头像（可选）`。

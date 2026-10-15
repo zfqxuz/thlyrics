@@ -245,6 +245,48 @@ function httpGet(url, headers, timeout) {
   });
 }
 
+/** 和 httpGet 一样，但返回原始 Buffer（音频代理用） */
+function httpGetBuf(url, headers, timeout) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({
+      host: u.hostname, path: u.pathname + u.search, method: 'GET',
+      headers: headers || {}, timeout: timeout || 12000,
+    }, (res) => {
+      const buf = [];
+      res.on('data', (d) => buf.push(d));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(buf) }));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('上游超时')));
+    req.end();
+  });
+}
+
+/** 在线日语 TTS（只给网页版用）：百度日语优先、有道兜底 */
+async function japaneseTts(text) {
+  const t = String(text || '').trim().slice(0, 60);
+  if (!t) throw new Error('没有要读的内容');
+  const enc = encodeURIComponent(t);
+  const ua = 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36';
+  const tries = [
+    { url: `https://fanyi.baidu.com/gettts?lan=jp&text=${enc}&spd=3&source=web`, headers: { 'User-Agent': ua, Referer: 'https://fanyi.baidu.com/' } },
+    { url: `https://dict.youdao.com/dictvoice?audio=${enc}&le=jap`, headers: { 'User-Agent': ua, Referer: 'https://dict.youdao.com/' } },
+  ];
+  let last = null;
+  for (const t0 of tries) {
+    try {
+      const r = await httpGetBuf(t0.url, t0.headers, 9000);
+      const type = String((r.headers && r.headers['content-type']) || '');
+      if (r.status === 200 && /audio|mpeg|octet/i.test(type) && r.body && r.body.length > 400) {
+        return { mime: /mpeg|mp3/i.test(type) ? 'audio/mpeg' : (type.split(';')[0] || 'audio/mpeg'), buffer: r.body };
+      }
+      last = new Error('上游返回 ' + r.status + ' ' + type);
+    } catch (e) { last = e; }
+  }
+  throw last || new Error('取不到日语发音');
+}
+
 /** 从一段分享文案里认出「平台 + 类型 + ID」；认不出类型但带链接时，返回 url 交给 follow 解析 */
 function shareHit(text) {
   const s = String(text || '');
@@ -511,6 +553,18 @@ exports.handler = async (event) => {
         const j = await netJson(`https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`);
         return reply(req, 200, { ok: true, lyric: (j.lrc && j.lrc.lyric) || '', tlyric: (j.tlyric && j.tlyric.lyric) || '' });
       } catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
+    }
+
+    // 网页版在线日语发音（原生 App 不用这条；限 60 字）
+    if (action === '/tts') {
+      const text = String(q.text || q.q || '').slice(0, 60);
+      if (!text.trim()) return reply(req, 400, { error: '缺 text' });
+      try {
+        const r = await japaneseTts(text);
+        return reply(req, 200, { ok: true, mime: r.mime, url: 'data:' + r.mime + ';base64,' + r.buffer.toString('base64') });
+      } catch (e) {
+        return reply(req, 502, { error: '发音服务暂时不可用：' + String((e && e.message) || e) });
+      }
     }
 
     // 网易云解析：短链 / 歌单 / 专辑 / 单曲（公开接口，不要求登录）
