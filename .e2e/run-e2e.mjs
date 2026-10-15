@@ -74,10 +74,10 @@ const E2E_SEG = {
 // 账号 API 的桩：页面会打到 https://thlyrics-auth-*.cn-hangzhou.fcapp.run/api/*
 const apiState = { users: {}, seq: 0, calls: [], deleted: [] };
 const apiMerge = (a, b) => {
-  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, a || {});
-  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, b || {});
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, b || {});
   const n = (v) => Number(v) || 0;
-  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del), fav: {}, sing: {}, roma: {} };
+  const out = { clearedAt: Math.max(n(A.clearedAt), n(B.clearedAt)), known: {}, notes: {}, audio: {}, imp: {}, del: Object.assign({}, B.del), fav: {}, sing: {}, roma: {}, words: {} };
   for (const kind of ['fav', 'sing']) {
     for (const k of new Set([...Object.keys(A[kind]), ...Object.keys(B[kind])])) {
       const x = n(A[kind][k]), y = n(B[kind][k]); const v = Math.abs(y) > Math.abs(x) ? y : x;
@@ -96,6 +96,11 @@ const apiMerge = (a, b) => {
   for (const k of new Set([...Object.keys(A.notes), ...Object.keys(B.notes)])) {
     const x = A.notes[k] || {}, y = B.notes[k] || {}; const v = n(y.u) > n(x.u) ? y : x;
     if (v && v.meaning) out.notes[k] = v;
+  }
+  for (const k of new Set([...Object.keys(A.words || {}), ...Object.keys(B.words || {})])) {
+    const x = (A.words || {})[k] || {}, y = (B.words || {})[k] || {};
+    const v = n(y.u) > n(x.u) ? y : x;
+    if (v && v.m) out.words[k] = v;
   }
   out.audio = Object.assign({}, B.audio, A.audio);
   for (const [k, v] of Object.entries(A.del)) out.del[k] = Math.max(n(out.del[k]), n(v));
@@ -1363,6 +1368,82 @@ const lineTap = await page.evaluate(async () => {
 });
 check('抽屉开着时点别的歌词行 → 只关抽屉，不跳句（不穿透）', lineTap.on === false && lineTap.before === lineTap.after,
   `抽屉开=${lineTap.on} · 当前句 ${lineTap.before} → ${lineTap.after}（点的是第 ${lineTap.tapped} 句）`);
+
+// ═══════ 13.13 真机反馈三连：发音 / 本曲词汇跳句 / 未收录的词能自己补 ═══════
+// (a) 本曲词汇 → ↦ 跳到那一句（用户反馈"点了没反应"：要开跟唱页 + 滚到可视区）
+await page.locator('#p-close').click();
+await page.waitForTimeout(400);
+await page.evaluate(() => { location.hash = '#/track/t1'; });
+await page.waitForTimeout(1300);
+const jumpRes = await page.evaluate(async () => {
+  const b = document.querySelector('#twlist [data-line]');
+  if (!b) return { none: true };
+  const want = Number(b.dataset.line);
+  b.click();
+  await new Promise((r) => setTimeout(r, 1500));
+  const box = document.getElementById('plyric');
+  const el = document.querySelector('#plyric .lblock.playing');
+  const br = box && box.getBoundingClientRect(), rr = el && el.getBoundingClientRect();
+  return { want, player: document.getElementById('player').classList.contains('on'),
+    playing: el ? Number(el.dataset.i) : null,
+    visible: !!(rr && br && rr.top >= br.top - 2 && rr.bottom <= br.bottom + 2) };
+});
+check('本曲词汇 → ↦ 跳到那一句，并滚进可视区', !!jumpRes && jumpRes.player && jumpRes.playing === jumpRes.want && jumpRes.visible, JSON.stringify(jumpRes));
+
+// (b) 抽屉里叫「发音」（不是「读这个词」），点了不抛错
+await focusLine(firstLineWithWord == null ? 0 : firstLineWithWord);
+await tapCurWord(0);
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+const speakLabel = await page.evaluate(() => { const b = document.getElementById('p-speak'); return b ? b.textContent.trim() : ''; });
+const errBefore = errors.length;
+await page.evaluate(() => { const b = document.getElementById('p-speak'); if (b) b.click(); });
+await page.waitForTimeout(600);
+check('抽屉里叫「发音」，点了不报错', speakLabel === '发音' && errors.length === errBefore, `按钮「${speakLabel}」· 错误 +${errors.length - errBefore}`);
+await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
+
+// (c) 词表没收录的词：说清为什么 + 能自己补一条释义（补完歌词下面就有中文）
+const unknown = await page.evaluate(async () => {
+  const blocks = [...document.querySelectorAll('#plyric .lblock[data-i]')];
+  const b = blocks.find((x) => x.querySelector('.w:not([data-w]):not([data-plain])'));
+  if (!b) return { none: true };
+  const li = Number(b.dataset.i);
+  b.scrollIntoView({ block: 'center' });
+  return { li };
+});
+if (!unknown.none) {
+  await focusLine(unknown.li);
+  const tapped = await page.evaluate(async () => {
+    const cur = document.querySelector('#plyric .lblock.playing');
+    const w = cur && cur.querySelector('.w:not([data-w]):not([data-plain])');
+    if (!w) return null;
+    const s = w.dataset.s;
+    w.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 700));
+    return { s, meaning: (document.getElementById('p-meaning') || {}).textContent || '', meta: (document.getElementById('p-meta') || {}).textContent || '', btn: (document.getElementById('p-edit') || {}).textContent || '', moreShown: !(document.getElementById('p-morebox') || {}).hidden };
+  });
+  check('未收录的词：说明「分词器切的、词表没有」，并给「补一条释义」',
+    !!tapped && /还没有这个词的释义/.test(tapped.meaning) && /词表/.test(tapped.meta) && /补一条释义/.test(tapped.btn) && tapped.moreShown,
+    tapped ? `${tapped.meaning} · ${tapped.btn} · 更多可见=${tapped.moreShown}` : '没找到未收录的词');
+  const saved = await page.evaluate(async () => {
+    const inp = document.getElementById('p-editinput');
+    if (!inp) return { none: true };
+    inp.value = 'E2E自补释义';
+    inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 120));
+    const rightAfter = (JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').words || {});
+    await new Promise((r) => setTimeout(r, 800));
+    const cur = document.querySelector('#plyric .lblock.playing');
+    const gloss = [...(cur ? cur.querySelectorAll('.g') : [])].map((x) => x.textContent);
+    const raw = localStorage.getItem('thlyrics.tool.v1') || '';
+    let j = {}; try { j = JSON.parse(raw); } catch (e) { return { parseErr: String(e.message), rawLen: raw.length }; }
+    const st = j.words || {};
+    return { gloss, stored: Object.keys(st).length, meaning: (document.getElementById('p-meaning') || {}).textContent || '',
+      rightAfter: Object.keys(rightAfter).length, rawLen: raw.length, wordsRaw: JSON.stringify(j.words || null).slice(0, 40) };
+  });
+  check('补完释义：存进本机 + 歌词下面立刻出现中文', !!(saved && saved.stored >= 1) && (saved.gloss || []).includes('E2E自补释义'),
+    `写入瞬间 ${(saved && saved.rightAfter) || 0} 条 · 0.9 秒后 ${(saved && saved.stored) || 0} 条 · 存储 ${(saved && saved.rawLen) || 0} 字节 · words=${(saved && saved.wordsRaw) || '空'}`);
+  await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
+}
 
 // ═══════ 13.12 原生壳专属分支：伪造成 App 跑一遍「我的」页 ═══════
 // 真机踩过：app.js 里用了版本号 V 但没 import，网页端 IS_NATIVE=false 走不到那段，
