@@ -22,6 +22,7 @@ public class TtsPlugin extends Plugin {
     private TextToSpeech tts = null;
     private boolean ready = false;
     private String pending = null;
+    private PluginCall pendingCall = null;
     private boolean jaOk = false;
 
     @Override
@@ -39,6 +40,13 @@ public class TtsPlugin extends Plugin {
                     } catch (Throwable ignored) { /* 引擎怪就怪吧，别把 App 带崩 */ }
                 }
                 if (ready && pending != null) { speakNow(pending); pending = null; }
+                if (pendingCall != null) {
+                    JSObject o = new JSObject();
+                    o.put("ok", ready);
+                    o.put("ja", jaOk);
+                    pendingCall.resolve(o);
+                    pendingCall = null;
+                }
             });
         } catch (Throwable e) { tts = null; }
     }
@@ -47,17 +55,23 @@ public class TtsPlugin extends Plugin {
     public void speak(PluginCall call) {
         String text = call.getString("text", "");
         if (text == null || text.trim().isEmpty()) { call.reject("没有要读的内容"); return; }
+        if (!ready) { pending = text; pendingCall = call; return; }   // 引擎刚起：就绪后再回结果并补读
         JSObject out = new JSObject();
         out.put("ok", true);
         out.put("ja", jaOk);
-        if (!ready) { pending = text; call.resolve(out); return; }   // 引擎刚起，就绪后自动补读
         speakNow(text);
         call.resolve(out);
     }
 
     private void speakNow(String text) {
         try {
-            tts.setLanguage(Locale.JAPANESE);
+            // 关键：只认日语。没有日语包时 setLanguage 会失败并退回默认语言（中文），
+            // 跟着 speak 就会把日文汉字按中文读出来 —— 用户反馈的"发音是中文"。
+            int a = tts.setLanguage(Locale.JAPANESE);
+            boolean ok = a == TextToSpeech.LANG_AVAILABLE || a == TextToSpeech.LANG_COUNTRY_AVAILABLE
+                    || a == TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE;
+            jaOk = ok;
+            if (!ok) return;                       // 没日语包就不出声，前端会提示去装
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "thlyrics");
         } catch (Throwable ignored) { /* 忽略：读不出来也不该崩 */ }
     }

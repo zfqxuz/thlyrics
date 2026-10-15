@@ -11,9 +11,26 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const BASE = process.argv[2] || 'http://127.0.0.1:8848/';
+const ARGS = process.argv.slice(2);
+const BASE = ARGS.find((a) => /^https?:/.test(a)) || 'http://127.0.0.1:8848/';
+const ONLY = new Set((ARGS.find((a) => a.startsWith('--groups=')) || '').replace('--groups=', '').split(',').map((x) => x.trim()).filter(Boolean));
 const SHOTS = path.join(HERE, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
+
+// 分组：一条用例太多跑不过来时，用 --groups=player,improt 只把这几组当断言；
+// --list 看分组清单。跑全量：不带 --groups（所有用例都算数）。
+if (ARGS.includes('--list')) {
+  const src = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  const marks = [...src.matchAll(/CUR_GROUP = '([A-Za-z0-9_-]+)'/g)].map((m) => ({ g: m[1], i: m.index }));
+  const counts = new Map();
+  for (let i = 0; i < marks.length; i++) {
+    const seg = src.slice(marks[i].i, i + 1 < marks.length ? marks[i + 1].i : src.length);
+    counts.set(marks[i].g, (counts.get(marks[i].g) || 0) + (seg.match(/\bcheck\(/g) || []).length);
+  }
+  console.log('可用分组（--groups=a,b）：');
+  for (const [g, n] of counts) console.log(`  ${g.padEnd(10)} ${n} 条`);
+  process.exit(0);
+}
 
 const HOME = process.env.HOME || '/home/zfq';
 const chrome = (() => {
@@ -26,7 +43,29 @@ const libPath = ['root/usr/lib/x86_64-linux-gnu', 'root/lib/x86_64-linux-gnu', '
 
 const n0 = (v) => (Number(v) || 0);
 const results = [];
-const check = (name, ok, extra = '') => { results.push({ name, ok, extra }); console.log(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`); };
+let CUR_GROUP = 'base';
+const seenGroups = new Set();
+const check = (name, ok, extra = '') => {
+  if (ONLY.size && !ONLY.has(CUR_GROUP)) {       // 没选中的组：照跑但不判定（有限回归只看选中的）
+    results.push({ name, group: CUR_GROUP, skip: true, ok: false, extra });
+    console.log(`· [${CUR_GROUP}] ${name}`);
+    return;
+  }
+  seenGroups.add(CUR_GROUP);
+  results.push({ name, group: CUR_GROUP, ok: !!ok, extra });
+  console.log(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`);
+};
+/** --groups 时：选中的组都跑完后，一进到没选中的组就提前结束（有限回归不用等全量） */
+async function e2eMaybeDone() {
+  if (!ONLY.size) return;
+  if (ONLY.has(CUR_GROUP)) return;
+  for (const g of ONLY) if (!seenGroups.has(g)) return;   // 还有选中的组没跑到
+  const judged0 = results.filter((r) => !r.skip);
+  console.log(`\n（有限回归：选中的 ${[...ONLY].join(', ')} 已跑完，提前结束）`);
+  fs.writeFileSync(path.join(SHOTS, 'report.json'), JSON.stringify({ base: BASE, at: new Date().toISOString(), groups: [...ONLY], results, errors: [] }, null, 1));
+  await browser.close();
+  process.exit(0);
+}
 
 const browser = await chromium.launch({
   executablePath: chrome,
@@ -245,7 +284,7 @@ const baseRoute = (route) => {
 };
 await page.route('**/*', baseRoute);
 // 自动的歌单体检会打乱节奏：测试里关掉（手动按钮那条照测）
-await page.addInitScript(() => { window.__NO_PLCHECK = true; });
+await page.addInitScript(() => { window.__NO_PLCHECK = true; window.__NO_GUARD = true; });  // 守卫/体检由专门用例覆盖，普通流程不受弹窗干扰
 page.on('dialog', (d) => d.accept());   // 删除导入曲目要确认
 const errors = [];
 const netReqs = [];
@@ -289,6 +328,8 @@ const tapLine = async (host, i, opts = {}) => {
 };
 
 // ═══════ 1 学词页（词汇入手 + 新视觉） ═══════
+CUR_GROUP = 'gate';
+await e2eMaybeDone();
 await page.goto(BASE, { waitUntil: 'load', timeout: 30000 });
 // ═══════ 0 登录闸门（没注册没登录不让用） ═══════
 await page.waitForSelector('#g-reg', { timeout: 25000 });
@@ -301,12 +342,16 @@ await page.waitForTimeout(3000);
 check('注册后放行，进入应用', (await page.locator('#gate').isVisible()) === false, '已进入');
 await page.waitForSelector('#view-home .nowcard', { timeout: 20000 });
 await page.waitForTimeout(400);
+CUR_GROUP = 'entry';
+await e2eMaybeDone();
 check('默认进首页：一条主路径（搜索 / 挑一首 / 次级入口）', (await page.locator('#view-home').isVisible()) && (await page.locator('#h-q').count()) === 1 && (await page.locator('#h-songs').count()) === 1, ((await txt('#view-home .nowcard .k')) || '').slice(0, 26));
 check('首页不堆功能：学词/曲库/生词本降级成小入口', (await page.locator('#view-home .btn-main').count()) === 1, (await page.locator('#view-home .herohead .hln button').count()) + ' 个次入口');
 await shot('00-home');
 await page.locator('#h-words').click();
 await page.waitForSelector('#deck .word', { timeout: 20000 });
 await page.waitForTimeout(300);
+CUR_GROUP = 'learn';
+await e2eMaybeDone();
 check('从首页能进学词页', await page.locator('#view-learn').isVisible());
 check('学词页有进度条', await page.locator('#view-learn .bar i').count() > 0, (await txt('#view-learn .sec-sub')) || '');
 const deckN = await page.locator('#deck .word').count();
@@ -328,6 +373,8 @@ await page.locator('#deck .word .tick').first().click();
 await page.waitForTimeout(200);
 await shot('01-learn');
 
+CUR_GROUP = 'search';
+await e2eMaybeDone();
 // ═══════ 2 顶栏搜索（渐进披露） ═══════
 check('搜索默认收起', !(await page.locator('#searchwrap').isVisible()));
 await page.locator('#btn-search').click();
@@ -349,26 +396,63 @@ await page.waitForTimeout(400);
 await page.locator('#btn-search').click();
 await page.waitForTimeout(200);
 
+CUR_GROUP = 'word';
+await e2eMaybeDone();
 // ═══════ 3 词条详情 ═══════
 await page.locator('#deck .word').first().click();
 await page.waitForSelector('#view-word .sec-title', { timeout: 8000 });
 const wbig = (await txt('#view-word .sec-title')) || '';
 check('词条详情打开', wbig.length > 0, wbig);
 check('词条有释义与难度条', ((await txt('#w-mean')) || '').length > 1);
-const goBtn = page.locator('#view-word [data-goto]').first();
-check('例句带「去这句」', await goBtn.count() > 0);
+check('例句不再用「去这句」按钮', (await page.locator('#view-word [data-goto]').count()) === 0);
+// 词卡的例句优先挑有音频的曲目；没有可播例句的（全标「无音频」）就换一个词
+let exRow = null;
+for (let k = 0; k < 6 && !exRow; k++) {
+  if (await page.locator('#view-word .exrow[data-pv]:not(.noaudio)').count()) {
+    exRow = page.locator('#view-word .exrow[data-pv]:not(.noaudio)').first();
+    break;
+  }
+  await page.locator('#w-back').click();
+  await page.waitForSelector('#deck .word', { timeout: 8000 });
+  await page.locator('#deck .word').nth(k + 1 >= 6 ? 0 : k + 1).click();
+  await page.waitForSelector('#view-word .sec-title', { timeout: 8000 });
+  await page.waitForTimeout(300);
+}
+check('例句行可点（行内试听）', !!exRow, exRow ? '' : '前几个词都只有无音频例句');
 await shot('03-word');
 
-// 去这句 → 单曲页并进入那句循环
-await goBtn.click();
-await page.waitForSelector('#view-track', { timeout: 8000 });
-await page.waitForTimeout(700);
-check('「去这句」进入单曲并开始单句循环', (await idxOf()) >= 0, '高亮第 ' + (await idxOf()) + ' 句');
-check('循环时模式开关切到「单句」', (await page.locator('#m-loop.on').count() > 0), (await txt('#p-scope')) || '');
-check('「去这句」直接把全屏跟唱页拉起来', await page.locator('#player.on').count() > 0);
-await page.locator('#p-close').click();          // 收起全屏页，继续测单曲页本体
-await page.waitForTimeout(450);
+// 例句行内试听：点一下播、再点停、再点重播；不跳页、不唤出播放器
+// headless 解不了 mp3：把 pv-audio 的 play/load/src 都桩掉（不真的解码），专验交互状态机（真出声在真机验）
+await page.evaluate(() => {
+  const a = document.getElementById('pv-audio');
+  if (!a) return;
+  let _src = '';
+  a.play = () => Promise.resolve();
+  a.load = () => {};
+  try { Object.defineProperty(a, 'src', { configurable: true, get: () => _src, set: (v) => { _src = String(v || ''); } }); } catch {}
+});
+const wordHash0 = await page.evaluate(() => location.hash);
+await exRow.click();
+await page.waitForTimeout(350);
+const ex1 = await page.evaluate(() => ({ on: !!document.querySelector('#view-word .exrow.on'), hash: location.hash, player: document.querySelector('#player').classList.contains('on') }));
+check('点例句：就地播一遍（不跳页、不唤出播放器）', ex1.on && ex1.hash === wordHash0 && !ex1.player, JSON.stringify(ex1));
+await exRow.click();
+await page.waitForTimeout(250);
+check('再点例句：停', (await page.evaluate(() => !!document.querySelector('#view-word .exrow.on'))) === false);
+await exRow.click();
+await page.waitForTimeout(350);
+check('第三次点例句：重播', (await page.evaluate(() => !!document.querySelector('#view-word .exrow.on'))) === true);
+await exRow.click();                             // 收尾：停掉
+await page.waitForTimeout(250);
 
+// 进单曲页：学词页不自动出声（后面点「进入跟唱」才播）
+await page.goto(BASE + '#/track/t1', { waitUntil: 'load' });
+await page.waitForSelector('#twlist .word', { timeout: 8000 });
+await page.waitForTimeout(600);
+check('点进学词页不自动出声', await page.evaluate(() => { const a = document.querySelector('audio'); return !a || !a.src || a.paused; }));
+
+CUR_GROUP = 'track';
+await e2eMaybeDone();
 // ═══════ 4 单曲页：词汇 / 歌词 分段 ═══════
 const twN = await page.locator('#twlist .word').count();
 check('默认停在「词汇」，先列这首歌的词', twN > 3, twN + ' 个词');
@@ -387,6 +471,8 @@ check('单曲页点「进入跟唱」打开播放器歌词', await page.locator(
   (await page.locator('#plyric .lblock').count()) + ' 块');
 check('单曲页里不再有第二套歌词 DOM', await page.locator('#lyric .lblock, #view-track .lblock').count() === 0);
 
+CUR_GROUP = 'lyrics';
+await e2eMaybeDone();
 // ═══════ 5 歌词排版：分块 / 词性分色 / 词级中文 ═══════
 const pos = await page.evaluate(() => {
   const g = (c) => document.querySelectorAll('#plyric .w.' + c).length;
@@ -424,6 +510,8 @@ await page.waitForTimeout(700);
 const ha = await page.evaluate(() => [...document.querySelectorAll('#plyric .lblock')].map((el) => Math.round(el.getBoundingClientRect().height)));
 check('切当前句时所有歌词块高度不变（不再上下跳）', hb.length === ha.length && hb.every((h, i) => h === ha[i]), `块数 ${hb.length}→${ha.length} · 切句前 ${[...new Set(hb)].join('/')} → 切句后 ${[...new Set(ha)].join('/')}`);
 
+CUR_GROUP = 'player';
+await e2eMaybeDone();
 // ═══════ 6 播放交互：点句=继续播、双击=单句循环 ═══════
 if (await page.locator('#m-loop.on').count()) await page.locator('#p-scope').click();   // 先切回「全曲」，再验点句子的行为
 await page.waitForTimeout(300);
@@ -449,6 +537,8 @@ await page.locator('#mb-loop').click();     // 一键退出循环
 await page.waitForTimeout(300);
 check('循环可一键关掉', (await page.locator('#m-all.on').count() > 0) && (await page.locator('#mb-loop').isHidden()), '整首点亮=' + (await page.locator('#m-all.on').count()));
 
+CUR_GROUP = 'order';
+await e2eMaybeDone();
 // ═══════ 6.5 播放顺序：顺序 / 循环 / 随机（放完一首自动接下一首） ═══════
 const orderLabel = () => txt('#p-order-t');
 const tapOrder = async () => { await page.locator('#p-order').click(); await page.waitForTimeout(250); };
@@ -509,23 +599,38 @@ check('测试后回到「顺序」，不影响后续用例', ((await orderLabel(
 await page.locator('#p-close').click();               // 收好全屏页，后面的用例要用迷你条
 await page.waitForTimeout(400);
 
+CUR_GROUP = 'minibar';
+await e2eMaybeDone();
 // ═══════ 7 迷你播放条 + 全屏跟唱页 ═══════
 check('迷你播放条已出现', await page.locator('#minibar.on').count() > 0);
 check('迷你条上有曲名与状态', ((await txt('#p-now')) || '').length > 2, ((await txt('#p-now')) || '').slice(0, 26));
+const tidMb0 = await page.evaluate(() => String(location.hash).replace('#/track/', '').split('@')[0]);
+await page.locator('#mb-next').click();
+await page.waitForTimeout(1500);
+const tidMb1 = await page.evaluate(() => String(location.hash).replace('#/track/', '').split('@')[0]);
+check('迷你条有「下一首」：切歌并自动播', !!tidMb1 && tidMb1 !== tidMb0, `${tidMb0} → ${tidMb1}`);
+await page.locator('#mb-prev').click();
+await page.waitForTimeout(1500);
+check('迷你条有「上一首」：切回来', (await page.evaluate(() => String(location.hash).replace('#/track/', '').split('@')[0])) === tidMb0,
+  `回 ${tidMb0}`);
 const btnsInTrack = await page.evaluate(() => document.querySelectorAll('#view-track #playbtn, #view-track button.big, #view-track #p-play').length);
 check('单曲页里没有第二个播放键', btnsInTrack === 0, btnsInTrack + ' 个');
 await page.locator('#playbtn').click();
-await page.waitForTimeout(900);
-check('点迷你条播放键：进入播放/缓冲', await page.evaluate(() => { const a = document.querySelector('audio'); return !!a.src; }), (await txt('#p-state')) || '');
+let mbHasSrc = false;
+for (let i = 0; i < 14; i++) { mbHasSrc = await page.evaluate(() => { const a = document.querySelector('audio'); return !!(a && a.src); }); if (mbHasSrc) break; await page.waitForTimeout(300); }
+check('点迷你条播放键：进入播放/缓冲', mbHasSrc, (await txt('#p-state')) || '');
 await page.locator('#mb-meta').click();
 await page.waitForTimeout(600);
 check('点迷你条展开全屏跟唱页', await page.locator('#player.on').count() > 0);
+check('全屏播放器有「上一首/下一首」（跟「上一句/下一句」并存）', (await page.locator('#p-ptrack').count()) === 1 && (await page.locator('#p-ntrack').count()) === 1, '⏮/⏭');
 check('全屏页有聚焦歌词（当前句更亮）', await page.locator('#plyric .lblock').count() > 5, (await page.locator('#plyric .lblock').count()) + ' 块');
 await shot('06-player', true);
 await page.locator('#p-close').click();
 await page.waitForTimeout(400);
 check('全屏页可收起', await page.locator('#player.on').count() === 0);
 
+CUR_GROUP = 'controls';
+await e2eMaybeDone();
 // ═══════ 8 倍速 / 上下句 ═══════
 await page.locator('#mb-meta').click();
 await page.waitForTimeout(400);
@@ -547,11 +652,24 @@ await page.locator('#p-prev').click(); await page.waitForTimeout(350);
 check('上一句切换', (await idxOf()) === i0, '回到 ' + (await idxOf()));
 await page.locator('#p-close').click();
 
+CUR_GROUP = 'songs';
+await e2eMaybeDone();
 // ═══════ 9 曲库与过滤 ═══════
 await page.locator('#tab-songs').click();
 await page.waitForTimeout(500);
 const trackN = await page.locator('#list .track').count();
 check('曲库列表渲染', trackN > 20, trackN + ' 首');
+const curRow = await page.evaluate(() => ({ has: !!document.querySelector('#list .track.current'), eq: !!document.querySelector('#list .track.current .eqbars'), jump: !!document.getElementById('jump-cur') }));
+check('正在播放的歌在列表里有动效 + 「正在播放」入口', curRow.has && curRow.eq && curRow.jump, JSON.stringify(curRow));
+if (curRow.jump) {
+  await page.locator('#jump-cur').click();
+  await page.waitForTimeout(500);
+  check('点「正在播放」能回到播放器', await page.locator('#player.on').count() > 0);
+  await page.locator('#p-close').click();
+  await page.waitForTimeout(300);
+} else {
+  check('点「正在播放」能回到播放器', false, '没有「正在播放」入口');
+}
 await page.locator('#view-songs .chip[data-f="audio"]').click(); await page.waitForTimeout(300);
 const fa = await page.locator('#list .track').count();
 await page.locator('#view-songs .chip[data-f="zh"]').click(); await page.waitForTimeout(300);
@@ -562,6 +680,8 @@ await page.locator('#view-songs .chip[data-f="all"]').click();
 await page.waitForTimeout(250);
 await shot('07-songs');
 
+CUR_GROUP = 'audio';
+await e2eMaybeDone();
 // ═══════ 10 内置曲目：OSS 音频已清空，改走解析接口 ═══════
 const beforeOss = netReqs.length;
 await page.goto(BASE + '#/track/t1', { waitUntil: 'load' });
@@ -577,6 +697,8 @@ const ossGone = await page.evaluate(async () => {
 });
 check('OSS 里的音频已经清空（曲目全部改走网易云解析）', ossGone.withOss === 0 && ossGone.withNid > 0, `带 audioOss 的 ${ossGone.withOss} 首 · 有 nid 能解析的 ${ossGone.withNid} 首`);
 
+CUR_GROUP = 'review';
+await e2eMaybeDone();
 // ═══════ 11 生词本 + 刷新恢复 ═══════
 await page.locator('#tab-mine').click();
 await page.waitForTimeout(400);
@@ -611,6 +733,8 @@ const restored = await page.evaluate(() => Object.keys(JSON.parse(localStorage.g
 check('刷新后本地进度保留', restored > 0, restored + ' 个词');
 await shot('08-restored');
 
+CUR_GROUP = 'import';
+await e2eMaybeDone();
 // ═══════ 12 网易云歌单导入（失败逐首报原因） ═══════
 await page.locator('#tab-songs').click();
 await page.waitForTimeout(400);
@@ -775,21 +899,32 @@ const tagTxt = await page.evaluate(() => [...document.querySelectorAll('#list .t
 check('列表里标出「QQ音乐」', /QQ音乐/.test(tagTxt), tagTxt.slice(0, 60));
 await shot('09-import', true);
 
-// 点开一首导入的歌：该自动起播，迷你条上该有专辑小图
+// 点开一首导入的歌：不再自动出声，点「进入跟唱」才播；迷你条上有专辑小图
 await page.locator('#view-songs .chip[data-f="imp"]').click();
 await page.waitForTimeout(400);
 const firstImpId = await page.evaluate(() => { const el = document.querySelector('#list .track'); return el ? el.dataset.id : ''; });
 await page.locator('#list .track').first().click();
-await page.waitForTimeout(3000);
+await page.waitForTimeout(1200);
 const opened = await page.evaluate(() => {
   const a = document.querySelector('audio');
-  return { tid: a && a.getAttribute('data-tid'), src: (a && a.src) || '',
+  return { tid: a && a.getAttribute('data-tid'), src: (a && a.src) || '', paused: a ? a.paused : true,
     cover: (document.getElementById('mb-cover') || {}).src || '', bar: document.getElementById('minibar').classList.contains('on') };
 });
-check('点开曲目自动起播（不用再点一次「进入跟唱」）', !!firstImpId && opened.tid === firstImpId && !!opened.src && opened.bar, `${opened.tid} · src ${opened.src.slice(0, 36)}`);
+check('点开曲目不自动出声，播放条指向这首', !!firstImpId && opened.bar && opened.paused !== false, `${opened.tid} · paused=${opened.paused}`);
 check('迷你播放条显示专辑小图（导入曲目）', /e2e-cover/.test(opened.cover), opened.cover.slice(0, 56));
+await page.evaluate(() => {
+  const a = document.querySelector('audio');
+  window.__played = [];
+  if (a) a.play = function () { window.__played.push(String(this.getAttribute('data-tid'))); try { this.dispatchEvent(new Event('play')); } catch {} return Promise.resolve(); };
+});
+await page.locator('#t-sing').click();
+await page.waitForTimeout(1600);
+const impPlaying = await page.evaluate(() => { const a = document.querySelector('audio'); return { tid: a.getAttribute('data-tid'), src: !!a.src, played: (window.__played || []).includes(String(a.getAttribute('data-tid'))) }; });
+check('点「进入跟唱」才开始播放', impPlaying.tid === firstImpId && impPlaying.src && impPlaying.played, JSON.stringify(impPlaying));
 check('导入曲目用的是服务端分词（词性/读音来自 kuromoji）', (await page.locator('#plyric .w.k-prt').count()) >= 0 && (await page.locator('#twlist .word').count()) > 0, '词汇 ' + (await page.locator('#twlist .word').count()));
 
+CUR_GROUP = 'library';
+await e2eMaybeDone();
 // ═══════ 12.5 排序 / 专辑网格 / 收藏会唱 / 分享码 ═══════
 await page.goto(BASE + '?org=1#/songs', { waitUntil: 'load' });
 await page.waitForSelector('#list .track', { timeout: 15000 });
@@ -897,7 +1032,9 @@ await page.waitForFunction(() => /导入完成|先把分享码|读不出来/.tes
 const shStat = (await txt('#sh-stat')) || '';
 check('导入别人的分享码：跑通并逐条报数', /导入完成：入库 \d+ 首/.test(shStat), shStat.slice(0, 40));
 
-// ═══════ 13 单词页 → 去这句（要真的换歌、跳句、出声） ═══════
+CUR_GROUP = 'feedback';
+await e2eMaybeDone();
+// ═══════ 13 单词页：例句就地试听（不再「去这句」跳页）═══════
 await page.goto(BASE + '#/track/t1');
 await page.waitForTimeout(900);
 await page.locator('#playbtn').click();
@@ -909,49 +1046,49 @@ const wid = await page.evaluate(() => {
 check('跟唱页能取到一个词（拿它去词条页）', !!wid, wid);
 await page.goto(BASE + '#/word/' + wid);
 await page.waitForTimeout(700);
-const firstEx = await page.locator('#view-word .item').first().textContent();
+const firstEx = await page.locator('#view-word .exrow').first().textContent();
 check('词条页把「正在听」的那句排在最前', /正在听/.test(firstEx), firstEx.replace(/\s+/g, ' ').slice(0, 44));
-const gotoAttr = await page.locator('#view-word [data-goto]').first().getAttribute('data-goto');
-const [gtid, gli] = gotoAttr.split('@');
-// 装个钩子：headless 的假 mp3 解码失败会让 paused 一直为 true，所以验「确实调了播放 + 切到了这首」
+
+// 词抽屉里的例句也能就地试听
+await page.goto(BASE + '#/track/t1');
+await page.waitForTimeout(1100);
+await page.locator('#t-sing').click();
+await page.waitForTimeout(1400);
+await focusLine(0);
+await tapCurWord(0);
+await page.waitForSelector('#pop.on', { timeout: 8000 });
+const drawerEx = await page.evaluate(() => {
+  const b = document.getElementById('p-ex');
+  return { row: !!(b && b.querySelector('.exrow[data-pv]')), goto: !!(b && b.querySelector('[data-goto]')) };
+});
+check('抽屉例句：行内试听、没有「去这句」按钮', drawerEx.row && !drawerEx.goto, JSON.stringify(drawerEx));
 await page.evaluate(() => {
-  window.__played = [];
-  const a = document.querySelector('audio');
-  if (a && !a.__hook) { a.__hook = 1; a.addEventListener('play', () => window.__played.push(a.getAttribute('data-tid'))); }
+  const a = document.getElementById('pv-audio');
+  if (!a) return;
+  let _src = '';
+  a.play = () => Promise.resolve();
+  a.load = () => {};
+  try { Object.defineProperty(a, 'src', { configurable: true, get: () => _src, set: (v) => { _src = String(v || ''); } }); } catch {}
 });
-await page.locator('#view-word [data-goto]').first().click();
-await page.waitForTimeout(1200);
-// 内置曲目现在要先解析出地址才出声，轮询等一下
-for (let i = 0; i < 12; i++) {
-  const p0 = await page.evaluate(() => { const a = document.querySelector('audio'); return a && !a.paused && !!a.src; });
-  if (p0) break;
-  await page.waitForTimeout(700);
+const drawerHash0 = await page.evaluate(() => location.hash);
+const drawerRow = page.locator('#p-ex .exrow[data-pv]').first();
+if (await drawerRow.count()) {
+  await drawerRow.click();
+  await page.waitForTimeout(350);
+  const d1 = await page.evaluate(() => ({ on: !!document.querySelector('#p-ex .exrow.on'), hash: location.hash }));
+  check('点抽屉例句：就地播一遍、不跳页', d1.on && d1.hash === drawerHash0, JSON.stringify(d1));
+  await drawerRow.click();
+  await page.waitForTimeout(250);
+  check('再点抽屉例句：停', (await page.evaluate(() => !!document.querySelector('#p-ex .exrow.on'))) === false);
+} else {
+  check('点抽屉例句：就地播一遍、不跳页', false, '抽屉里没有可试听的例句行');
+  check('再点抽屉例句：停', false, '抽屉里没有可试听的例句行');
 }
-await page.waitForTimeout(600);
-const jumped = await page.evaluate(() => {
-  const a = document.querySelector('audio');
-  const el = document.querySelector('#plyric .lblock.playing');
-  return { hash: location.hash, tid: a.getAttribute('data-tid'), src: !!a.src, paused: a.paused, open: document.querySelector('#player').classList.contains('on'), line: el ? Number(el.dataset.i) : -1 };
-});
-check('去这句：跳到对应那句', jumped.hash === `#/track/${gtid}@${gli}` && jumped.open && jumped.line === Number(gli), JSON.stringify(jumped));
-// headless 的假 mp3 解不了码，所以这里只验「换歌 + 地址链路」（真出声在真浏览器上验）
-const jumpedUrl = await page.evaluate(() => (document.querySelector('audio') || {}).src || '');
-check('去这句：音频换成这首歌（走解析拿到地址）', jumped.tid === gtid && /music\.126\.net|e2e-stub|blob:/.test(jumpedUrl), `${jumped.tid} → ${jumpedUrl.slice(0, 48)}`);
-await shot('10-goto', true);
+await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
 await page.locator('#p-close').click();
 await page.waitForTimeout(300);
-// 没有音频的曲目：要明确告诉用户，并给绑定入口
-const noAudioId = await page.evaluate(async () => {
-  const d = await (await fetch('data/index.json')).json();
-  const t = d.tracks.find((x) => !x.audioOss && !x.audio);
-  return t ? t.id : '';
-});
-await page.goto(BASE + '#/track/' + noAudioId);
-await page.waitForTimeout(800);
-await page.locator('#mb-meta').click();
-await page.waitForTimeout(500);
-check('没音频的曲目：播放器给出「绑定音频」入口', await page.locator('#p-nosrc').isVisible(), noAudioId + ' · ' + ((await txt('#p-state')) || '').slice(0, 24));
-
+CUR_GROUP = 'heal';
+await e2eMaybeDone();
 // ═══════ 13.4 旧缓存里的音频地址失效 → 自动回落到解析接口 ═══════
 {
   // 模拟用户浏览器里那份旧 index.json：t1 还写着已经删掉的 OSS 音频地址
@@ -977,6 +1114,8 @@ await page.goto(BASE + '?heal=1#/track/t1', { waitUntil: 'load' });
   await page.waitForTimeout(300);
 }
 
+CUR_GROUP = 'roma';
+await e2eMaybeDone();
 // ═══════ 13.2 罗马音纠正（备选 + 自由输入；编辑时暂停、改完继续；键盘不遮抽屉） ═══════
 await page.goto(BASE + '?roma=1#/track/t1', { waitUntil: 'load' });
 await page.waitForTimeout(1200);
@@ -1078,6 +1217,8 @@ await page.waitForTimeout(1500);
 const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').roma || {});
 check('刷新后纠正还在（并跟着账号同步）', Object.keys(persisted).length === 1 && Object.values(persisted)[0].y === 'my-own-romaji', JSON.stringify(persisted).slice(0, 60));
 
+CUR_GROUP = 'plcheck';
+await e2eMaybeDone();
 // ═══════ 13.5 歌单体检（手动按钮；自动那条每天一次，测试里关掉） ═══════
 await page.goto(BASE + '?plchk=1#/songs', { waitUntil: 'load' });
 await page.waitForSelector('.impbox summary', { timeout: 15000 });
@@ -1089,6 +1230,8 @@ await page.waitForTimeout(5000);
 const chkMsg = (await txt('#plstat')) || '';
 check('检查歌单更新：能跑通并报出每张歌单的情况', /线上 \d+ 首/.test(chkMsg) && /库里 \d+ 首/.test(chkMsg), chkMsg.slice(0, 60).replace(/\n/g, ' | '));
 
+CUR_GROUP = 'misc';
+await e2eMaybeDone();
 // ═══════ 13.6 空状态 / 复习闭环 / 手机宽度 / 继续学习 ═══════
 await page.goto(BASE + '?emp=1#/search/zzzzzz', { waitUntil: 'load' });
 await page.waitForTimeout(1200);
@@ -1175,11 +1318,17 @@ await page.evaluate(() => { const j = JSON.parse(localStorage.getItem('thlyrics.
 await page.goto(BASE + '?pos=1#/home', { waitUntil: 'load' });
 await page.waitForSelector('#view-home .nowcard', { timeout: 15000 });
 check('首页「正在学习」显示上次听到哪', /上次听到 1:23/.test((await txt('#view-home .nowcard .a')) || ''), ((await txt('#view-home .nowcard .a')) || '').slice(0, 34));
+const homeBar = await page.evaluate(() => ({ on: document.getElementById('minibar').classList.contains('on'), now: (document.getElementById('p-now') || {}).textContent || '', src: !(document.querySelector('audio') && document.querySelector('audio').src) }));
+check('开屏/首页就有播放器（上次那首，点了才播）', homeBar.on && homeBar.now.length > 2, `${homeBar.now.slice(0, 20)} · 未加载音频=${homeBar.src}`);
 check('音频设置不再挂在每个页面（首页看不到）', await page.locator('#srcslot').isHidden(), '首页隐藏');
 await page.goto(BASE + '?pos=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#m-push', { timeout: 15000 });
 check('音频设置只在「我的」/单曲页里出现', await page.locator('#srcslot').isVisible(), '我的页可见');
+const srcMeta = await page.locator('#srcbox .meta').allTextContents();
+check('音频来源与设置里没有解释性文案', srcMeta.every((t) => !/复制一份|断网|加密|下载的/.test(t)), srcMeta.join(' | ').slice(0, 50));
 
+CUR_GROUP = 'account';
+await e2eMaybeDone();
 // ═══════ 14 账号：自动同步 / 墓碑 / 清空 / 换设备登录恢复 ═══════
 if (await page.locator('#player.on').count()) { await page.locator('#p-close').click(); await page.waitForTimeout(300); }
 await page.goto(BASE + '?acc=1#/me', { waitUntil: 'load' });
@@ -1270,6 +1419,8 @@ const delKey = await page.evaluate(() => { const el = document.querySelector('#v
 if (delKey) { await page.locator(`#view-admin [data-admdel="${delKey}"]`).first().click(); await page.waitForTimeout(1500); }
 check('管理员：能删 OSS 上的文件（走管理员接口）', !!delKey && apiState.deleted.indexOf(delKey) >= 0, delKey ? `已请求删除 ${delKey}` : '没找到可删的');
 
+CUR_GROUP = 'heal2';
+await e2eMaybeDone();
 // ── 13.9 地址失效自愈：重解析之后要从原进度续播，不能从头开始 ──
 // 场景：直链过期/CDN 掉线 → audio 触发 error → 丢掉坏地址重解析 → 以前这里直接 playTrack() 从头播，
 // 后台回来会出现「进度从 100 多秒跳回 0」。断言续播位置必须贴近失效前的进度。
@@ -1307,6 +1458,8 @@ check('地址失效自愈后从原进度续播（不再从头开始）',
   `曲目 ${healTid} · 失效前 ${healPlayed.t.toFixed(2)}s → 自愈后 ${healAfter.t.toFixed(2)}s（paused=${healAfter.paused}）`);
 await page.unroute('**/api/audio*');
 
+CUR_GROUP = 'pop';
+await e2eMaybeDone();
 // ── 13.11 词抽屉：点外部（包括别的词）先收起 ──
 await page.evaluate(() => { location.hash = '#/songs'; });
 await page.waitForTimeout(900);
@@ -1369,6 +1522,8 @@ const lineTap = await page.evaluate(async () => {
 check('抽屉开着时点别的歌词行 → 只关抽屉，不跳句（不穿透）', lineTap.on === false && lineTap.before === lineTap.after,
   `抽屉开=${lineTap.on} · 当前句 ${lineTap.before} → ${lineTap.after}（点的是第 ${lineTap.tapped} 句）`);
 
+CUR_GROUP = 'fixes';
+await e2eMaybeDone();
 // ═══════ 13.13 真机反馈三连：发音 / 本曲词汇跳句 / 未收录的词能自己补 ═══════
 // (a) 本曲词汇 → ↦ 跳到那一句（用户反馈"点了没反应"：要开跟唱页 + 滚到可视区）
 await page.locator('#p-close').click();
@@ -1417,13 +1572,14 @@ if (!unknown.none) {
     const w = cur && cur.querySelector('.w:not([data-w]):not([data-plain])');
     if (!w) return null;
     const s = w.dataset.s;
+    window.__picked = { s, b: w.dataset.w || '' };
     w.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     await new Promise((r) => setTimeout(r, 700));
     return { s, meaning: (document.getElementById('p-meaning') || {}).textContent || '', meta: (document.getElementById('p-meta') || {}).textContent || '', btn: (document.getElementById('p-edit') || {}).textContent || '', moreShown: !(document.getElementById('p-morebox') || {}).hidden };
   });
-  check('未收录的词：说明「分词器切的、词表没有」，并给「补一条释义」',
-    !!tapped && /还没有这个词的释义/.test(tapped.meaning) && /词表/.test(tapped.meta) && /补一条释义/.test(tapped.btn) && tapped.moreShown,
-    tapped ? `${tapped.meaning} · ${tapped.btn} · 更多可见=${tapped.moreShown}` : '没找到未收录的词');
+  check('未收录的词：给「补一条释义」且不写解释性文案',
+    !!tapped && /暂无释义/.test(tapped.meaning) && !/词表|分词器/.test(tapped.meta) && /补一条释义/.test(tapped.btn) && tapped.moreShown,
+    tapped ? `${tapped.meaning} · ${tapped.meta} · ${tapped.btn} · 更多可见=${tapped.moreShown}` : '没找到未收录的词');
   const saved = await page.evaluate(async () => {
     const inp = document.getElementById('p-editinput');
     if (!inp) return { none: true };
@@ -1434,17 +1590,50 @@ if (!unknown.none) {
     await new Promise((r) => setTimeout(r, 800));
     const cur = document.querySelector('#plyric .lblock.playing');
     const gloss = [...(cur ? cur.querySelectorAll('.g') : [])].map((x) => x.textContent);
+    const th = (window.__th && window.__th()) || {};
     const raw = localStorage.getItem('thlyrics.tool.v1') || '';
     let j = {}; try { j = JSON.parse(raw); } catch (e) { return { parseErr: String(e.message), rawLen: raw.length }; }
     const st = j.words || {};
     return { gloss, stored: Object.keys(st).length, meaning: (document.getElementById('p-meaning') || {}).textContent || '',
-      rightAfter: Object.keys(rightAfter).length, rawLen: raw.length, wordsRaw: JSON.stringify(j.words || null).slice(0, 40) };
+      rightAfter: Object.keys(rightAfter).length, rawLen: raw.length, wordsRaw: JSON.stringify(j.words || null).slice(0, 40),
+      memo: th, picked: window.__picked || null };
   });
   check('补完释义：存进本机 + 歌词下面立刻出现中文', !!(saved && saved.stored >= 1) && (saved.gloss || []).includes('E2E自补释义'),
-    `写入瞬间 ${(saved && saved.rightAfter) || 0} 条 · 0.9 秒后 ${(saved && saved.stored) || 0} 条 · 存储 ${(saved && saved.rawLen) || 0} 字节 · words=${(saved && saved.wordsRaw) || '空'}`);
+    `词「${(saved && saved.picked && saved.picked.s) || '?'}」· 写入瞬间 ${(saved && saved.rightAfter) || 0} 条 · 0.9 秒后 ${(saved && saved.stored) || 0} 条 · 内存 ${JSON.stringify((saved && saved.memo) || {})}`);
   await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
 }
 
+CUR_GROUP = 'guard';
+await e2eMaybeDone();
+// ═══════ 13.14 误触退出保护：左划/返回 → 二次确认；播放不中断 ═══════
+{
+  await page.evaluate(() => {
+    window.__NO_GUARD = true;
+    history.replaceState(null, '', '#/songs');
+    location.hash = '#/track/t1';
+  });
+  await page.waitForTimeout(900);
+  await page.evaluate(() => { const b = document.getElementById('playbtn'); if (b) b.click(); const p = document.getElementById('player'); if (p) p.classList.remove('on'); });   // 收掉全屏播放器（它在时返回手势只收播放器，是另一条契约）
+  await page.waitForTimeout(800);
+  const playBefore = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: !!a.src, hash: location.hash }; });
+  await page.evaluate(() => { window.__NO_GUARD = false; location.hash = '#/home'; });   // 模拟误触：离开学词页
+  await page.waitForTimeout(800);
+  const guardHit = await page.evaluate(() => { const d = document.getElementById('dlg'); return { hash: location.hash, open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
+  check('误触退出：弹二次确认', guardHit.open && /退出学词页/.test(guardHit.text), JSON.stringify(guardHit).slice(0, 80));
+  await page.locator('#dlg [data-di="0"]').click();                       // 继续听
+  await page.waitForTimeout(600);
+  const playAfter = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: !!a.src, hash: location.hash, paused: a.paused }; });
+  check('「继续听」：回到学词页，播放不被打断', playAfter.hash === '#/track/t1' && playAfter.src === playBefore.src, JSON.stringify(playAfter));
+  await page.evaluate(() => { location.hash = '#/home'; });               // 再误触一次
+  await page.waitForTimeout(800);
+  await page.locator('#dlg [data-di="1"]').click();                       // 退出
+  await page.waitForTimeout(600);
+  check('「退出」：真的回到上一页', (await page.evaluate(() => location.hash)) === '#/home', await page.evaluate(() => location.hash));
+  await page.evaluate(() => { window.__NO_GUARD = true; });
+}
+
+CUR_GROUP = 'native';
+await e2eMaybeDone();
 // ═══════ 13.12 原生壳专属分支：伪造成 App 跑一遍「我的」页 ═══════
 // 真机踩过：app.js 里用了版本号 V 但没 import，网页端 IS_NATIVE=false 走不到那段，
 // E2E 全绿也发现不了 —— 一装到手机上「我的」页就整页空白（ReferenceError）。
@@ -1480,16 +1669,27 @@ if (!unknown.none) {
   await np.locator('#g-reg').click();
   await np.waitForSelector('#view-home .nowcard', { timeout: 20000 });
   await np.evaluate(() => { location.hash = '#/me'; });
-  await np.waitForTimeout(1500);
+  await np.waitForTimeout(3400);            // 等开屏的更新检查（2.5s）弹出公告
   const meLen = await np.evaluate(() => ((document.getElementById('view-me') || {}).innerHTML || '').length);
   check('App（原生壳）里「我的」页能正常渲染（不是空白）', meLen > 200, meLen + ' 字符');
   const updEnt = await np.evaluate(() => ({ has: !!document.getElementById('me-upd'), txt: ((document.querySelector('#view-me') || {}).textContent || '').replace(/\s+/g, ' ').slice(0, 46) }));
   check('App 里有「更新 → 检查更新」入口', updEnt.has, updEnt.txt);
+  const dlg1 = await np.evaluate(() => { const d = document.getElementById('dlg'); return { open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
+  check('App 开屏：更新公告弹窗（更新 / 忽略这次 / 忽略本版本）',
+    dlg1.open && /29990101a/.test(dlg1.text) && /忽略这次/.test(dlg1.text) && /忽略 29990101a/.test(dlg1.text), dlg1.text.slice(0, 80));
+  await np.locator('#dlg [data-di="1"]').click();          // 忽略这次
+  await np.waitForTimeout(300);
+  check('「忽略这次」：弹窗关掉', await np.evaluate(() => document.getElementById('dlg').hidden));
   await np.locator('#me-upd').click();
-  await np.waitForTimeout(2500);
-  const afterChk = await np.evaluate(() => ({ go: !!document.getElementById('me-upd-go'), state: (document.getElementById('p-state') || {}).textContent || '' }));
-  check('App 检查更新：发现新版本后给出「下载并安装」', afterChk.go, '状态「' + afterChk.state + '」');
-  await np.locator('#me-upd-go').click();
+  await np.waitForTimeout(2000);
+  check('手动检查更新：即使忽略过也弹公告', await np.evaluate(() => !document.getElementById('dlg').hidden));
+  await np.locator('#dlg [data-di="2"]').click();          // 忽略本版本
+  await np.waitForTimeout(300);
+  const afterIgnore = await np.evaluate(() => ({ hidden: document.getElementById('dlg').hidden, skip: JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').updSkip || '', go: !!document.getElementById('me-upd-go') }));
+  check('「忽略本版本」：记住，更新行不再提示', afterIgnore.hidden && afterIgnore.skip === '29990101a' && !afterIgnore.go, JSON.stringify(afterIgnore));
+  await np.locator('#me-upd').click();
+  await np.waitForTimeout(2000);
+  await np.locator('#dlg [data-di="0"]').click();          // 更新
   await np.waitForTimeout(900);
   const installCall = await np.evaluate(() => window.__apkInstall || null);
   check('点「下载并安装」：把远端地址交给原生插件', !!installCall && /example\.com\/a\.apk/.test(String(installCall.url || '')), JSON.stringify(installCall || {}).slice(0, 64));
@@ -1497,6 +1697,8 @@ if (!unknown.none) {
   await nCtx.close();
 }
 
+CUR_GROUP = 'gate';
+await e2eMaybeDone();
 // 退出 → 回到闸门（本机记录保留）
 await page.goto(BASE + '?out=1#/me', { waitUntil: 'load' });
 await page.waitForSelector('#acc-out', { timeout: 15000 });
@@ -1504,15 +1706,21 @@ await page.locator('#acc-out').click();
 await page.waitForTimeout(1000);
 check('退出登录：回到闸门', (await page.locator('#gate').isVisible()) && (await page.locator('#g-login').count()) === 1, '闸门');
 
+CUR_GROUP = 'data';
+await e2eMaybeDone();
 // 线上数据是干净的：曲库只有用户导入的（不带内置曲目），词表/读音表保留做注解
 const shipped = await (await page.request.get(BASE + 'data/index.json')).json();
 check('线上曲库数据不含内置曲目（曲库=自己导入的）', (shipped.tracks || []).length === 0 && (shipped.originals || []).length === 0 && (shipped.vocab || []).length > 1000,
   `tracks ${(shipped.tracks || []).length} · originals ${(shipped.originals || []).length} · vocab ${(shipped.vocab || []).length}`);
 
+CUR_GROUP = 'base';
+await e2eMaybeDone();
 check('控制台无错误', errors.length === 0, errors.slice(0, 3).join(' || '));
 
-const okN = results.filter((r) => r.ok).length;
-console.log(`\n===== ${okN}/${results.length} 通过 =====`);
-fs.writeFileSync(path.join(SHOTS, 'report.json'), JSON.stringify({ base: BASE, at: new Date().toISOString(), results, errors }, null, 1));
+const judged = results.filter((r) => !r.skip);
+const okN = judged.filter((r) => r.ok).length;
+const skipN = results.length - judged.length;
+console.log(`\n===== ${okN}/${judged.length} 通过${ONLY.size ? `（只看分组：${[...ONLY].join(', ')}；跳过 ${skipN} 条）` : `（全部 ${results.length} 条）`} =====`);
+fs.writeFileSync(path.join(SHOTS, 'report.json'), JSON.stringify({ base: BASE, at: new Date().toISOString(), groups: [...ONLY], results, errors }, null, 1));
 await browser.close();
 process.exit(okN === results.length ? 0 : 1);

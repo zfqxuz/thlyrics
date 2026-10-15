@@ -1,6 +1,6 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261015y';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater } from './platform/index.js?v=20261015y';
+import { V } from './version.js?v=20261016b';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, tts } from './platform/index.js?v=20261016b';
 
 (() => {
   'use strict';
@@ -44,15 +44,18 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, rate: 1, ruby: true, gloss: false, zh: true,
+  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, rate: 1, ruby: true, gloss: false, zh: true,
     mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
-  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {};
+  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {};
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new'; }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
-  const save = () => { kvSetJson(LS_KEY, S); queueSync(); };
+  let saveN = 0;
+  const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); queueSync(); };
+  // 真机排错用的小钩子（不改状态，只读）：浏览器控制台里 __th() 看当前关键状态
+  if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, lsBytes: (kvGet(LS_KEY) || '').length });
 
   // ── 主题：深色 / 暖白（白天）/ 跟随系统 ──
   const THEMES = [['dark', '深色'], ['warm', '暖白'], ['auto', '跟随系统']];
@@ -208,9 +211,27 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (r && want && want !== r && !want.startsWith(r) && !r.startsWith(want)) return null;
     return v;
   }
+  // 用户自己补的词义：S.words = { 词典形: { m: 释义, r: 读音, y: 罗马音, k: 词性码, u: 时间戳 } }
+  // 为什么要有它：切词是分词器干的（任何词都能切出来），词表是人工整理的（6423 条，覆盖不到所有歌）。
+  // 「切出来了但词表没有」不该是死路 —— 用户自己写一条，就存在这里，跟着账号同步。
+  const userWordKey = (sg, fallback) => 'w:' + (((sg && (sg.b || sg.s)) || fallback) || '');
+  const userWord = (sg, fallback) => {
+    const k = userWordKey(sg, fallback);
+    return Object.prototype.hasOwnProperty.call(S.words || {}, k) ? S.words[k] : null;
+  };
+  function setUserWord(sg, fallback, m) {
+    const k = userWordKey(sg, fallback); if (k === 'w:' || !m) return;
+    S.words = S.words || {};
+    S.words[k] = Object.assign({}, S.words[k], { m, r: (sg && sg.r) || '', y: (sg && sg.y) || '', k: (sg && sg.k) || '', u: Date.now() });
+    save();
+  }
+
   /** 词下那一行中文：只有「实词」才有。助词、助动词、接续词、形式名词一律留白（见 GLOSS_KIND / GLOSS_SKIP） */
   const glossOf = (sg, w) => {
-    if (!sg || !w || !GLOSS_KIND[sg.k]) return '';
+    if (!sg) return '';
+    if (!w) { const mine = userWord(sg); return (mine && mine.m && mine.m.length <= 14) ? mine.m : '';   // 词表没有 → 看用户自己补的（不看词性）
+    }
+    if (!GLOSS_KIND[sg.k]) return '';
     const base = sg.b || w.word || '';
     if (GLOSS_SKIP[base] && KANA_ONLY.test(sg.s || '')) return '';
     const g = meaningOf(w) || '';
@@ -222,16 +243,101 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // 旧版本往 IndexedDB 绑过本机音频文件，功能已下线：开机清一次，别留垃圾
   dropLegacyDB('thlyrics');
 
-  // ────────────── 语音朗读 ──────────────
-  let jaVoice = null;
-  const pick = () => { jaVoice = (speechSynthesis.getVoices() || []).find((v) => (v.lang || '').toLowerCase().startsWith('ja')) || null; };
-  if ('speechSynthesis' in window) { pick(); speechSynthesis.onvoiceschanged = pick; }
-  function speak(t) { if (!('speechSynthesis' in window) || !t) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; if (jaVoice) u.voice = jaVoice; u.rate = .9; speechSynthesis.speak(u); }
+  // ────────────── 发音朗读（网页=浏览器 TTS；原生壳=安卓系统 TTS）──────────────
+  // 踩过：WebView 不支持 Web Speech API，壳里点「发音」永远没声音 → 走 platform/tts.js
+  async function speak(t) {
+    const r = await tts.speak(t);
+    if (!r || !r.ok) toast('读不出来：' + ((r && r.error) || '这个环境不支持朗读'));
+    else if (r.ja === false) toast('没有日语语音包：设置 → 语音与输入 → 文字转语音');
+  }
 
   // ────────────── 音频 ──────────────
   const audio = createAudioEl();
   const mountAudio = () => { if (document.body && !audio.isConnected) document.body.appendChild(audio); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAudio); else mountAudio();
+
+  // ── 例句行内试听：单独一个 audio，不碰主播放器 ──
+  // 点一行 = 只播这一句，播完就停；再点同一行 = 停；停后再点 = 重播。不跳页、不唤出播放器。
+  const pvAudio = createAudioEl();
+  pvAudio.id = 'pv-audio';
+  pvAudio.preload = 'auto';
+  if (document.body) document.body.appendChild(pvAudio);
+  else document.addEventListener('DOMContentLoaded', () => { try { document.body.appendChild(pvAudio); } catch {} });
+  const pvCache = new Map();                         // tid -> { url, at }
+  let pvKey = '', pvSeq = 0, pvStopAt = 0, pvMainWasPlaying = false, pvTimer = null, pvOn = false;
+  function refreshPvUI() {
+    const on = pvOn && !!pvKey;
+    document.querySelectorAll('.exrow[data-pv]').forEach((el) => el.classList.toggle('on', on && el.dataset.pv === pvKey));
+  }
+  function pvStop(resume) {
+    pvSeq++;
+    clearTimeout(pvTimer); pvTimer = null; pvStopAt = 0; pvOn = false;
+    try { pvAudio.pause(); } catch {}
+    pvKey = '';
+    refreshPvUI();
+    if (resume === false) return;
+    if (pvMainWasPlaying && curTrack && !audio.ended && !($('pop') && $('pop').classList.contains('on'))) playTrack(curTrack).catch(() => {});
+    pvMainWasPlaying = false;
+  }
+  pvAudio.addEventListener('ended', () => pvStop());                       // 自然播完：主播放器接着放
+  pvAudio.addEventListener('timeupdate', () => { if (pvKey && pvStopAt && pvAudio.currentTime >= pvStopAt) pvStop(); });
+  pvAudio.addEventListener('error', () => { if (pvKey) pvStop(); });
+  function pvPlay(tid, li) {
+    const t = TRACK.get(String(tid));
+    const line = t && (t.lines || [])[li];
+    if (!t || !line) { toast('这一句试听不了'); return; }
+    if (line.t == null) { toast('这一句没有时间轴'); return; }
+    const key = t.id + '|' + li;
+    if (pvKey === key) { pvStop(); return; }          // 同一行再点 = 停
+    pvStop(false);
+    if (!audio.paused && audio.src) { pvMainWasPlaying = true; try { audio.pause(); } catch {} }   // 主播放器让位，但不换歌
+    pvKey = key; refreshPvUI();
+    const my = ++pvSeq;
+    const start = (url) => {
+      if (my !== pvSeq || pvKey !== key) return;
+      if (pvAudio.getAttribute('data-pv') !== t.id) { pvAudio.setAttribute('data-pv', t.id); pvAudio.src = url; pvAudio.load(); }
+      else if (pvAudio.src !== url) { pvAudio.src = url; pvAudio.load(); }
+      const seekToLine = () => { if (my !== pvSeq || pvKey !== key) return; try { pvAudio.currentTime = line.t; } catch {} };
+      const nxt = t.lines[li + 1];
+      pvStopAt = (nxt && nxt.t != null && nxt.t > line.t) ? nxt.t - 0.06 : line.t + 8;
+      if (pvAudio.readyState >= 1) seekToLine(); else pvAudio.addEventListener('loadedmetadata', seekToLine, { once: true });
+      let pr = null;
+      try { pr = pvAudio.play(); } catch (e) { pr = Promise.reject(e); }
+      if (pr && pr.then) pr.then(() => {
+        if (my !== pvSeq || pvKey !== key) return;
+        pvOn = true; refreshPvUI();
+        pvTimer = setTimeout(() => { if (pvKey === key) pvStop(); }, Math.max(2000, (pvStopAt - line.t + 0.8) * 1000));
+      }).catch(() => { if (my === pvSeq && pvKey === key) { pvStop(); toast('这一句没有音频'); } });
+      else { pvOn = true; refreshPvUI(); }
+    };
+    const hit = pvCache.get(t.id);
+    if (hit && Date.now() - hit.at < 18 * 60 * 1000) { start(hit.url); return; }
+    urlFor(t).then((url) => { if (!url) throw new Error('取不到音频地址'); pvCache.set(t.id, { url, at: Date.now() }); start(url); })
+      .catch((e) => { if (my === pvSeq && pvKey === key) { pvKey = ''; refreshPvUI(); toast('试听失败：' + ((e && e.message) || '取不到音频')); } });
+  }
+  if (typeof window !== 'undefined') window.__tlPv = () => ({ key: pvKey, on: pvOn, seq: pvSeq, paused: pvAudio.paused, src: pvAudio.src, ready: pvAudio.readyState });
+  function bindPreviewRows(root) {
+    if (!root) return;
+    root.querySelectorAll('.exrow[data-pv]').forEach((el) => {
+      el.onclick = () => {
+        const [tid, li] = String(el.dataset.pv || '').split('|');
+        const t = TRACK.get(String(tid));
+        if (!t || !(t.audioOss || t.audio || (S.audio || {})[t.id])) { toast('这首还没有音频'); return; }
+        pvPlay(tid, Number(li));
+      };
+    });
+    refreshPvUI();
+  }
+  function exRowHtml(ex) {
+    const t = TRACK.get(String(ex.tid));
+    const hasA = !!(t && (t.audioOss || t.audio || (S.audio || {})[t.id]));
+    return `<div class="item exrow${hasA ? '' : ' noaudio'}" data-pv="${esc(ex.tid)}|${Number(ex.li) || 0}">
+      <span class="exico"><span class="tri">▶</span><span class="eqbars"><i></i><i></i><i></i></span></span>
+      <div class="col"><div class="l1" style="font-weight:400;font-size:14.5px;white-space:normal">${esc(ex.jp)}</div>
+      ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${esc(ex.zh)}</div>` : ''}
+      <div class="l3">${ex.now ? '正在听 · ' : ''}${esc(ex.track || '')}${hasA ? '' : ' · 无音频'}</div></div>
+    </div>`;
+  }
 
   // ── 媒体会话：通知栏/锁屏/耳机线控；原生壳里顺带把前台服务起起来（后台播放靠它保命）──
   let mediaPushedAt = 0;
@@ -345,7 +451,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       t = list[n];
     }
     if (!t || (curTrack && t.id === curTrack.id)) return null;
-    go('#/track/' + t.id);                       // 进去就自动起播（showTrack 里已经这么做）
+    pendingPlayId = t.id;                        // 播放器里切歌：直接播
+    go('#/track/' + t.id);
     if (!opts.silent) toast((dir > 0 ? '下一首：' : '上一首：') + t.title);
     return t;
   }
@@ -444,6 +551,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (opts.at != null) jump(opts.at);
     try { await audio.play(); } catch {}
     $('minibar').classList.add('on');
+    markCurRows();
   }
 
   function bindAudio() {
@@ -452,9 +560,9 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     audio.addEventListener('canplay', () => { applySeek(); setLoad(false); });
     audio.addEventListener('loadedmetadata', () => { applySeek(); if (audio.duration) { $('p-dur').textContent = fmt(audio.duration); $('p-seek').value = String(Math.round((audio.currentTime / audio.duration) * 1000)); } });
     audio.addEventListener('loadeddata', applySeek);
-    audio.addEventListener('playing', () => { setLoad(false); $('minibar').classList.add('on'); });
-    audio.addEventListener('play', () => { $('playbtn').textContent = '❚❚'; $('p-play').textContent = '❚❚'; });
-    audio.addEventListener('pause', () => { $('playbtn').textContent = '▶'; $('p-play').textContent = '▶'; });
+    audio.addEventListener('playing', () => { setLoad(false); $('minibar').classList.add('on'); markCurRows(); });
+    audio.addEventListener('play', () => { $('playbtn').textContent = '❚❚'; $('p-play').textContent = '❚❚'; markCurRows(); });
+    audio.addEventListener('pause', () => { $('playbtn').textContent = '▶'; $('p-play').textContent = '▶'; markCurRows(); });
     audio.addEventListener('error', () => {
       if (stationNid) urlCache.delete(String(stationNid));
       setLoad(false);
@@ -480,7 +588,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       S.bgAsked = 1; save();
       batteryExempt.check().then((ok) => {
         if (ok) return;
-        toast('想让它在后台继续播？请在接下来的弹窗里点「允许」');
+        toast('后台播放：请在弹窗里点「允许」');
         setTimeout(() => batteryExempt.request(), 900);
       }).catch(() => {});
     }
@@ -561,10 +669,15 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if (mb) mb.hidden = i == null || mode !== 'loop';
     highlight(true);
     if (i == null || !curLines[i]) return;
-    const t = curLines[i].t;
-    if (t == null) { setState('这句没有时间轴'); return; }
+    let t = curLines[i].t, note = '';
+    if (t == null) {                                   // 这一句没时间轴：退到最近的有时间轴的一句，别点了没反应
+      for (let k = i - 1; k >= 0; k--) if (curLines[k] && curLines[k].t != null) { t = curLines[k].t; note = '这句没有时间轴，从上一句开始放'; break; }
+      if (t == null) for (let k = i + 1; k < curLines.length; k++) if (curLines[k] && curLines[k].t != null) { t = curLines[k].t; note = '这句没有时间轴，从下一句开始放'; break; }
+    }
+    if (t == null) { setState('这首歌没有时间轴'); return; }
     jump(t);
     if (audio.paused) audio.play().catch(() => {});
+    if (note) setState(note);
   }
   const lineAtTime = (t) => {
     let idx = -1;
@@ -645,6 +758,18 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     setState(msg);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { if (!audio.paused) setState(''); }, 2600);
+  }
+  /** 通用弹窗：开屏更新公告 / 离开跟唱页二次确认 */
+  function showDialog(o) {
+    const d = $('dlg'); if (!d) return;
+    const acts = (o && o.actions) || [];
+    d.innerHTML = `<div class="dlgcard">
+      <div class="dlgt">${esc((o && o.title) || '')}</div>
+      ${(o && o.body) ? `<div class="dlgb">${o.body}</div>` : ''}
+      <div class="dlga">${acts.map((a, i) => `<button data-di="${i}" class="${a.kind === 'main' ? 'btn-main' : a.kind === 'danger' ? 'btn-danger' : 'toolbtn'}">${esc(a.label)}</button>`).join('')}</div>
+    </div>`;
+    d.hidden = false;
+    d.querySelectorAll('[data-di]').forEach((el) => (el.onclick = () => { const a = acts[Number(el.dataset.di)]; d.hidden = true; if (a && a.onClick) a.onClick(); }));
   }
 
   // ────────────── 数据 ──────────────
@@ -759,12 +884,12 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入</button></div>
       </div>` : `<div class="nowcard">
         <div class="k">曲库是空的</div>
-        <div class="t">导入网易云歌单 / 专辑 / 单曲</div>
+        <div class="t">导入歌单 / 专辑 / 单曲</div>
         <div class="acts"><button class="btn-main" id="h-imp">导入</button><button class="btn-ghost" id="h-pick">去曲库</button></div>
       </div>`)}
       <div class="hair"></div>
       <div class="sec-sub">今天学这些</div>
-      <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">导入歌曲后，歌里的词会出现在这里</span>'}</div>`;
+      <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">暂无</span>'}</div>`;
     const goHome = (h) => { location.hash = h; };
     $('h-go').onclick = () => { const q = ($('h-q').value || '').trim(); if (q) goHome('#/search/' + encodeURIComponent(q)); };
     $('h-q').onkeydown = (e) => { if (e.key === 'Enter') $('h-go').click(); };
@@ -772,7 +897,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('h-songs').onclick = () => goHome('#/songs');
     $('h-words').onclick = () => goHome('#/learn');
     $('h-mine').onclick = () => goHome('#/mine');
-    if ($('h-continue')) $('h-continue').onclick = () => goHome('#/track/' + last.id);
+    if ($('h-continue')) $('h-continue').onclick = () => { pendingPlayId = last.id; pendingResumeId = last.id; goHome('#/track/' + last.id); };
     if ($('h-pick')) $('h-pick').onclick = () => goHome('#/songs');
     if ($('h-imp')) $('h-imp').onclick = () => { impState.open = true; goHome('#/songs'); };
     $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => {
@@ -823,7 +948,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <div class="rw">${esc(v.word)}</div>
         ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(v.romaji || '')}</div>
           <div class="rm">${esc(meaningOf(v) || '（没有释义）')}</div>
-          ${ex ? `<div class="rx">${esc(ex.track || '')}<br>${esc(ex.jp)}${ex.zh ? '<br>' + esc(ex.zh) : ''}</div>` : ''}`
+          ${ex ? exRowHtml(ex) : ''}`
         : '<div class="rr">？</div>'}
       </div>
       <div class="revacts">
@@ -831,14 +956,13 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         : `<button class="k" id="rev-show">看释义</button>`}
       </div>
       <div class="row" style="justify-content:center;margin-top:12px;gap:8px">
-        ${ex && ex.tid ? `<button class="toolbtn" id="rev-cue">去这句</button>` : ''}
         <button class="toolbtn" id="rev-detail">词条详情</button>
         <button class="toolbtn" id="rev-stop">结束</button>
       </div></div>`;
+    bindPreviewRows($('view-review'));
     if ($('rev-show')) $('rev-show').onclick = () => { revShown = true; renderReview(); };
     if ($('rev-ok')) $('rev-ok').onclick = () => { toggleKnown(v); revStat.ok++; revI++; revShown = false; renderReview(); };
     if ($('rev-again2')) $('rev-again2').onclick = () => { if (isKnown(v)) toggleKnown(v); revStat.again++; revDeck.push(v); revI++; revShown = false; renderReview(); };
-    if ($('rev-cue')) $('rev-cue').onclick = () => go('#/track/' + ex.tid + '@' + ex.li);
     if ($('rev-detail')) $('rev-detail').onclick = () => go('#/word/' + v.id);
     if ($('rev-stop')) $('rev-stop').onclick = () => go('#/mine');
   }
@@ -877,7 +1001,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <button class="toolbtn ${S.hideKnown !== false ? 'on' : ''}" id="d-hideknown">隐藏已掌握</button>
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
-      ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里还没有词表收录的词'}</div>` : ''}
+      ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里没有可学的词'}</div>` : ''}
       ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个</button></div>` : ''}
 `;
     $('d-range').value = S.dRange || 'all';
@@ -891,7 +1015,17 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     wireWords($('view-learn'));
   }
 
+  /** 列表里正在播放的行：动效 + 一键回播放（重渲染后也能恢复状态） */
+  function markCurRows() {
+    const playing = !!(curTrack && audio.src && !audio.paused && !audio.ended);
+    document.querySelectorAll('.item.track').forEach((el) => {
+      const isCur = !!(curTrack && String(el.dataset.id) === String(curTrack.id));
+      el.classList.toggle('current', isCur);
+      el.classList.toggle('playing', isCur && playing);
+    });
+  }
   function trackRow(t) {
+    const isCur = !!(curTrack && String(curTrack.id) === String(t.id));
     const tags = [];
     if (t.imp) tags.push('导入');
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push('有声'); else tags.push('无音源');
@@ -905,13 +1039,14 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     // 只有真有封面素材才放图；没有就不放空占位框（不为了填满空间做装饰卡片）
     const cover = t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
       : (t.coverUrl ? `<img class="cover" loading="lazy" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '');
-    return `<div class="item track" data-id="${t.id}">
+    return `<div class="item track${isCur ? ' current' : ''}" data-id="${t.id}">
       ${cover}
       <div class="col">
-        <div class="l1">${esc(t.title)}</div>
+        <div class="l1">${esc(t.title)}${isCur ? '<span class="eqbars" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</div>
         <div class="l2">${esc(t.artist)}${t.base ? ' · ' + esc(t.base) : (t.album ? ' · ' + esc(t.album) : '')}</div>
         <div class="l3">${t.lineCount} 行歌词${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
+      ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">▶</button>` : ''}
       ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">✕</button>` : '<span class="mini">›</span>'}
     </div>`;
   }
@@ -1375,8 +1510,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
-    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, a);
-    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, clearedAt: 0 }, b);
+    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, a);
+    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, b);
     const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
     out.known = {};
     for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
@@ -1391,6 +1526,12 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         const v = Math.abs(y) > Math.abs(x) ? y : x;
         if (v) out[kind][k] = v;
       }
+    }
+    out.words = {};                                   // 用户自补的词义：按时间戳取新
+    for (const k of new Set([...Object.keys(A.words), ...Object.keys(B.words)])) {
+      const x = A.words[k] || {}, y = B.words[k] || {};
+      const v = n0(y.u) > n0(x.u) ? y : x;
+      if (v && v.m) out.words[k] = v;
     }
     out.notes = {};
     for (const k of new Set([...Object.keys(A.notes), ...Object.keys(B.notes)])) {
@@ -1417,7 +1558,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     return out;
   }
   const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {},
-    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, clearedAt: n0(o.clearedAt) });
+    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, words: o.words || {}, clearedAt: n0(o.clearedAt) });
 
   /** 合并后多出来的导入曲目，挂进内存里的曲库 */
   function registerImpTracks() {
@@ -1480,11 +1621,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const logged = !!(ACC && ACC.token);
     const who = logged ? '账号 ' + esc(ACC.name) : '未登录';
     if (!logged) return '未登录';
-    if (S.autoSync === false) return '云端：自动同步已关 · ' + who;
-    if (syncBusy) return '云端：同步中… · ' + who;
-    if (syncErr) return '云端：上次同步失败（' + esc(syncErr) + '），有改动会自动重试 · ' + who;
-    if (S.syncAt) return '云端：已自动同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who;
-    return '云端：等着第一次同步… · ' + who;
+    if (S.autoSync === false) return '同步已关 · ' + who;
+    if (syncBusy) return '同步中… · ' + who;
+    if (syncErr) return '同步失败：' + esc(syncErr) + ' · ' + who;
+    if (S.syncAt) return '已同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who;
+    return '等待同步… · ' + who;
   }
 
   // ────────────── 账号（注册 / 登录 / 退出 / 改密码） ──────────────
@@ -1530,7 +1671,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     } catch (e) { setLoad(false); toast('读取失败：' + e.message); }
   }
   async function adminDelete(key) {
-    if (!confirm('删除 ' + key + ' ？删了就找不回来了')) return;
+    if (!confirm('删除 ' + key + ' ？')) return;
     try {
       await apiCall('/admin/delete', { method: 'POST', body: { key } });
       toast('已删除 ' + key);
@@ -1571,6 +1712,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const g = $('gate'); if (g) g.hidden = true;
     document.body.classList.remove('gated');
     route();
+    // 开屏公告：从闸门登录/注册进来时 boot 早就 return 了，这里补一次检查
+    if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);
   }
   function showGate(msg) {
     const g = $('gate'); if (!g) return;
@@ -1805,7 +1948,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if ($('plgo')) $('plgo').disabled = false;
     if (res.error) { impState.msg = res.error; if (stat) stat.textContent = res.error; return; }
     const bits = [`入库 ${res.ok.length} 首`];
-    if (res.noAudio) bits.push(`${res.noAudio} 首暂无音源（会员曲等，可在单曲页绑）`);
+    if (res.noAudio) bits.push(`${res.noAudio} 首暂无音源`);
     if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
     impState.msg = `${res.plName || ''} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
@@ -1876,6 +2019,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       </div>
       <div class="row" style="margin:2px 0 0">
         <input id="qs" class="sel" style="flex:1;min-width:150px;height:34px" placeholder="搜曲名 / 社团 / 专辑" value="${esc(songQ)}">
+        ${curTrack ? '<button class="toolbtn on" id="jump-cur">正在播放</button>' : ''}
         <select id="tsort" class="sel" style="height:34px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
       </div>
       <div class="chips">
@@ -1917,9 +2061,12 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch {} }
     };
     $('view-songs').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
-      if (e.target.closest('[data-del]')) return;
+      if (e.target.closest('[data-del]') || e.target.closest('[data-cur]')) return;
       go('#/track/' + el.dataset.id);
     }));
+    $('view-songs').querySelectorAll('[data-cur]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); openPlayer(); }));
+    if ($('jump-cur')) $('jump-cur').onclick = () => openPlayer();
+    markCurRows();
     $('view-songs').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); }));
     if ($('plgo')) $('plgo').onclick = () => startImport();
     if ($('plchk')) $('plchk').onclick = () => checkPlaylists({ manual: true });
@@ -2001,14 +2148,27 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // ────────────── 我的（账号 / 主题 / 数据） ──────────────
   let shMsg = '';                                          // 分享码的结果提示（重渲染后还在）
   // ── App 自更新（只有原生壳）：读远端 apk.json → 比版本号 → 原生下载 + 系统安装 ──
-  let apkRemote = null, apkCheckedAt = 0;
+  let apkRemote = null, apkCheckedAt = 0, updIgnoredOnce = '';
   const apkNewer = () => !!(apkRemote && apkRemote.version && String(apkRemote.version) > V);
+  function showUpdateDialog() {
+    const v = apkRemote.version;
+    showDialog({
+      title: '发现新版本 ' + v,
+      body: apkRemote.notes ? esc(String(apkRemote.notes)).replace(/\n/g, '<br>') : '',
+      actions: [
+        { label: '更新', kind: 'main', onClick: () => installApk() },
+        { label: '忽略这次', onClick: () => { updIgnoredOnce = v; } },
+        { label: '忽略 ' + v, onClick: () => { S.updSkip = v; save(); if (location.hash.startsWith('#/me')) renderMe(); } },
+      ],
+    });
+  }
   async function checkApk(manual) {
     if (!appUpdater.available) { if (manual) toast('网页版请到「我的 → 安卓 App → 下载 APK」'); return; }
     try { apkRemote = await appUpdater.check(); apkCheckedAt = Date.now(); }
     catch (e) { if (manual) toast('检查更新失败：' + ((e && e.message) || e)); return; }
-    if (apkNewer()) toast(manual ? `发现新版本 ${apkRemote.version}，点「下载并安装」` : `有新版本 ${apkRemote.version}：我的 → 检查更新`);
-    else if (manual) toast('已经是最新版本（' + V + '）');
+    if (apkNewer()) {
+      if (manual || (S.updSkip !== apkRemote.version && updIgnoredOnce !== apkRemote.version)) showUpdateDialog();
+    } else if (manual) toast('已经是最新版本（' + V + '）');
     if (location.hash.startsWith('#/me')) renderMe();
   }
   async function installApk() {
@@ -2047,20 +2207,19 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
       </div>
       ${IS_NATIVE ? `<div class="sect">更新</div>
-      <div class="setrow"><div class="k">当前版本<small>${V}${apkCheckedAt ? ' · 上次检查 ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
+      <div class="updrow"><div class="k"><b>当前版本</b><small>${V}${apkCheckedAt ? ' · ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
         <button class="toolbtn" id="me-upd">检查更新</button></div>
-      ${apkNewer() ? `<div class="setrow"><div class="k">新版本 ${esc(apkRemote.version)}<small>${esc(apkRemote.notes || '')}</small></div>
+      ${apkNewer() && S.updSkip !== apkRemote.version ? `<div class="updrow"><div class="k"><b>新版本 ${esc(apkRemote.version)}</b><small>${esc(apkRemote.notes || '')}</small></div>
         <button class="toolbtn on" id="me-upd-go">下载并安装</button></div>` : ''}` : `<div class="sect">安卓 App</div>
-      <div class="setrow"><div class="k">装到手机上<small>后台播放 · 锁屏控制 · 本机音源；网页版数据可登录同一账号同步</small></div>
-        <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">下载 APK</a></div>
-      <div class="meta" style="margin-top:6px">下载后点开安装即可（首次需要在系统里允许「安装未知来源应用」）。
-        下不动就用<a href="${APK_URL_BACKUP}" rel="noopener">备用地址</a>。</div>`}
+      <div class="setrow"><div class="k">装到手机上</div>
+        <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">下载 APK</a>
+        <a class="toolbtn" href="${APK_URL_BACKUP}" rel="noopener">备用</a></div>`}
       <div class="sect">数据</div>
-      <div class="setrow"><div class="k">导出 / 导入<small>JSON 文件，备份或换设备</small></div>
+      <div class="setrow"><div class="k">导出 / 导入</div>
         <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
-      <div class="setrow"><div class="k">清空进度<small>导入的歌保留</small></div><button class="btn-danger" id="m-clear">清空</button></div>
+      <div class="setrow"><div class="k">清空进度</div><button class="btn-danger" id="m-clear">清空</button></div>
       <div class="sect">分享歌单</div>
-      <textarea class="code" id="sh-code" placeholder="「生成分享码」复制给别人；别人给的粘这里再点「导入分享码」"></textarea>
+      <textarea class="code" id="sh-code" placeholder="分享码"></textarea>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="sh-gen">生成分享码</button>
         <button class="toolbtn on" id="sh-imp">导入分享码</button>
@@ -2107,7 +2266,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
-    if ($('m-clear')) $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清（导入的歌保留）')) return; S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.clearedAt = Date.now(); save(); renderMe(); };
+    if ($('m-clear')) $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清')) return; S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.clearedAt = Date.now(); save(); renderMe(); };
     const shStat = $('sh-stat');
     if ($('sh-gen')) $('sh-gen').onclick = async () => {
       const code = shareCode();
@@ -2179,7 +2338,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       <div class="bar" style="margin:14px 0 0"><i style="width:${level(v) * 20}%"></i></div>
       <div style="font-size:17px;margin-top:14px;color:#ffe9df" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
       <div class="row" style="margin-top:14px">
-        <button class="btn-primary" id="w-play">🔊 读这个词</button>
+        <button class="btn-primary" id="w-play">🔊 发音</button>
         <button class="toolbtn ${isKnown(v) ? 'on' : ''}" id="w-known">${isKnown(v) ? '已掌握' : '标为已掌握'}</button>
         <button class="toolbtn" id="w-edit">改释义</button>
       </div>
@@ -2190,12 +2349,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       ${forms.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">词形</div><div class="chips">${forms.map(([f, o]) => `<span class="chip">${esc(f)}${o.readingHira ? '（' + esc(o.readingHira) + '）' : ''}</span>`).join('')}</div>` : ''}
       <div class="hair"></div>
       <div class="sec-sub" style="margin-bottom:6px">它出现在这些句子里</div>
-      <div class="list">${exs.length ? exs.map((ex) => `<div class="item" style="align-items:flex-start">
-        <div class="col"><div class="l1" style="font-weight:400;font-size:14.5px;white-space:normal">${esc(ex.jp)}</div>
-        ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${esc(ex.zh)}</div>` : ''}
-        <div class="l3">${ex.now ? '正在听：' : ''}${esc(ex.track || '')}${(() => { const t = TRACK.get(ex.tid); return (t && (t.audioOss || t.audio || S.audio[t.id])) ? '' : ' · 无音频'; })()}</div></div>
-        ${ex.tid ? `<button class="toolbtn" data-goto="${ex.tid}@${ex.li}">去这句</button>` : ''}</div>`).join('') : '<div class="meta">曲库里还没有这个词的例句</div>'}</div>`;
-    $('w-back').onclick = () => history.length > 1 ? history.back() : go('#/learn');
+      <div class="list">${exs.length ? exs.map(exRowHtml).join('') : '<div class="meta">曲库里还没有这个词的例句</div>'}</div>`;
+    $('w-back').onclick = () => goBack('#/learn');
     $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.goWord)));
     $('w-play').onclick = () => speak(v.word);
     $('w-known').onclick = () => { toggleKnown(v); showWord(v.id); };
@@ -2203,10 +2358,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     const saveMean = () => { S.notes[v.id] = Object.assign({}, S.notes[v.id], { meaning: $('w-editinput').value.trim(), u: Date.now() }); save(); showWord(v.id); };
     $('w-save').onclick = saveMean;
     $('w-editinput').onkeydown = (e) => { if (e.key === 'Enter') saveMean(); };
-    $('view-word').querySelectorAll('[data-goto]').forEach((el) => (el.onclick = () => {
-      const [tid, li] = el.dataset.goto.split('@');
-      go('#/track/' + tid + '@' + li);
-    }));
+    bindPreviewRows($('view-word'));
   }
 
   // ────────────── 检索 ──────────────
@@ -2244,9 +2396,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     if ($('ssort')) $('ssort').onchange = (e) => { S.tSort = e.target.value; save(); showSearch(q); };
     wireWords($('view-search'));
     $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
-      if (e.target.closest('[data-del]')) return;
+      if (e.target.closest('[data-del]') || e.target.closest('[data-cur]')) return;
       go('#/track/' + el.dataset.id);
     }));
+    $('view-search').querySelectorAll('[data-cur]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); openPlayer(); }));
+    markCurRows();
     $('view-search').querySelectorAll('[data-del]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); delImpTrack(el.dataset.del); if (!IDX.tracks.some((t) => t.id === el.dataset.del)) showSearch(q); }));
     $('view-search').querySelectorAll('[data-base]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.base; go('#/search/' + encodeURIComponent(el.dataset.base)); }));
     $('view-search').querySelectorAll('[data-artist]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.artist; go('#/search/' + encodeURIComponent(el.dataset.artist)); }));
@@ -2286,8 +2440,10 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     host.querySelectorAll('[data-line]').forEach((el) => (el.onclick = (e) => {
       e.stopPropagation();
       const i = Number(el.dataset.line);
+      $('player').classList.add('on');                 // 先开页，不然歌词区没布局，滚动算不准
+      renderLyrics($('plyric'), curTrack); bindLyrics($('plyric'));
       setLoop(i);
-      $('player').classList.add('on');
+      setTimeout(() => highlight(true), 420);          // 等全屏动画（0.3s）走完再滚到那一句
     }));
     host.querySelectorAll('.word').forEach((el) => (el.onclick = (e) => { if (!e.target.closest('[data-line]')) go('#/word/' + el.dataset.id); }));
   }
@@ -2404,15 +2560,25 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     host.addEventListener('touchend', () => clearTimeout(pressTimer));
     host.addEventListener('touchmove', () => clearTimeout(pressTimer));
   }
+  // 重播/续播标记：只有「播放器里切歌」「首页继续」「播完自动下一首」才自动出声；
+  // 点进学词页一律不播（用户要求：只有点「进入跟唱」才开始）。
+  let pendingPlayId = '', pendingResumeId = '';
   function showTrack(id, atIdx) {
     const t = TRACK.get(id);
     if (!t) { go('#/learn'); return; }
-    curTrack = t; curLines = t.lines; loopLine = null;
-    if (t.imp) refreshSegsFor(t.id);            // 老分词结果按需重算（只算这一首）
+    const same = !!(curTrack && curTrack.id === t.id);
+    const auto = pendingPlayId === t.id;
+    const resume = pendingResumeId === t.id;
+    pendingPlayId = ''; pendingResumeId = '';
+    if (!same) {
+      if (!auto) { try { audio.pause(); } catch {} }     // 切到别的曲目但不自动出声
+      curTrack = t; curLines = t.lines || []; loopLine = null; activeLine = -1;
+      if (t.imp) refreshSegsFor(t.id);                   // 老分词结果按需重算（只算这一首）
+    } else {
+      curLines = t.lines || [];
+    }
     S.lastTrack = t.id; save();
-    audio.pause();
     const zhN = t.lines.filter((l) => l.zh).length;
-    const knownN = (t.vocabIds || []).filter((i) => Number(S.known[i]) > 0).length;
     $('view-track').innerHTML = `
       <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">← 返回</button></div>
       <div class="item" style="border:0;padding:0 0 12px;cursor:default">
@@ -2439,14 +2605,18 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <div class="list" id="twlist"></div>
       </div>`;
     twFilter = 'all';
-    $('t-sing').onclick = () => { openPlayer(); if (!audio.src || audio.getAttribute('data-tid') !== t.id) playTrack(t); };
+    $('t-sing').onclick = () => {
+      openPlayer();
+      if (audio.getAttribute('data-tid') === t.id && audio.src) { if (audio.paused) audio.play().catch(() => {}); }
+      else playTrack(t);                                 // 第一次进这首：从 0 开始
+    };
     $('t-fav').onclick = () => { toggleMark('fav', t.id); showTrack(t.id); };
     $('t-mark').onclick = () => { toggleMark('sing', t.id); showTrack(t.id); };
     renderTrackWords();
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
-    $('b-back').onclick = () => history.length > 1 ? history.back() : go('#/songs');
+    $('b-back').onclick = () => goBack('#/songs');
     $('p-title').textContent = t.title; $('p-artist').textContent = t.artist + ' · ' + t.album;
-    const pc = $('p-cover');                       // 全屏页头部也给一张封面，别只有一行字
+    const pc = $('p-cover');                             // 全屏页头部也给一张封面，别只有一行字
     if (pc) {
       const psrc = t.coverFile ? 'data/' + t.coverFile : httpsImg(t.coverUrl);
       if (psrc) { pc.src = psrc; pc.hidden = false; } else { pc.removeAttribute('src'); pc.hidden = true; }
@@ -2462,17 +2632,47 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('srcinfo').textContent = describeSource(t);
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
     if ($('p-nosrc')) $('p-nosrc').hidden = !!(t.audioOss || t.audio || S.audio[t.id]);
-    activeLine = -1; loopLine = null;
+    if (!same) { activeLine = -1; loopLine = null; }
     applyControls();
     if (!raf) raf = requestAnimationFrame(frame);
     renderLyrics($('plyric'), t); bindLyrics($('plyric'));   // 先进跟唱页时就绪，不白屏
-    prepAudio(t);
-    if (atIdx != null && Number.isFinite(atIdx)) { $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric')); playTrack(t).then(() => setLoop(atIdx)); }
-    else {
+    if (atIdx != null && Number.isFinite(Number(atIdx))) {
+      $('player').classList.add('on'); renderLyrics($('plyric'), t); bindLyrics($('plyric'));
+      // 先把「当前句」定到目标句并高亮/滚动：解析音频可能要 1~3 秒，不能让用户干等
+      loopLine = atIdx; activeLine = atIdx;
+      if (mode !== 'loop') { mode = 'loop'; S.mode = mode; save(); applyControls(); }
+      const mb0 = $('mb-loop'); if (mb0) mb0.hidden = false;
+      highlight(false);
+      setTimeout(() => highlight(true), 420);
+      playTrack(t).then(() => setLoop(atIdx));            // 音频就绪后再跳到那句的时间轴
+    } else if (auto) {
       const p0 = (S.pos || {})[t.id];
-      playTrack(t);                                  // 点开就出声（不再让人再点一次「进入跟唱」）
-      if (p0 > 5) { jump(p0); toast(`接着上次听：${fmt(p0)}`); }
+      playTrack(t, resume && p0 > 5 ? { at: p0 } : {});
+      if (resume && p0 > 5) toast('上次听到 ' + fmt(p0));
+    } else {
+      prepAudio(t);                                       // 只准备，不出声
+      if (!(audio.getAttribute('data-tid') === t.id && audio.src && !audio.paused)) setState('点播放开始');
     }
+    markCurRows();
+  }
+  /** 开屏恢复：把上次那首挂到播放条上（暂停状态），首页/开屏页也能看到播放器 */
+  function restoreBar() {
+    const t = S.lastTrack && TRACK.get(S.lastTrack);
+    if (!t) return;
+    curTrack = t; curLines = t.lines || [];
+    setNow(t.title + ' — ' + t.artist);
+    const p0 = (S.pos || {})[t.id];
+    setState(p0 > 5 ? '上次听到 ' + fmt(p0) : '点播放开始');
+    const mbCover = $('mb-cover');
+    if (mbCover) {
+      const src = t.coverFile ? 'data/' + t.coverFile : httpsImg(t.coverUrl);
+      if (src) { mbCover.src = src; mbCover.hidden = false; }
+      else { mbCover.removeAttribute('src'); mbCover.hidden = true; }
+    }
+    $('p-title').textContent = t.title;
+    $('p-artist').textContent = t.artist + ' · ' + (t.album || '');
+    $('minibar').classList.add('on');
+    markCurRows();
   }
   function describeSource(t) {
     if (t.audioOss) return `音频：阿里云 OSS`;
@@ -2508,37 +2708,46 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     popPos = (seg && seg.li != null && seg.ti != null && curTrack) ? { tid: curTrack.id, li: seg.li, ti: seg.ti } : null;
     const on = (id) => { const el = $(id); if (el) el.style.display = ''; };
     if (!w) {
+      popWord = null;                                   // 必须清掉：否则补释义会写到上一个查过的词上
       const rd = (seg && seg.r) ? norm(seg.r) : '';
+      const mine = userWord(seg, fallback);
       $('p-word').textContent = fallback || '';
       $('p-reading').textContent = rd ? '（' + rd + '）' : '';
       $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || (seg && seg.y) || '';
-      $('p-meaning').textContent = rd ? '词表未收录' : '词表未收录，也没查到读音';
-      $('p-ex').textContent = ''; $('p-meta').textContent = '';
-      $('p-known').style.display = 'none'; $('p-goto').style.display = 'none';
-      $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none'; $('p-edit').style.display = 'none';
-      if ($('p-morebox')) $('p-morebox').hidden = true;
+      $('p-meaning').textContent = (mine && mine.m) || '暂无释义';
+      $('p-ex').innerHTML = '';
+      $('p-meta').textContent = [POSNAME[seg && seg.k], mine ? '自补释义' : ''].filter(Boolean).join(' · ');
+      $('p-known').style.display = 'none';
+      $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none';
+      $('p-edit').style.display = '';                       // 允许补一条释义（存本机 + 跟账号同步）
+      $('p-edit').textContent = (mine && mine.m) ? '改释义' : '补一条释义';
+      if ($('p-morebox')) $('p-morebox').hidden = false;     // 「补一条释义」在更多里，别藏起来
+      if ($('p-more')) $('p-more').style.display = 'none';
+      bindPreviewRows($('pop'));
       $('pop').classList.add('on'); return;
     }
     popWord = w;
-    ['p-known', 'p-goto', 'p-detail', 'p-lines', 'p-edit'].forEach(on);
+    ['p-known', 'p-detail', 'p-lines', 'p-edit'].forEach(on);
     if ($('p-morebox')) $('p-morebox').hidden = true;
-    const exG = examplesFor(w, 1)[0];
-    if ($('p-goto')) $('p-goto').style.display = exG && exG.tid ? '' : 'none';
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
-    const ex = exG;
-    $('p-ex').textContent = ex ? `例句（${ex.track}）：${ex.jp}${ex.zh ? ' → ' + ex.zh : ''}` : '';
+    const ex = examplesFor(w, 1)[0];
+    $('p-ex').innerHTML = ex ? exRowHtml(ex) : '';
     const st = libStat(w);
     $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), st ? `${st.tracks.size} 首歌 / ${st.n} 次` : ''].filter(Boolean).join(' · ');
     $('p-known').textContent = isKnown(w) ? '取消已掌握' : '标为已掌握';
+    if ($('p-edit')) $('p-edit').textContent = '改释义';
+    if ($('p-more')) $('p-more').style.display = '';
     $('p-editrow').style.display = 'none';
+    bindPreviewRows($('pop'));
     $('pop').classList.add('on');
   }
   /** 关弹层：顺手收起罗马音编辑器；抽屉弹出时暂停的播放，在这里续上 */
   const hidePop = (keepPaused) => {
     const skip = keepPaused === true;               // ⚠️ 会被当 onclick 用，参数可能是 MouseEvent，必须判 === true
+    pvStop(false);
     const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; }
     closeRomaEditor();
     $('pop').classList.remove('on');
@@ -2559,6 +2768,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
   // ────────────── 路由 ──────────────
   const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-me', 'view-admin', 'view-word', 'view-track', 'view-search', 'view-review'];
   function show(which) {
+    try { pvStop(); } catch {}
     const avd = $('avdrop'); if (avd) avd.hidden = true;
     // 首页已经自带次级入口了，全局 tab 行在首页收起来（别让两排入口抢注意力）
     if ($('tabs')) $('tabs').hidden = (which === 'view-home');
@@ -2570,7 +2780,43 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     ['tab-learn', 'tab-songs', 'tab-mine', 'tab-me'].forEach((t) => { const el = $(t); if (el) el.classList.toggle('on', map[which] === t); });
     window.scrollTo(0, 0);
   }
-  const go = (h) => { location.hash = h; };
+  const go = (h) => { if (String(h || '') !== location.hash) armAllowLeave(); location.hash = h; };        // 自己点的导航不算误触
+  const goBack = (fallback) => { armAllowLeave(); if (history.length > 1) history.back(); else go(fallback); };
+
+  // ── 离开学词/跟唱页的二次确认（防左划误触退出；播放不打断）──
+  // 路由是 hash：#/track/... → 主 tab 时先弹确认；全屏播放器开着时返回手势只收播放器。
+  let navFrom = '#/home', allowLeaveGuard = false, leaveT = null;
+  function armAllowLeave() { allowLeaveGuard = true; clearTimeout(leaveT); leaveT = setTimeout(() => { allowLeaveGuard = false; }, 900); }
+  const LEAVING_TABS = /^#\/(home|learn|songs|mine|me|search|review|admin)(\/|$)/;
+  if (typeof window !== 'undefined') window.__tlGuard = () => ({ navFrom, allow: allowLeaveGuard, noGuard: !!window.__NO_GUARD });
+  function onNavGuard(e) {
+    const to = location.hash || '#/home';
+    if (typeof window !== 'undefined' && window.__NO_GUARD) { navFrom = to; return; }   // 自动化测试用：关掉二次确认
+    if (allowLeaveGuard) { allowLeaveGuard = false; navFrom = to; return; }             // 自己点的导航：无条件放行一次
+    const from = navFrom;
+    navFrom = to;
+    if (to === from) return;
+    const pl = $('player');
+    if (from.startsWith('#/track/') && pl && pl.classList.contains('on')) {
+      // 全屏跟唱页开着：返回手势只收播放器，不离开学词页
+      pl.classList.remove('on');
+      allowLeaveGuard = true; go(from);
+      return;
+    }
+    if (from.startsWith('#/track/') && LEAVING_TABS.test(to)) {
+      const tr = curTrack;
+      showDialog({
+        title: '要退出学词页吗？',
+        body: tr ? esc(tr.title) : '',
+        actions: [
+          { label: '继续听', kind: 'main', onClick: () => { go(from); } },   // 回学词页；播放没被动过
+          { label: '退出', onClick: () => {} },                              // 已经离开，保持现状
+        ],
+      });
+      return;
+    }
+  }
+
   function route() {
     const raw = decodeURIComponent(String(location.hash || '').replace(/^#\/?/, ''));
     const [path, at] = raw.split('@');
@@ -2653,8 +2899,12 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();
     $('mb-loop').onclick = (e) => { e.stopPropagation(); setMode('all'); toast('已退出单句循环'); };
+    $('mb-prev').onclick = (e) => { e.stopPropagation(); stepTrack(-1); };
+    $('mb-next').onclick = (e) => { e.stopPropagation(); stepTrack(1); };
     $('p-close').onclick = () => $('player').classList.remove('on');
     $('p-play').onclick = () => togglePlay();
+    $('p-ptrack').onclick = () => stepTrack(-1);
+    $('p-ntrack').onclick = () => stepTrack(1);
     $('p-prev').onclick = () => step(-1);
     $('p-next').onclick = () => step(1);
     // 单句 / 全曲：合成一个开关，点一下换边（两个半区都看得见当前是哪一档）
@@ -2683,7 +2933,18 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       const r = $('p-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none';
       $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus();
     };
-    $('p-editinput').onkeydown = (e) => { if (e.key !== 'Enter' || !popWord) return; S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: e.target.value.trim(), u: Date.now() }); save(); showPop(popWord); };
+    $('p-editinput').onkeydown = (e) => {
+      if (e.key !== 'Enter') return;
+      const text = e.target.value.trim();
+      if (!text) return;
+      if (popWord) { S.notes[popWord.id] = Object.assign({}, S.notes[popWord.id], { meaning: text, u: Date.now() }); save(); showPop(popWord); refreshLyricsNow(); return; }
+      if (popFallback) {                                    // 词表没收录的词：自己补一条
+        setUserWord(popSeg, popFallback, text);
+        refreshLyricsNow();
+        showPop(null, popFallback, popSeg);
+        toast('已记下：' + popFallback + ' = ' + text);
+      }
+    };
     $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) renderLyrics($('plyric'), curTrack); };
     $('p-more').onclick = () => { const b = $('p-morebox'); if (b) b.hidden = !b.hidden; };
     // ── 罗马音纠正：打开时暂停播放，保存/关闭后继续 ──
@@ -2697,7 +2958,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('p-roma').onclick = () => {
       const t = romaTarget(); if (!t) return;
       romaCtx = t;
-      if (romaboxHint()) romaboxHint().textContent = popWasPlaying ? '播放已暂停，收起抽屉后继续' : '播放本来就是停着的';
+      if (romaboxHint()) romaboxHint().textContent = popWasPlaying ? '暂停中' : '选一个，或自己写';
       const box = $('p-romabox'); if (box) box.hidden = false;
       $('p-romainput').value = romaOf(t.tid, t.li, t.ti) || (t.seg && t.seg.y) || (t.w && t.w.romaji) || '';
       $('p-romacands').dataset.hint = (t.seg && t.seg.s) || t.surface;
@@ -2720,32 +2981,25 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     $('p-romasave').onclick = () => saveRoma(false);
     $('p-romareset').onclick = () => saveRoma(true);
     $('p-romainput').onkeydown = (e) => { if (e.key === 'Enter') saveRoma(false); };
-    $('p-goto').onclick = () => {
-      if (!popWord) return;
-      const ex = examplesFor(popWord, 1)[0];
-      if (!ex || !ex.tid) { toast('曲库里还没有这个词的例句'); return; }
-      hidePop(true);                                  // 马上要跳去别的歌，这里不用续播
-      go('#/track/' + ex.tid + '@' + ex.li);
-    };
     $('p-lines').onclick = () => {
       if (!popWord) return;
       const box = $('p-exlist');
       if (!box) return;
       if (box.dataset.on === '1') { box.innerHTML = ''; box.dataset.on = '0'; return; }
-      const here = curTrack ? curTrack.lines.filter((l) => (l.segs || []).some((s) => s.w && s.b === popWord.word)).slice(0, 3) : [];
+      const here = curTrack ? curTrack.lines.map((l, i) => ({ l, i })).filter((x) => (x.l.segs || []).some((s) => s.w && s.b === popWord.word)).slice(0, 3) : [];
       const others = examplesFor(popWord, 5).filter((x) => !x.now);
       box.dataset.on = '1';
-      const row = (jp, zh, meta, cue) => `<div class="item" style="cursor:default">
-        <div class="col"><div class="l1" style="font-size:var(--fs-sub);font-weight:400;white-space:normal">${esc(jp)}</div>
-        ${zh ? `<div class="l2">${esc(zh)}</div>` : ''}${meta ? `<div class="l3">${esc(meta)}</div>` : ''}</div>
-        ${cue ? `<button class="toolbtn" data-cue="${esc(cue)}">去这句</button>` : ''}</div>`;
       box.innerHTML =
-        (here.length ? `<div class="mt">正在听的这首里</div><div class="list">${here.map((l) => row(l.text, l.zh, '', curTrack.id + '@' + curLines.indexOf(l))).join('')}</div>` : '')
-        + (others.length ? `<div class="mt">其它曲目里</div><div class="list">${others.map((ex) => row(ex.jp, ex.zh, ex.track, ex.tid ? ex.tid + '@' + (ex.li || 0) : '')).join('')}</div>` : '')
+        (here.length ? `<div class="mt">正在听的这首里</div><div class="list">${here.map((x) => exRowHtml({ jp: x.l.text, zh: x.l.zh, track: '', tid: curTrack.id, li: x.i, now: true })).join('')}</div>` : '')
+        + (others.length ? `<div class="mt">其它曲目里</div><div class="list">${others.map(exRowHtml).join('')}</div>` : '')
         + ((!here.length && !others.length) ? '<div class="mt">曲库里还没有这个词的例句</div>' : '');
-      box.querySelectorAll('[data-cue]').forEach((el) => (el.onclick = () => { const [tid, li] = el.dataset.cue.split('@'); if (!tid) return; hidePop(); go('#/track/' + tid + '@' + li); }));
+      bindPreviewRows(box);
     };
-    document.addEventListener('click', (e) => { if (!e.target.closest('#pop') && !e.target.closest('.w') && !e.target.closest('[data-known]')) hidePop(); });
+    document.addEventListener('click', (e) => {
+      const p = $('pop');
+      if (!p || !p.classList.contains('on')) return;     // 抽屉没开就别 hidePop：会把例句试听一起停掉
+      if (!e.target.closest('#pop') && !e.target.closest('.w') && !e.target.closest('[data-known]')) hidePop();
+    });
 
     // 抽屉开着时，点外面那一下**只用来关抽屉**，不能穿透到下面的歌词（否则会"顺手跳到那一句"）。
     // 必须在 click 的**捕获阶段**吞掉：pointerdown 拦不住后续的 click，而 #plyric 的处理函数是 click。
@@ -2835,14 +3089,21 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     };
     function togglePlay() {
       if (!curTrack) return;
-      if (audio.getAttribute('data-tid') !== curTrack.id || !audio.src) { playTrack(curTrack); return; }
+      if (audio.getAttribute('data-tid') !== curTrack.id || !audio.src) {
+        const p0 = (S.pos || {})[curTrack.id];
+        playTrack(curTrack, p0 > 5 ? { at: p0 } : {});     // 开屏恢复的那首：从上次听到的地方继续
+        return;
+      }
       if (audio.paused) { if (audio.error || audio.readyState === 0) playTrack(curTrack); else audio.play().catch(() => {}); }
       else audio.pause();
     }
     if (!location.hash) history.replaceState(null, '', '#/home');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
+    navFrom = location.hash || '#/home';
+    window.addEventListener('hashchange', onNavGuard);                 // 先挂守卫：误触退出要拦下来问一句
     window.addEventListener('hashchange', route);                     // 闸门也要挂：登录后靠它路由
     if (!ACC || !ACC.token) { showGate(); return; }   // 必须登录才能用
     route();
+    if (!location.hash.startsWith('#/track/')) restoreBar();   // 开屏页显示上次那首（暂停，点了才播）
     // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
     if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
     apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; ACC.avatar = r.user.avatar || ACC.avatar || ''; saveAcc(); renderAv(); if (location.hash.startsWith('#/mine')) renderMine(); else if (location.hash.startsWith('#/me') || location.hash.startsWith('#/admin')) route(); } }).catch(() => {});
