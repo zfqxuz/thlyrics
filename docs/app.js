@@ -1,5 +1,5 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt } from './platform/index.js?v=20261015u';
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater } from './platform/index.js?v=20261015v';
 
 (() => {
   'use strict';
@@ -1997,6 +1997,29 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
 
   // ────────────── 我的（账号 / 主题 / 数据） ──────────────
   let shMsg = '';                                          // 分享码的结果提示（重渲染后还在）
+  // ── App 自更新（只有原生壳）：读远端 apk.json → 比版本号 → 原生下载 + 系统安装 ──
+  let apkRemote = null, apkCheckedAt = 0;
+  const apkNewer = () => !!(apkRemote && apkRemote.version && String(apkRemote.version) > V);
+  async function checkApk(manual) {
+    if (!appUpdater.available) { if (manual) toast('网页版请到「我的 → 安卓 App → 下载 APK」'); return; }
+    try { apkRemote = await appUpdater.check(); apkCheckedAt = Date.now(); }
+    catch (e) { if (manual) toast('检查更新失败：' + ((e && e.message) || e)); return; }
+    if (apkNewer()) toast(manual ? `发现新版本 ${apkRemote.version}，点「下载并安装」` : `有新版本 ${apkRemote.version}：我的 → 检查更新`);
+    else if (manual) toast('已经是最新版本（' + V + '）');
+    if (location.hash.startsWith('#/me')) renderMe();
+  }
+  async function installApk() {
+    if (!apkRemote || !apkRemote.url) { toast('先点一次「检查更新」'); return; }
+    toast('开始下载 ' + apkRemote.version + '…');
+    try {
+      await appUpdater.install(apkRemote.url, apkRemote.version, (type, d) => {
+        if (type === 'progress') setState(`下载中 ${(d && d.pct != null) ? d.pct + '%' : '…'}`);
+        else if (type === 'done') setState('下载完成，请在系统界面点「安装」');
+        else if (type === 'error') setState('更新失败：' + ((d && d.message) || ''));
+      });
+    } catch (e) { toast('更新失败：' + ((e && e.message) || e)); }
+  }
+
   function renderMe() {
     const favN = Object.keys(S.fav || {}).filter((k) => Number(S.fav[k]) > 0).length;
     const singN = Object.keys(S.sing || {}).filter((k) => Number(S.sing[k]) > 0).length;
@@ -2020,7 +2043,11 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
         <button class="toolbtn" id="m-pull">从云端拉回</button>
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
       </div>
-      ${IS_NATIVE ? '' : `<div class="sect">安卓 App</div>
+      ${IS_NATIVE ? `<div class="sect">更新</div>
+      <div class="setrow"><div class="k">当前版本<small>${V}${apkCheckedAt ? ' · 上次检查 ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
+        <button class="toolbtn" id="me-upd">检查更新</button></div>
+      ${apkNewer() ? `<div class="setrow"><div class="k">新版本 ${esc(apkRemote.version)}<small>${esc(apkRemote.notes || '')}</small></div>
+        <button class="toolbtn on" id="me-upd-go">下载并安装</button></div>` : ''}` : `<div class="sect">安卓 App</div>
       <div class="setrow"><div class="k">装到手机上<small>后台播放 · 锁屏控制 · 本机音源；网页版数据可登录同一账号同步</small></div>
         <a class="toolbtn on" id="m-apk" href="${APK_URL}" rel="noopener">下载 APK</a></div>
       <div class="meta" style="margin-top:6px">下载后点开安装即可（首次需要在系统里允许「安装未知来源应用」）。</div>`}
@@ -2038,6 +2065,8 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
       <div class="meta" id="sh-stat" style="margin-top:8px">${esc(shMsg)}</div>
       ${ACC && ACC.admin ? `<div class="sect">管理员</div><div class="row" style="margin-top:8px"><button class="toolbtn" id="me-admin">OSS 文件管理</button></div>` : ''}`;
 
+    if ($('me-upd')) $('me-upd').onclick = () => checkApk(true);
+    if ($('me-upd-go')) $('me-upd-go').onclick = () => installApk();
     const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
     if (accReg) accReg.onclick = () => doAuth('reg');
     if (accLogin) accLogin.onclick = () => doAuth('login');
@@ -2816,6 +2845,7 @@ import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as ne
     // 老数据补分词：只补没有 segs 的（静默，慢一点没关系）；测试里不跑
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
     setTimeout(() => gcLocalAudio(), 3000);            // 清掉没人认领的本机音频副本
+    if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);   // 静默查一次新版本
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
     if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {
       setTimeout(() => checkPlaylists({ silent: true }), 9000);
