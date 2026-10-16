@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>β 视觉重设计预览</title>
+<style>
+:root{
+  --bg:#fbf7ee; --ink:#3a302a; --ink2:#756a5d; --accent:#b54a3b;
+  --hairline:rgba(74,58,42,.10); --paper:#f4eedf;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Hiragino Sans",sans-serif;line-height:1.7;padding:48px 24px;max-width:1080px;margin:0 auto}
+body.dark{--bg:#171a1f;--ink:#ede5d2;--ink2:#a8a294;--accent:#e0826a;--hairline:rgba(237,229,210,.08);--paper:#1c1f26}
+h1{font-family:"Hiragino Mincho ProN","Source Han Serif SC",serif;font-size:34px;letter-spacing:.02em;margin-bottom:8px}
+h1 .accent{color:var(--accent)}
+h2{font-family:"Hiragino Mincho ProN",serif;font-size:22px;font-weight:600;margin:48px 0 6px;padding-top:14px;border-top:1px solid var(--hairline)}
+.lead{color:var(--ink2);font-size:14px;margin-bottom:6px}
+.lead code{background:var(--paper);padding:1px 6px;border-radius:4px;font-size:12.5px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:12px}
+figure{margin:0;background:var(--paper);border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(74,58,42,.08)}
+body.dark figure{box-shadow:0 4px 16px rgba(0,0,0,.3)}
+figure img{display:block;width:100%;height:auto;background:#000}
+figcaption{font-size:12.5px;color:var(--ink2);padding:10px 14px;border-top:1px solid var(--hairline)}
+.toolbar{position:sticky;top:0;background:var(--bg);padding:14px 0;display:flex;gap:12px;align-items:center;margin-bottom:18px;border-bottom:1px solid var(--hairline)}
+.toolbar button{font-family:"Hiragino Mincho ProN",serif;padding:6px 14px;border:0;background:transparent;color:var(--ink2);font-size:13px;cursor:pointer;position:relative}
+.toolbar button.on{color:var(--ink);font-weight:600}
+.toolbar button.on::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent)}
+.toggle{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2)}
+.toggle button{padding:4px 12px;border-radius:999px;border:0;background:var(--paper);color:var(--ink);cursor:pointer;font-family:inherit}
+.toggle button.on{background:var(--accent);color:#fff8ec}
+.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--hairline);font-size:12px;color:var(--ink2);text-align:center;font-family:"Hiragino Mincho ProN",serif;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button class="on" data-tab="pages">页面</button>
+  <button data-tab="player">跟唱</button>
+  <button data-tab="notes">说明</button>
+  <div class="toggle">
+    <span>主题</span>
+    <button class="on" id="t-warm">暖纸</button>
+    <button id="t-dark">夜墨</button>
+  </div>
+</div>
+
+<h1>β 视觉重设计<span class="accent">。</span></h1>
+<p class="lead">日式轻小说风：思源宋衬线扉页 + 暖纸背景 + 文字下划线链接 + 扁平跟唱控件。</p>
+
+<h2 id="pages-title">5 个主路由</h2>
+<div class="row" id="pages">
+  <figure><img src="demo-warm-home.png"   alt=""><figcaption>首页 · warm</figcaption></figure>
+  <figure><img src="demo-warm-songs.png"  alt=""><figcaption>曲库 · warm</figcaption></figure>
+  <figure><img src="demo-warm-learn.png"  alt=""><figcaption>学词 · warm</figcaption></figure>
+  <figure><img src="demo-warm-mine.png"   alt=""><figcaption>生词本 · warm</figcaption></figure>
+  <figure><img src="demo-warm-me.png"     alt=""><figcaption>我的 · warm</figcaption></figure>
+</div>
+<div class="row" id="pages-dark" hidden>
+  <figure><img src="demo-dark-home.png"   alt=""><figcaption>首页 · dark</figcaption></figure>
+  <figure><img src="demo-dark-songs.png"  alt=""><figcaption>曲库 · dark</figcaption></figure>
+  <figure><img src="demo-dark-learn.png"  alt=""><figcaption>学词 · dark</figcaption></figure>
+  <figure><img src="demo-dark-mine.png"   alt=""><figcaption>生词本 · dark</figcaption></figure>
+  <figure><img src="demo-dark-me.png"     alt=""><figcaption>我的 · dark</figcaption></figure>
+</div>
+
+<h2 id="player-title">跟唱 + 词条弹层</h2>
+<div class="row" id="player">
+  <figure><img src="demo-warm-track.png"  alt=""><figcaption>单曲页 · warm</figcaption></figure>
+  <figure><img src="demo-warm-player.png" alt=""><figcaption>跟唱页 · warm</figcaption></figure>
+  <figure><img src="demo-warm-pop.png"    alt=""><figcaption>词条弹层 · warm</figcaption></figure>
+</div>
+<div class="row" id="player-dark" hidden>
+  <figure><img src="demo-dark-track.png"  alt=""><figcaption>单曲页 · dark</figcaption></figure>
+  <figure><img src="demo-dark-player.png" alt=""><figcaption>跟唱页 · dark</figcaption></figure>
+</div>
+
+<h2>设计要点</h2>
+<div class="row" id="notes" hidden>
+  <figure style="padding:18px;background:var(--paper)">
+    <figcaption style="border:0;padding:0;color:var(--ink);font-size:14px;line-height:1.85">
+      <b style="font-family:'Hiragino Mincho ProN',serif">调色</b><br>
+      warm：`#fbf7ee`（旧纸） · `#3a302a`（墨） · `#b54a3b`（柔朱）<br>
+      dark：`#171a1f`（夜墨） · `#ede5d2`（纸白） · `#e0826a`
+    </figcaption>
+  </figure>
+  <figure style="padding:18px;background:var(--paper)">
+    <figcaption style="border:0;padding:0;color:var(--ink);font-size:14px;line-height:1.85">
+      <b style="font-family:'Hiragino Mincho ProN',serif">字体</b><br>
+      标题/封面：`Hiragino Mincho ProN → 思源宋 → 游明朝`<br>
+      正文：`苹方/Noto Sans JP`，加 <code>font-feature-settings: "palt"</code> 让假名紧凑
+    </figcaption>
+  </figure>
+  <figure style="padding:18px;background:var(--paper)">
+    <figcaption style="border:0;padding:0;color:var(--ink);font-size:14px;line-height:1.85">
+      <b style="font-family:'Hiragino Mincho ProN',serif">去容器</b><br>
+      顶栏/Tabs/chip/按钮/词条弹层——全部去掉硬边框，改用文字色 + hover 极浅底色 + active 下划线
+    </figcaption>
+  </figure>
+  <figure style="padding:18px;background:var(--paper)">
+    <figcaption style="border:0;padding:0;color:var(--ink);font-size:14px;line-height:1.85">
+      <b style="font-family:'Hiragino Mincho ProN',serif">App 多端</b><br>
+      `colors.xml` 新增 paper/accent token；`MainActivity` edge-to-edge + 透明状态栏；CSS 用 <code>env(safe-area-inset-*)</code> 接管顶部安全区
+    </figcaption>
+  </figure>
+</div>
+
+<p class="foot">β · 20261017a · 等验收后合主干</p>
+
+<script>
+const tab = document.querySelectorAll('[data-tab]');
+const groups = {
+  pages: ['#pages-title','#pages', '#pages-dark'],
+  player: ['#player-title','#player', '#player-dark'],
+  notes: ['', '#notes'],
+};
+const groupsDark = { pages: '#pages-dark', player: '#player-dark' };
+function show(t) {
+  document.querySelectorAll('.row').forEach(el => el.hidden = true);
+  if (t === 'notes') { document.getElementById('notes').hidden = false; return; }
+  document.getElementById(t === 'pages' ? 'pages-title' : 'player-title').hidden = false;
+  document.getElementById(t).hidden = false;
+  const dark = document.body.classList.contains('dark');
+  const dk = document.getElementById(t + '-dark');
+  if (dk) dk.hidden = !dark;
+}
+tab.forEach(b => b.onclick = () => { tab.forEach(x => x.classList.toggle('on', x === b)); show(b.dataset.tab); });
+document.getElementById('t-warm').onclick = () => { document.body.classList.remove('dark'); document.getElementById('t-warm').classList.add('on'); document.getElementById('t-dark').classList.remove('on'); show(document.querySelector('[data-tab].on').dataset.tab); };
+document.getElementById('t-dark').onclick = () => { document.body.classList.add('dark'); document.getElementById('t-dark').classList.add('on'); document.getElementById('t-warm').classList.remove('on'); show(document.querySelector('[data-tab].on').dataset.tab); };
+</script>
+</body>
+</html>
