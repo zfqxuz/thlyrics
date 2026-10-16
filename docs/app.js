@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017g';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017g';
-import { icon } from './icons.js?v=20261017g';
+import { V } from './version.js?v=20261017k';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017k';
+import { icon } from './icons.js?v=20261017k';
 
 (() => {
   'use strict';
@@ -1118,7 +1118,7 @@ import { icon } from './icons.js?v=20261017g';
       host.querySelectorAll('.chip').forEach((el) => {
         const on = el.dataset.v === cur;
         el.classList.toggle('on', on);
-        el.onclick = () => { S[key] = el.dataset.v; save(); forgetScroll('view-learn'); if (key === 'dRange' || key === 'dPos') deckCount = 30; renderLearn(); };
+        el.onclick = () => { S[key] = el.dataset.v; save(); if (key === 'dRange' || key === 'dPos') deckCount = 30; renderLearn(); };
       });
     });
     $('d-hideknown').onclick = (e) => { S.hideKnown = S.hideKnown === false; save(); e.target.classList.toggle('on', S.hideKnown !== false); renderLearn(); };
@@ -2888,7 +2888,7 @@ import { icon } from './icons.js?v=20261017g';
     popPos = (seg && seg.li != null && seg.ti != null && curTrack) ? { tid: curTrack.id, li: seg.li, ti: seg.ti } : null;
     $('pop').classList.remove('expanded');                 // 每次打开都回到一阶段
     closeRomaEditor();                                     // 编辑器别残留
-    const row = $('p-editrow'); if (row) row.style.display = 'none';
+    const row = $('p-editrow'); if (row) row.hidden = true;
 
     if (!w) {
       popWord = null;                                      // 必须清掉：否则补释义会写到上一个查过的词上
@@ -2905,7 +2905,6 @@ import { icon } from './icons.js?v=20261017g';
       $('p-exlist').innerHTML = '<div class="mt">这个词是自补的，暂时没有例句</div>';
       bindPreviewRows($('pop'));
       $('pop').classList.add('on');
-      autoExpandIfTall();
       return;
     }
 
@@ -2916,14 +2915,14 @@ import { icon } from './icons.js?v=20261017g';
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
-    $('p-known').textContent = isKnown(w) ? '取消已掌握' : '标为已掌握';
+    $('p-known').classList.toggle('on', !!isKnown(w));
+    $('p-known').title = isKnown(w) ? '取消已掌握' : '标为已掌握';
     if ($('p-edit')) $('p-edit').textContent = '改释义';
     const st = libStat(w);
     $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), st ? `${st.tracks.size} 首歌 / ${st.n} 次` : ''].filter(Boolean).join(' · ');
     renderPopExamples();                                   // 「出现的句子」直接铺出来，不再藏在按钮后面
     bindPreviewRows($('pop'));
     $('pop').classList.add('on');
-    autoExpandIfTall();
   }
   /** 例句区块：正在听这首里的 + 其它曲目里的 */
   function renderPopExamples() {
@@ -2937,14 +2936,6 @@ import { icon } from './icons.js?v=20261017g';
       (here.length ? head('正在听的这首里') + `<div class="list">${here.map((x) => exRowHtml({ jp: x.l.text, zh: x.l.zh, track: '', tid: curTrack.id, li: x.i, now: true })).join('')}</div>` : '')
       + (others.length ? head('其它曲目里') + `<div class="list">${others.map(exRowHtml).join('')}</div>` : '')
       + ((!here.length && !others.length) ? '<div class="mt">曲库里还没有这个词的例句</div>' : '');
-  }
-  /** 一阶段就装得下的话，别显示「上拉看更多」（省得用户白拉一下） */
-  function autoExpandIfTall() {
-    const body = $('p-body'), sh = $('pop');
-    if (!body || !sh) return;
-    requestAnimationFrame(() => {
-      sh.classList.toggle('short', body.scrollHeight <= body.clientHeight + 6);
-    });
   }
   /** 关弹层：顺手收起罗马音编辑器；抽屉弹出时暂停的播放，在这里续上 */
   const hidePop = (keepPaused) => {
@@ -2969,58 +2960,17 @@ import { icon } from './icons.js?v=20261017g';
 
   // ────────────── 路由 ──────────────
   const VIEWS = ['view-home', 'view-learn', 'view-songs', 'view-mine', 'view-me', 'view-admin', 'view-word', 'view-track', 'view-search', 'view-review', 'view-voicepack'];
-  /** 列表页的浏览位置记忆：去详情页再回来要停在原处（用户要求），下拉刷新/换 tab 才重置 */
-  const scrollMem = new Map();          // viewId -> { y, at }
-  const scrollableOf = (viewId) => {
-    const el = $(viewId);
-    if (!el) return null;
-    // 页面里第一个可纵向滚动的子孙（歌词/词表的滚动容器），没有就用 window
-    const cand = [...el.querySelectorAll('*')].find((n) => {
-      const cs = getComputedStyle(n);
-      return /(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 4;
-    });
-    return cand || null;
-  };
-  function rememberScroll(which) {
-    if (!which) return;
-    const box = scrollableOf(which);
-    scrollMem.set(which, { y: window.scrollY, box: box ? box.scrollTop : 0, at: Date.now() });
-  }
-  function restoreScroll(which) {
-    const m = scrollMem.get(which);
-    if (!m) { window.scrollTo(0, 0); return; }
-    requestAnimationFrame(() => {
-      window.scrollTo(0, m.y || 0);
-      const box = scrollableOf(which);
-      if (box) box.scrollTop = m.box || 0;
-      // 内容还没铺完的话再补一次（词表是懒加载的）
-      setTimeout(() => {
-        window.scrollTo(0, m.y || 0);
-        const b2 = scrollableOf(which);
-        if (b2) b2.scrollTop = m.box || 0;
-      }, 90);
-    });
-  }
-  let curView = null;
-  function show(which, opts = {}) {
+  function show(which) {
     try { pvStop(); } catch {}
     const avd = $('avdrop'); if (avd) avd.hidden = true;
-    // 离开当前页时记下浏览位置（详情页/播放器不进记忆）
-    if (curView && curView !== which) rememberScroll(curView);
-    // 首页已经自带次级入口了，全局 tab 行在首页收起来（别让两排入口抢注意力）
     if ($('tabs')) $('tabs').hidden = (which === 'view-home');
-    // 音频配置不再挂在每个页面底部：只在生词本（设置）和单曲页出现
     const slot = $('srcslot');
-    if (slot) slot.hidden = !(which === 'view-me' || which === 'view-track');   // ⚠️ 别挪进 view：render* 会用 innerHTML 把它冲掉
+    if (slot) slot.hidden = !(which === 'view-me' || which === 'view-track');
     VIEWS.forEach((v) => { const el = $(v); if (el) el.hidden = v !== which; });
     const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine', 'view-me': 'tab-me', 'view-admin': 'tab-me' };
     ['tab-learn', 'tab-songs', 'tab-mine', 'tab-me'].forEach((t) => { const el = $(t); if (el) el.classList.toggle('on', map[which] === t); });
-    const keep = opts.keepScroll || ['view-word', 'view-track', 'view-search', 'view-review', 'view-voicepack', 'view-admin'].includes(which);
-    if (!keep) restoreScroll(which); else window.scrollTo(0, 0);
-    curView = which;
+    window.scrollTo(0, 0);
   }
-  /** 换筛选 / 排序时把当前页的位置清掉（避免下次回来跳到不相干的位置） */
-  const forgetScroll = (which) => { scrollMem.delete(which || curView); };
   const go = (h) => { if (String(h || '') !== location.hash) armAllowLeave(); location.hash = h; };        // 自己点的导航不算误触
   const goBack = (fallback) => { armAllowLeave(); if (history.length > 1) history.back(); else go(fallback); };
 
@@ -3123,8 +3073,8 @@ import { icon } from './icons.js?v=20261017g';
     const v = parts[0] || 'home';
     if (v !== 'track' && v !== 'word') lastMainHash = location.hash || '#/home';
     if (v !== 'search') lastNonSearch = '#/' + path;
-    if (v === 'word') { show('view-word', { keepScroll: true }); return showWord(parts[1]); }
-    if (v === 'track') { show('view-track', { keepScroll: true }); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
+    if (v === 'word') { show('view-word'); return showWord(parts[1]); }
+    if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
     if (v === 'search') { show('view-search'); $('searchwrap').classList.add('on'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
     if (v === 'home') { show('view-home'); return renderHome(); }
     if (v === 'review') { show('view-review'); return renderReview(); }
@@ -3230,18 +3180,27 @@ import { icon } from './icons.js?v=20261017g';
     $('p-speak').onclick = () => speak((popWord && (popWord.reading || popWord.word)) || (popSeg && popSeg.r) || popFallback);
     $('p-close2').onclick = hidePop;
     // 底部「上拉看更多」：点一下展开到 75%；展开态再点标题栏区域可收回
+    // 点释义就地改；点罗马音就地改 —— 取代原来那排「改释义 / 罗马音」链接
+    const mg = $('p-meaning');
+    if (mg) mg.onclick = () => { const e = $('p-edit'); if (e) e.onclick(); };
+    const rj = $('p-romaji');
+    if (rj) rj.onclick = () => { const e = $('p-roma'); if (e) e.onclick(); };
+
     const expandBtn = $('p-expand');
     if (expandBtn) expandBtn.onclick = () => {
       const sh = $('pop'); if (!sh) return;
       sh.classList.add('expanded');
-      $('p-body').scrollTop = 0;
+      const b = $('p-body'); if (b) b.scrollTop = 0;
     };
+    // 把手点一下 = 收起回一阶段（再点一下不会关抽屉，关闭走「更多」里的关闭或下拉）
     const grab = document.querySelector('#pop .grab');
     if (grab) grab.onclick = () => $('pop').classList.remove('expanded');
     $('p-edit').onclick = () => {
       if (!popWord) return;
-      const r = $('p-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none';
-      $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus();
+      const r = $('p-editrow');
+      const opening = r.hidden;
+      r.hidden = !opening;
+      if (opening) { $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus(); }
     };
     $('p-editinput').onkeydown = (e) => {
       if (e.key !== 'Enter') return;
@@ -3316,35 +3275,43 @@ import { icon } from './icons.js?v=20261017g';
       e.preventDefault();
     }, true);
 
-    // 底部抽屉拖拽：向上 = 展开到 75%；向下 = 先收起、再关掉
+    // 底部抽屉手势：只在「把手」和「上拉看更多」上跟手，且只跟向下 ——
+    // 之前挂在整块 .sheet 上，会在内部滚动词条时抢手势 → 卡顿/乱跳，向上拖还能把抽屉整个拎起来。
     (function sheetPull() {
       const sh = $('pop'); if (!sh) return;
-      let y0 = null, dy = 0, dragging = false;
-      sh.addEventListener('touchstart', (e) => {
-        if (e.target.closest('input,textarea,#p-romabox')) return;   // 编辑区里别抢手势
-        y0 = e.touches[0].clientY; dy = 0; dragging = false; sh.style.transition = '';
-      }, { passive: true });
-      sh.addEventListener('touchmove', (e) => {
+      const body = $('p-body');
+      const zones = [sh.querySelector('.grab'), $('p-expand')].filter(Boolean);
+      let y0 = null, dy = 0, raf = 0;
+      const paint = () => {
+        raf = 0;
+        // 只向下跟手；向上不给位移（靠松手后的 snap 展开）
+        sh.style.transform = dy > 0 ? `translateY(${dy}px)` : '';
+      };
+      const start = (e) => { y0 = e.touches[0].clientY; dy = 0; sh.style.transition = 'none'; };
+      const move = (e) => {
         if (y0 == null) return;
-        const y = e.touches[0].clientY; dy = y - y0;
-        if (!dragging && Math.abs(dy) < 10) return;
-        dragging = true;
-        sh.style.transition = 'none';
-        sh.style.transform = `translateY(${dy > 0 ? dy : dy * 0.35}px)`;
-        // 向下拉：收起态才允许继续往下（准备关闭）
-        if (dy > 0 && sh.classList.contains('expanded') && dy > 40) {}
-      }, { passive: true });
-      sh.addEventListener('touchend', () => {
-        if (!dragging) { y0 = null; return; }
+        dy = e.touches[0].clientY - y0;
+        if (!raf) raf = requestAnimationFrame(paint);          // rAF 节流，别每个 touchmove 都写样式
+      };
+      const end = () => {
+        if (y0 == null) return;
+        cancelAnimationFrame(raf); raf = 0;
+        const d = dy;
         sh.style.transition = ''; sh.style.transform = '';
-        if (dy > 90) {
-          if (sh.classList.contains('expanded')) sh.classList.remove('expanded');   // 先收回一阶段
-          else hidePop();                                                            // 再拉就关
-        } else if (dy < -30) {
+        y0 = null; dy = 0;
+        if (d > 80) {
+          if (sh.classList.contains('expanded')) sh.classList.remove('expanded');  // 先收回一阶段
+          else hidePop();                                                          // 再拉就关
+        } else if (d < -40) {
           sh.classList.add('expanded');
-          $('p-body').scrollTop = 0;
+          if (body) body.scrollTop = 0;
         }
-        y0 = null; dy = 0; dragging = false;
+      };
+      zones.forEach((el) => {
+        el.addEventListener('touchstart', start, { passive: true });
+        el.addEventListener('touchmove', move, { passive: true });
+        el.addEventListener('touchend', end);
+        el.addEventListener('touchcancel', end);
       });
     })();
     window.addEventListener('keydown', (e) => {

@@ -765,17 +765,27 @@ body:not(.warm) #player .pctl{background:rgba(23,26,31,.85)}
 .pop-more .ic.arrow{width:15px;height:15px;animation:nudge 1.5s ease-in-out infinite}
 @keyframes nudge{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(-4px);opacity:1}}
 
-/* 词头 */
-#pop .r1{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--hairline)}
+/* 词头：左词右图标（发音/已掌握/关闭）—— 不再有链接行 */
+#pop .r1{display:flex;align-items:flex-start;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--hairline)}
+#pop .r1-l{flex:1;min-width:0;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+#pop .r1-r{flex:0 0 auto;display:flex;align-items:center;gap:2px;margin:-4px -6px 0 0}
+#pop .icbtn{width:32px;height:32px;border-radius:50%;border:0;background:transparent;color:var(--ink-3);
+  display:grid;place-items:center;font-size:16px;transition:background-color .15s,color .15s}
+#pop .icbtn:hover{background:var(--hov);color:var(--ink)}
+#pop .icbtn.on{color:var(--ok)}
 #pop .w1{font-size:28px;font-weight:600;font-family:var(--serif);color:var(--ink);letter-spacing:.02em}
 #pop .w2{font-size:14px;color:var(--ink-2);font-family:var(--serif)}
-#pop .w3{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-left:auto;letter-spacing:.04em}
-#pop .mg{font-size:16px;margin-top:12px;color:var(--ink);font-family:var(--serif);line-height:1.6}
+#pop .w3{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.04em;cursor:pointer}
+#pop .w3::after{content:" ✎";font-size:9px;opacity:.5}
+#pop .mg{font-size:16px;margin-top:12px;color:var(--ink);font-family:var(--serif);line-height:1.6;cursor:pointer}
+#pop .mg::after{content:" ✎";font-size:10px;opacity:.35;margin-left:4px}
 #pop .mt{font-size:11.5px;color:var(--ink-3);margin-top:6px;letter-spacing:.04em}
 
-/* 动作行：文字链，不再是按钮 tab */
-.pop-acts{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;align-items:center}
-.pop-acts .tlink{font-size:13px;font-family:var(--serif)}
+/* 「更多」整块：只在展开（二阶段）出现 —— 一阶段保持干净（用户要求：不要按钮也不要例句） */
+.pop-more-pane{display:none}
+.sheet.expanded .pop-more-pane{display:block}
+
+/* 「更多」里只剩例句，没有链接行 */
 #pop input{width:100%;height:38px;padding:0 12px;border-radius:11px;border:0;background:var(--field);color:var(--ink)}
 #pop #p-romabox{margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)}
 #pop #p-romabox .meta{margin-bottom:8px}
@@ -783,9 +793,11 @@ body:not(.warm) #player .pctl{background:rgba(23,26,31,.85)}
 #pop #p-romabox .row + .row{margin-top:8px}
 
 /* 「出现的句子」区块：直接展示，不再藏在按钮后面 */
-.pop-sec{margin-top:14px;padding-top:12px;border-top:1px solid var(--hairline)}
+#p-more > .pop-sec:first-child{margin-top:14px;padding-top:12px;border-top:1px solid var(--hairline)}
 .pop-sec-t{font-size:11px;color:var(--ink-3);letter-spacing:.16em;font-family:var(--serif);margin-bottom:6px}
 #p-exlist .list{margin-top:2px}
+#p-editrow{margin-top:12px}
+#p-romabox{margin-top:12px}
 #p-exlist .mt{margin-top:10px}
 
 details.src{border-top:1px solid var(--line);margin-top:18px;padding-top:10px}
@@ -1084,23 +1096,26 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 <div class="sheet" id="pop">
   <div class="grab"></div>
   <div class="pop-body" id="p-body">
+    <!-- 一阶段：词 / 假名 / 罗马音 / 释义，没有任何链接行；操作收成右上角图标 -->
     <div class="r1">
-      <span class="w1" id="p-word"></span>
-      <span class="w2" id="p-reading"></span>
-      <span class="w3" id="p-romaji"></span>
+      <div class="r1-l">
+        <span class="w1" id="p-word"></span>
+        <span class="w2" id="p-reading"></span>
+        <span class="w3" id="p-romaji"></span>
+      </div>
+      <div class="r1-r">
+        <button class="icbtn" id="p-speak" title="发音"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg></button>
+        <button class="icbtn" id="p-known" title="标为已掌握"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button>
+        <button class="icbtn" id="p-close2" title="关闭"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
+      </div>
     </div>
-    <div class="mg" id="p-meaning"></div>
+    <!-- 绑定用的隐藏触发点：对应的动作由「点释义 / 点罗马音」触发，界面上不出现 -->
+    <button hidden id="p-edit"></button>
+    <button hidden id="p-roma"></button>
+    <!-- 点释义就地改；点罗马音就地改 -->
+    <div class="mg" id="p-meaning" title="点一下改释义"></div>
+    <div class="row" id="p-editrow" hidden><input id="p-editinput" placeholder="写你自己的释义，回车保存"></div>
     <div class="mt" id="p-meta"></div>
-    <div class="pop-acts">
-      <button class="tlink" id="p-known">标为已掌握</button>
-      <button class="tlink tlink-ghost" id="p-speak">发音</button>
-      <button class="tlink tlink-ghost" id="p-edit">改释义</button>
-      <button class="tlink tlink-ghost" id="p-roma">罗马音</button>
-      <button class="tlink tlink-ghost" id="p-close2">关闭</button>
-    </div>
-    <div class="row" id="p-editrow" style="display:none;margin-top:4px">
-      <input id="p-editinput" placeholder="写你自己的释义，回车保存">
-    </div>
     <div id="p-romabox" hidden>
       <div class="meta" id="p-romahint">选一个，或自己写</div>
       <div class="row" id="p-romacands"></div>
@@ -1111,9 +1126,13 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
         <button class="toolbtn" id="p-romareset">还原</button>
       </div>
     </div>
-    <div class="pop-sec" id="p-exwrap">
-      <div class="pop-sec-t">出现的句子</div>
-      <div id="p-exlist"></div>
+
+    <!-- 二阶段：只有例句，没有任何链接行；改释义 / 罗马音 走上面的就地编辑 -->
+    <div class="pop-more-pane" id="p-more">
+      <div class="pop-sec">
+        <div class="pop-sec-t">出现的句子</div>
+        <div id="p-exlist"></div>
+      </div>
     </div>
   </div>
   <button class="pop-more" id="p-expand" aria-label="上拉看更多">
@@ -1122,6 +1141,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017g"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017k"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
