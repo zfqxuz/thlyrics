@@ -935,3 +935,88 @@ node .e2e/run-e2e.mjs                              # 全量（所有 check 都�
   - 白名单 `scripts/copy-allow.txt`（只给确实必要的功能错误开小口）。
 - 已接入：`npm run check`（layers + copy）和 `scripts/build-apk.sh` 开头；`.e2e/run-e2e.mjs` 末尾也有「交付前门禁」断言。
 - 这次清掉的典型：`没有日语嗓子` → `日语未安装`；`请到系统设置…` → `打开失败`；`本机音频找不到了（可能被清理过）` → `本机音频不可用`；`接口暂时不可用（可能被限流）` → `接口不可用`；`头像（可选，注册后也能换）` → `头像（可选）`。
+
+### 2026-10-16 夜：真机反馈四件（返回不再二次确认 / 语音包完全自建 / 静默在线兜底）
+
+用户反馈（原话大意）：① 每个侧滑都二次确认，多一倍操作，只有不可回退的页面才该问；② 联网模式没装语音包不许弹窗，直接联网发音；首次打开页面时检查语音包，没有就提示跳转安装，可「不再提醒」；③ 让人下载 APK 装 TTS 引擎很诡异，且装了不生效——要网上开源免费非商业的语音包，放 OSS，用户把数据下到 App 本地，不安装、不走系统，统一在 App 里管理（自建）。
+
+#### 一、返回/侧滑：能回就直接回
+
+- `onNavGuard` 不再拦「详情页 → 主 tab」，`__tlOnBackPressed` 在 `#/track/*`、`#/word/*` 直接 `leaveDetail()`（history.back，没历史回最近主 tab）。
+- 只有「回不到上一页、再返回就退桌面」时才 `askExitApp()` 弹「退出 App？ / 退出 / 取消」（主页、闸门、无历史页）。
+- 全屏跟唱页开着时，返回手势仍只收播放器，不离开详情页。
+- E2E `guard` 组改成 4 条：详情页侧滑直达 `#/songs` 不弹窗 / 跟唱页只收播放器 / 主页返回才问 / 取消留在 App。
+
+#### 二、发音链路（全部静默，不弹窗）
+
+- 原生 App：**装了离线语音包 → App 内合成（Open JTalk）**；没装 → **直接在线**（`speakOnline()`，百度/有道代理），不再问「在线还是语音包」，不再用系统 TTS（`TtsPlugin` 已从 MainActivity 摘掉，代码留着备查）。
+- 网页版不变：`GET /api/tts?text=` 在线。
+- 首启提示：原生壳 boot 后 `voicePackPrompt()` 查 `VoicePack.status`，没装就弹「安装离线语音包？ / 去安装 / 不再提醒」；「不再提醒」写 `S.vpNoAsk=1`。E2E 用 `window.__tlVpPrompt()` 测这条。
+- 「我的」发音区只剩：`离线语音包`（跳 `#/voicepack`）+ `试听`。
+
+#### 三、App 内自建语音包（不装 APK、不走系统 TTS）
+
+- 引擎：**Open JTalk 1.11 + MeCab 0.996 + HTS Engine 1.10**，源码 vendored 在
+  `app/android/app/src/main/cpp/vendor/`（BSD/修改 BSD；MeCab 为 BSD/GPL/LGPL 三选一）。
+- 数据：NAIST-jdic（修改 BSD）+ MMDAgent 的 **Mei** 嗓音（CC-BY 3.0）。打成一个 zip：
+  `dic/`（MeCab 词典）+ `voice/mei_normal.htsvoice` + 各许可证 + `PACK.txt`。
+  - OSS：`thlyrics-audio/tts/openjtalk-ja-1.11.zip`（约 23 MB，10 年签名 URL 写进
+    `docs/data/voice-packs.json`；桶有 Referer 白名单，原生下载必须带 `Referer: https://zfqxuz.github.io/`）。
+  - 清单字段：`{id,name,version,url,size,sha256,source,license}`。
+- 原生：`VoicePackPlugin`
+  - `install`：HttpURLConnection 下载（带 Referer/进度事件）→ sha256 校验 → `ZipInputStream` 解压到
+    `filesDir/voicepacks/<id>/`（防 zip slip；写 `manifest.json`）→ 通知 `done`。
+  - `status/list/remove/synth`：`synth` 后台线程用 JNI（`nativeInit/nativeSynth`）合成 48kHz WAV 到
+    `cacheDir/tts/<sha1>.wav`，JS 用 `Capacitor.convertFileSrc` 播。
+  - APK 里带 `libopenjtalk.so`（arm64-v8a + armeabi-v7a；NDK 27.2.12479018 / CMake 3.22.1；
+    `externalNativeBuild` 在 `app/build.gradle`）。
+- JS：`docs/platform/voice-pack.js`（status/install/remove/synth，进度走事件）；`#/voicepack` 页只列我们的包
+  （未装=体积+下载，已装=试听+删除），不再列系统引擎/系统设置入口。
+- 真机自检（debug 专用，MainActivity `debugHooks()`）：
+  - `adb shell "am start -n com.zfqxuz.thlyrics/.MainActivity --es vpinstall 1"` → 按 assets 清单下载安装，
+    logcat `THLYRICS: VPDEBUG ok`。
+  - `adb shell "am start -n com.zfqxuz.thlyrics/.MainActivity --es vptest こんにちは"` → 合成到
+    `files/selftest.wav`，logcat `VPDEBUG ok <bytes>`；`adb exec-out run-as com.zfqxuz.thlyrics cat files/selftest.wav`
+    可验 48kHz/16bit/mono。2026-10-16 真机（NOH-AN00）实测与宿主机同文本输出**逐字节一致**。
+
+#### 四、旧方案退场
+
+- eSpeak NG APK「下载并安装 → 系统安装器」链路整条删除（`renderVoicepack/loadVoicePacks` 旧实现、
+  `#vp-packs`、Tts 引擎/嗓子设置 UI、`S.ttsFallback`）。OSS 上 `tts/espeak-ng-1.52.0.bin` 暂时留着，
+  没人再引用；`TtsPlugin.java` 也没注册，只作为历史参考。
+
+### 2026-10-17 凌晨：发音质量返工（Kokoro 词音频包 + F01 兜底）
+
+用户听完 Mei 的评价：**「发音太难崩了，能不能换个语音包」**。HTS 参数合成（Mei/F01）对学习者耳朵都不够，于是把「离线发音」拆成两层：
+
+#### 一、主语音包：Kokoro-82M int8 预生成词音频（kind=audio）
+
+- 引擎/嗓音：**Kokoro-82M v1.0 int8**（Apache-2.0，`thewh1teagle/kokoro-onnx` 的 ONNX 量化）+ 日语女声 `jf_alpha`（`onnx-community/Kokoro-82M-v1.0-ONNX`）。
+- 前端 G2P：`misaki[ja]`（Apache-2.0）+ `pyopenjtalk`（MIT，Open JTalk/NAIST-jdic 前端），**在生成机上跑**，手机不装 Python。
+- 生成脚本（本机，不进仓库）：读 `docs/data/index.json` 的 6357 条 `reading || word`（+ こんにちは等兜底词），
+  Kokoro 24kHz → 48kbps MP3（lameenc），文件名 `sha1(text).mp3`，索引 `index.json {meta, files:{text:file}}`。
+  6 进程并行，约 40 分钟；成果 zip 传 OSS：
+  `thlyrics-audio/tts/kokoro-ja-1.0.zip`（kind=audio，30.1 MB / sha256 0588c8…）。
+- App 侧：`VoicePackPlugin` 支持 `kind`：`audio` 校验 `index.json` + 非空 `audio/`；新增 `resolve({id,text})`
+  读索引拿本地文件；JS `speak()` 顺序 = **音频包查表 → 在线 → Open JTalk 兜底**（查不到就联网，离线才会用 HTS）。
+- `docs/platform/voice-pack.js` 增加 `resolve()`；`install()` 带 `kind`。
+
+#### 二、兜底语音包：Open JTalk + F01（kind=ojt）
+
+- 原来的 Mei 换成 **tohoku-f01-neutral**（東北大学 ICN 研，CC-BY 4.0，比 Mei 清楚）；
+  词典仍是 NAIST-jdic（BSD）。新包 `thlyrics-audio/tts/openjtalk-ja-1.12.zip`（约 24 MB）。
+- 只在「音频包查不到 + 当前离线」时用；联网时优先线上 Baidu/有道（网页版一直如此）。
+- OJT 包仍可单独下载/删除，页面排在 Kokoro 之后。
+
+#### 三、体验顺序（用户视角）
+
+1. 装完新版 App：**在线优先**，词/句都先走线上自然音（不再一上来就 Mei）。
+2. 「我的 → 语音包」下载 **Kokoro 日语**（约 30MB）后：词全部走本地 Kokoro（离线也自然）。
+3. 句子/变体没收录：联网走线上；离线才回退 F01 的 Open JTalk。
+
+#### 四、真机自检
+
+- `--es vpinstall kokoro-ja`（读 assets 清单按 id 装）→ logcat `VPDEBUG ok`；
+- CDP `window.__tlSpeak('さなえ')` → `VoicePack.resolve` 命中 `files/voicepacks/kokoro-ja/audio/<sha1>.mp3`，
+  `<audio id=speak-audio>` 播放本地文件（`convertFileSrc`）。
+- 2026-10-16 对比样本（一年签名 URL）：`tts/samples/kokoro-*.mp3` 与 `tts/samples/f01-*.mp3`。

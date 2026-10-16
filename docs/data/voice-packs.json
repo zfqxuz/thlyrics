@@ -1,16 +1,26 @@
 {
   "packs": [
     {
-      "id": "espeak-ng",
-      "name": "eSpeak NG",
-      "pkg": "com.reecedunn.espeak",
-      "version": "1.52.0",
-      "versionCode": 22,
-      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/espeak-ng-1.52.0.bin?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107463985&Signature=%2BuEtUhYKW7RyYlSesyupKv11FAY%3D",
-      "size": 10446659,
-      "sha256": "0a7822fec54d7f7ae759ffedc9afeaa77f809587b171fb2101998787821ec790",
-      "source": "https://f-droid.org/packages/com.reecedunn.espeak/",
-      "license": "GPL-3.0"
+      "id": "kokoro-ja",
+      "name": "Kokoro 日语",
+      "version": "1.0",
+      "kind": "audio",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-1.0.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107489375&Signature=uZpGqsTFne71FiLYDYsjYM5Nhtk%3D",
+      "size": 31568868,
+      "sha256": "0588c8359b06741cd3f839cbe831a25ad44a794285868e31cc3e8996089fe617",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "openjtalk-ja",
+      "name": "Open JTalk 兜底",
+      "version": "1.12",
+      "kind": "ojt",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/openjtalk-ja-1.12.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107488173&Signature=f0e8FblAn77JDKCPDbLMIlU9VKE%3D",
+      "size": 25020966,
+      "sha256": "cf3f7ed04564ede0472dfef159b7004c893afd88056626e83e70f31b9bc19228",
+      "source": "https://github.com/icn-lab/htsvoice-tohoku-f01",
+      "license": "CC-BY 4.0"
     }
   ]
 }

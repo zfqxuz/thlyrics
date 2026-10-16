@@ -1569,10 +1569,11 @@ check('网页版「发音」走在线日语 TTS（无需语音包）',
   `按钮「${speakLabel}」· 送读「${spokenText}」· /tts 请求 +${ttsReqs.length - ttsN0}`);
 await page.evaluate(() => { const d = document.getElementById('dlg'); if (d) d.hidden = true; });
 await page.goto(BASE + '#/voicepack');
-await page.waitForSelector('#vp-settings', { timeout: 8000 });
-check('语音包页：提供系统设置入口（不托管安装包）',
-  (await page.locator('#vp-settings').count()) === 1 && /语音包/.test((await txt('#view-voicepack .sec-title')) || ''),
-  (await txt('#view-voicepack .sec-title')) || '');
+await page.waitForSelector('#view-voicepack .sec-title', { timeout: 8000 });
+await page.waitForTimeout(400);
+check('网页版语音包页：只提示 App 内可用，不提供下载',
+  /语音包/.test((await txt('#view-voicepack .sec-title')) || '') && (await page.locator('#vp-list .empty').count()) === 1,
+  ((await txt('#vp-list')) || '').slice(0, 40));
 await page.evaluate(() => document.getElementById('pop').classList.remove('on'));
 
 // (c) 词表没收录的词：说清为什么 + 能自己补一条释义（补完歌词下面就有中文）
@@ -1624,19 +1625,17 @@ if (!unknown.none) {
 
 CUR_GROUP = 'guard';
 await e2eMaybeDone();
-// ═══════ 13.14 误触退出保护：侧滑/返回 → 二次确认；播放不中断 ═══════
+// ═══════ 13.14 返回：能回就回；只有回不到上一页（退桌面）才问一句 ═══════
 {
+  // 详情页侧滑：直接回上一页，不弹窗
   await page.evaluate(() => {
-    window.__NO_GUARD = true;
+    window.__NO_GUARD = false;
     history.replaceState(null, '', '#/songs');
     location.hash = '#/track/t1';
   });
-  await page.waitForTimeout(900);
-  await page.evaluate(() => { const b = document.getElementById('playbtn'); if (b) b.click(); const p = document.getElementById('player'); if (p) p.classList.remove('on'); });
-  await page.waitForTimeout(800);
-  const playBefore = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: !!a.src, hash: location.hash }; });
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => { const p = document.getElementById('player'); if (p) p.classList.remove('on'); });
   await page.evaluate(() => {
-    window.__NO_GUARD = false;
     try {
       const target = document.getElementById('view-track') || document.body;
       const mk = (type, x, y) => new TouchEvent(type, {
@@ -1649,19 +1648,29 @@ await e2eMaybeDone();
       target.dispatchEvent(mk('touchend', 132, 304));
     } catch (e) { if (window.__tlSwipe) window.__tlSwipe(); }
   });
+  await page.waitForTimeout(900);
+  const backHit = await page.evaluate(() => { const d = document.getElementById('dlg'); return { hash: location.hash, open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
+  check('详情页侧滑：直接回上一页，不弹二次确认', !backHit.open && backHit.hash === '#/songs', JSON.stringify(backHit).slice(0, 90));
+
+  // 跟唱页开着：返回手势只收播放器，不离开详情页
+  await page.evaluate(() => { location.hash = '#/track/t1'; });
+  await page.waitForTimeout(900);
+  await page.evaluate(() => { const p = document.getElementById('player'); if (p) p.classList.add('on'); });
+  await page.evaluate(() => window.__tlOnBackPressed());
+  await page.waitForTimeout(300);
+  const playerHit = await page.evaluate(() => ({ hash: location.hash, on: document.getElementById('player').classList.contains('on') }));
+  check('跟唱页开着：返回只收播放器', playerHit.hash === '#/track/t1' && playerHit.on === false, JSON.stringify(playerHit));
+
+  // 主页返回：回不到上一页 → 问是否退出 App
+  await page.evaluate(() => { location.hash = '#/home'; });
   await page.waitForTimeout(800);
-  const guardHit = await page.evaluate(() => { const d = document.getElementById('dlg'); return { hash: location.hash, open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
-  check('侧滑返回：弹二次确认', guardHit.open && /退出学词页/.test(guardHit.text), JSON.stringify(guardHit).slice(0, 90));
-  await page.locator('#dlg [data-di="0"]').click();                       // 继续听
-  await page.waitForTimeout(700);
-  const playAfter = await page.evaluate(() => { const a = document.querySelector('audio'); return { src: !!a.src, hash: location.hash, paused: a.paused }; });
-  check('「继续听」：回到学词页，播放不被打断', playAfter.hash === '#/track/t1' && playAfter.src === playBefore.src, JSON.stringify(playAfter));
-  await page.evaluate(() => { location.hash = '#/home'; });               // 再退出一次
-  await page.waitForTimeout(800);
-  await page.locator('#dlg [data-di="1"]').click();                       // 退出
-  await page.waitForTimeout(600);
-  check('「退出」：真的回到上一页', (await page.evaluate(() => location.hash)) === '#/home', await page.evaluate(() => location.hash));
-  await page.evaluate(() => { window.__NO_GUARD = true; });
+  await page.evaluate(() => window.__tlOnBackPressed());
+  await page.waitForTimeout(300);
+  const exitDlg = await page.evaluate(() => { const d = document.getElementById('dlg'); return { open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
+  check('主页返回：问是否退出 App', exitDlg.open && /退出 App/.test(exitDlg.text), JSON.stringify(exitDlg).slice(0, 80));
+  await page.locator('#dlg [data-di="1"]').click();   // 取消
+  await page.waitForTimeout(300);
+  check('「取消」：留在 App 里', await page.evaluate(() => document.getElementById('dlg').hidden));
 }
 
 CUR_GROUP = 'native';
@@ -1673,24 +1682,25 @@ await e2eMaybeDone();
 {
   const nCtx = await browser.newContext({ viewport: { width: 400, height: 850 }, isMobile: true, hasTouch: true });
   await nCtx.addInitScript(() => {
+    window.__vpStatus = { installed: false, id: 'openjtalk-ja', version: '1.11' };
     window.Capacitor = {
       isNativePlatform: () => true,
       getPlatform: () => 'android',
+      convertFileSrc: (p) => 'https://localhost/_capacitor_file_' + p,
       Plugins: {
         AppUpdater: {
           install: (o) => { window.__apkInstall = o; return Promise.resolve(); },
           addListener: () => Promise.resolve({ remove() {} }),
         },
-        Tts: {
-          engines: () => Promise.resolve({ ok: true, default: 'com.google.android.tts', engines: [{ name: 'com.google.android.tts', label: 'Google 文字转语音', def: true }] }),
-          voices: () => Promise.resolve({ ok: true, voices: [{ name: 'ja-jp-e2e', locale: 'ja_JP', quality: 400, latency: 300, network: false, features: [], ja: true, genuine: true }] }),
-          speak: (o) => { window.__ttsSpeak = Object.assign({}, o, { voice: o.voice || 'ja-jp-e2e' }); return Promise.resolve({ ok: true, ja: true, voice: o.voice || 'ja-jp-e2e', engine: o.engine || '' }); },
-          openInstall: () => { window.__ttsInstall = 1; return Promise.resolve(); },
-          openSettings: () => { window.__ttsSettings = 1; return Promise.resolve(); },
-          appInfo: (o) => { window.__ttsAppInfo = o.pkg; return Promise.resolve(); },
-          packInfo: () => Promise.resolve({ ok: true, installed: false, versionName: '', versionCode: 0 }),
-          uninstall: (o) => { window.__ttsUninstall = o.pkg; return Promise.resolve(); },
-          openStore: (o) => { window.__ttsStore = o.pkg; return Promise.resolve(); },
+        VoicePack: {
+          status: (o) => Promise.resolve(Object.assign({ id: (o && o.id) || 'openjtalk-ja', kind: ((o && o.id) === 'kokoro-ja' ? 'audio' : 'ojt'), installed: false, version: '1.12' }, window.__vpStatus || {})),
+          resolve: (o) => { window.__vpResolve = o; return Promise.resolve(o && o.text === 'こんにちは' ? { found: true, path: '/data/user/0/com.zfqxuz.thlyrics/files/voicepacks/kokoro-ja/audio/x.mp3' } : { found: false }); },
+          list: () => Promise.resolve({ packs: [] }),
+          engine: () => Promise.resolve({ version: 'Open JTalk 1.11' }),
+          synth: (o) => { window.__vpSynth = o; return Promise.resolve({ path: '/data/user/0/com.zfqxuz.thlyrics/cache/tts/x.wav' }); },
+          install: (o) => { window.__vpInstall = o; return Promise.resolve(); },
+          remove: (o) => { window.__vpRemove = o; return Promise.resolve({ ok: true }); },
+          addListener: () => Promise.resolve({ remove() {} }),
         },
       },
     };
@@ -1723,24 +1733,54 @@ await e2eMaybeDone();
   await np.locator('#dlg [data-di="1"]').click();          // 忽略这次
   await np.waitForTimeout(300);
   check('「忽略这次」：弹窗关掉', await np.evaluate(() => document.getElementById('dlg').hidden));
-  // 发音设置：多声源（引擎 + 日语嗓子 + 去安装 + 试听）
-  await np.waitForTimeout(900);
-  const ttsSet = await np.evaluate(() => ({
-    engine: document.getElementById('tts-engine') ? [...document.getElementById('tts-engine').options].map((o) => o.textContent).join('|') : '',
-    voice: document.getElementById('tts-voice') ? [...document.getElementById('tts-voice').options].map((o) => o.textContent).join('|') : '',
-    online: !!document.getElementById('tts-online'), packs: !!document.getElementById('tts-packs'), test: !!document.getElementById('tts-test'),
-  }));
-  check('App 发音设置：列引擎与日语嗓子，带在线开关/语音包/试听',
-    /Google 文字转语音/.test(ttsSet.engine) && /ja_JP/.test(ttsSet.voice) && ttsSet.online && ttsSet.packs && ttsSet.test, JSON.stringify(ttsSet).slice(0, 120));
-  await np.locator('#tts-test').click();
+  // 首启语音包提示：没装 → 问安装 / 不再提醒；选了不再提醒后不再弹
+  await np.evaluate(() => window.__tlVpPrompt());
   await np.waitForTimeout(400);
-  const ttsSpoke = await np.evaluate(() => window.__ttsSpeak || null);
-  check('点「试听」：按选中的引擎/嗓子发音', !!ttsSpoke && /こんにちは/.test(String(ttsSpoke.text || '')) && /ja-jp-e2e/.test(String(ttsSpoke.voice || '')), JSON.stringify(ttsSpoke || {}).slice(0, 90));
-  const fbBefore = await np.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').ttsFallback || '');
-  await np.locator('#tts-online').click();
+  const vpPrompt = await np.evaluate(() => { const d = document.getElementById('dlg'); return { open: !!d && !d.hidden, text: d ? d.textContent.replace(/\s+/g, ' ') : '' }; });
+  check('首启检查：没装语音包 → 问安装 / 不再提醒', vpPrompt.open && /安装离线语音包/.test(vpPrompt.text) && /不再提醒/.test(vpPrompt.text), JSON.stringify(vpPrompt).slice(0, 80));
+  await np.locator('#dlg [data-di="1"]').click();          // 不再提醒
   await np.waitForTimeout(300);
-  const fbAfter = await np.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').ttsFallback || '');
-  check('点「无本地语音时」：在线发音/语音包页可切换', fbBefore !== fbAfter && ['online', 'pack'].includes(fbAfter), `${fbBefore || '未选'} → ${fbAfter}`);
+  const noAsk = await np.evaluate(() => JSON.parse(localStorage.getItem('thlyrics.tool.v1') || '{}').vpNoAsk || 0);
+  check('「不再提醒」：记住选择', noAsk === 1, 'vpNoAsk=' + noAsk);
+  await np.evaluate(() => window.__tlVpPrompt());
+  await np.waitForTimeout(300);
+  check('选了不再提醒：不再弹', await np.evaluate(() => document.getElementById('dlg').hidden));
+  // 发音设置：只留离线语音包入口 + 试听
+  await np.waitForTimeout(300);
+  const ttsSet = await np.evaluate(() => ({
+    packs: !!document.getElementById('tts-packs'), test: !!document.getElementById('tts-test'),
+    engine: !!document.getElementById('tts-engine'), online: !!document.getElementById('tts-online'),
+  }));
+  check('App 发音设置：只留离线语音包 + 试听', ttsSet.packs && ttsSet.test && !ttsSet.engine && !ttsSet.online, JSON.stringify(ttsSet));
+  await np.evaluate(() => { window.__vpStatus = { installed: true, version: '1.12' }; window.__vpResolve = null; });
+  await np.locator('#tts-test').click();
+  await np.waitForTimeout(700);
+  const vpSpoke = await np.evaluate(() => window.__vpResolve || null);
+  check('点「试听」：走本地词音频包', !!vpSpoke && /こんにちは/.test(String(vpSpoke.text || '')) && vpSpoke.id === 'kokoro-ja', JSON.stringify(vpSpoke || {}).slice(0, 80));
+  // 语音包页：下载 / 已安装 / 删除
+  await np.evaluate(() => { window.__vpStatus = { installed: false }; location.hash = '#/voicepack'; });
+  await np.waitForSelector('#vp-list .item', { timeout: 8000 });
+  const vpInfo = await np.evaluate(() => ({
+    text: (document.querySelector('#vp-list .item .l2') || {}).textContent || '',
+    dl: !!document.querySelector('#vp-list [data-dl]'),
+    rm: !!document.querySelector('#vp-list [data-rm]'),
+  }));
+  check('语音包页：未装显示体积 + 下载', /MB/.test(vpInfo.text) && vpInfo.dl && !vpInfo.rm, JSON.stringify(vpInfo));
+  await np.locator('#vp-list [data-dl]').first().click();
+  await np.waitForTimeout(500);
+  const packCall = await np.evaluate(() => window.__vpInstall || null);
+  check('点「下载」：OSS 地址 + sha256 + kind 交给原生下载器',
+    !!packCall && /kokoro-ja/.test(String(packCall.url || '')) && /^[0-9a-f]{64}$/.test(String(packCall.sha256 || '')) && packCall.kind === 'audio', JSON.stringify(packCall || {}).slice(0, 110));
+  await np.evaluate(() => { window.__vpStatus = { installed: true, version: '1.11' }; location.hash = '#/me'; });
+  await np.waitForTimeout(500);
+  await np.evaluate(() => { location.hash = '#/voicepack'; });
+  await np.waitForSelector('#vp-list [data-rm]', { timeout: 8000 });
+  check('已安装：显示试听 / 删除', await np.evaluate(() => !!document.querySelector('#vp-list [data-test]') && !!document.querySelector('#vp-list [data-rm]')));
+  await np.locator('#vp-list [data-rm]').first().click();
+  await np.waitForTimeout(500);
+  check('点「删除」：删本地数据包', (await np.evaluate(() => (window.__vpRemove || {}).id || '')) === 'kokoro-ja', JSON.stringify(await np.evaluate(() => window.__vpRemove || {})).slice(0, 60));
+  await np.evaluate(() => { location.hash = '#/me'; });
+  await np.waitForSelector('#me-upd', { timeout: 8000 });
   await np.locator('#me-upd').click();
   await np.waitForTimeout(2000);
   check('手动检查更新：即使忽略过也弹公告', await np.evaluate(() => !document.getElementById('dlg').hidden));
@@ -1754,31 +1794,6 @@ await e2eMaybeDone();
   await np.waitForTimeout(900);
   const installCall = await np.evaluate(() => window.__apkInstall || null);
   check('点「下载并安装」：把远端地址交给原生插件', !!installCall && /example\.com\/a\.apk/.test(String(installCall.url || '')), JSON.stringify(installCall || {}).slice(0, 64));
-  // 语音包页：列引擎 + 官方安装/卸载入口
-  await np.evaluate(() => { location.hash = '#/voicepack'; });
-  await np.waitForSelector('#vp-settings', { timeout: 8000 });
-  await np.waitForTimeout(900);
-  const vp = await np.evaluate(() => ({
-    row: (document.querySelector('#vp-list .item .l2') || {}).textContent || '',
-    del: !!document.querySelector('#vp-list [data-del]'),
-    app: !!document.querySelector('#vp-list [data-app]'),
-    settings: !!document.getElementById('vp-settings'),
-  }));
-  check('App 语音包页：列出引擎日语状态 + 应用信息/卸载/系统设置入口', /日语可用/.test(vp.row) && vp.del && vp.app && vp.settings, JSON.stringify(vp));
-  await np.locator('#vp-list [data-del]').first().click();
-  await np.waitForTimeout(300);
-  check('语音包页「卸载」：走系统卸载入口', (await np.evaluate(() => window.__ttsUninstall || '')) === 'com.google.android.tts', 'Tts.uninstall 已调用');
-  await np.locator('#vp-settings').click();
-  await np.waitForTimeout(300);
-  check('语音包页「去设置」：打开文字转语音设置', (await np.evaluate(() => window.__ttsSettings || 0)) === 1, 'Tts.openSettings 已调用');
-  // 离线引擎：App 内从 OSS 下载、交系统安装器
-  await np.waitForSelector('#vp-packs .item', { timeout: 8000 });
-  const packInfo = await np.evaluate(() => ({ text: (document.querySelector('#vp-packs .item .l2') || {}).textContent || '', dl: !!document.querySelector('#vp-packs [data-dl]') }));
-  check('语音包页：离线日语引擎可下载（来自 OSS）', /9\.96|10|MB/.test(packInfo.text) && packInfo.dl, JSON.stringify(packInfo));
-  await np.locator('#vp-packs [data-dl]').first().click();
-  await np.waitForTimeout(600);
-  const packCall = await np.evaluate(() => window.__apkInstall || {});
-  check('点「下载并安装」：把 OSS 地址交给原生下载器', /espeak-ng/.test(String(packCall.url || '')) && packCall.version === '1.52.0', JSON.stringify(packCall).slice(0, 90));
   check('App 分支没有未捕获错误', nErrors.length === 0, nErrors.slice(0, 2).join(' || '));
   await nCtx.close();
 }

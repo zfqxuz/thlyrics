@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261016f';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, tts, nativeBack } from './platform/index.js?v=20261016f';
-import { icon } from './icons.js?v=20261016f';
+import { V } from './version.js?v=20261016i';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261016i';
+import { icon } from './icons.js?v=20261016i';
 
 (() => {
   'use strict';
@@ -46,13 +46,13 @@ import { icon } from './icons.js?v=20261016f';
 
   // ────────────── 本地状态 ──────────────
   let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, rate: 1, ruby: true, gloss: false, zh: true,
-    mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new', ttsEngine: '', ttsVoice: '', ttsFallback: '' };
+    mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
   function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {};
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
-    if (!S.ttsEngine) S.ttsEngine = ''; if (!S.ttsVoice) S.ttsVoice = ''; if (!['online', 'pack'].includes(S.ttsFallback)) S.ttsFallback = ''; }
+    }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   let saveN = 0;
   const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); queueSync(); };
@@ -246,8 +246,9 @@ import { icon } from './icons.js?v=20261016f';
   dropLegacyDB('thlyrics');
 
   // ────────────── 发音朗读 ──────────────
-  // 原生壳：系统 TTS（本地语音包）。只认真实日语发音；没有 → 跳 App 内「语音包」页引导安装。
-  // 网页版：在线日语（经自己的函数计算代理），不需要装任何东西。
+  // 原生壳：词音频包（Kokoro，自然）→ 在线 → Open JTalk 兜底包；全程不弹窗。网页版直接在线。
+  const VP_ID = 'openjtalk-ja';        // Open JTalk 兜底包（任意文本可合成）
+  const VP_AUDIO = 'kokoro-ja';        // 词音频包（自然发音，按文本查表）
   let speakAudio = null;
   const getSpeakAudio = () => {                       // 懒加载：别插在主 audio 前面（很多逻辑取第一个 audio）
     if (speakAudio && speakAudio.isConnected) return speakAudio;
@@ -259,40 +260,70 @@ import { icon } from './icons.js?v=20261016f';
   };
   const speakCache = new Map();
   async function speakOnline(text) {
-    try {
-      let url = speakCache.get(text);
-      if (!url) {
-        const j = await fcJson('/tts?text=' + encodeURIComponent(text.slice(0, 60)));
-        if (!j || !j.url) throw new Error('没有音频');
-        url = j.url;
-        if (speakCache.size >= 200) speakCache.delete(speakCache.keys().next().value);
-        speakCache.set(text, url);
-      }
-      const el = getSpeakAudio();
-      try { el.pause(); } catch {}
-      el.src = url;
-      el.currentTime = 0;
-      await el.play();
-    } catch (e) { toast('发音失败'); }
+    let url = speakCache.get(text);
+    if (!url) {
+      const j = await fcJson('/tts?text=' + encodeURIComponent(text.slice(0, 60)));
+      if (!j || !j.url) throw new Error('没有音频');
+      url = j.url;
+      if (speakCache.size >= 200) speakCache.delete(speakCache.keys().next().value);
+      speakCache.set(text, url);
+    }
+    await playSpeakSrc(url);
+  }
+  const capFileSrc = (p) => (window.Capacitor && window.Capacitor.convertFileSrc ? window.Capacitor.convertFileSrc(p) : p);
+  async function playSpeakSrc(src) {
+    const el = getSpeakAudio();
+    try { el.pause(); } catch { /* 没播过 */ }
+    el.src = src;
+    el.currentTime = 0;
+    await el.play();
+  }
+  let vpAudio = null, vpOjt = null, vpCheckedAt = 0;
+  async function activePacks() {
+    if (!IS_NATIVE || !voicePack.available) return { audio: null, ojt: null };
+    if (Date.now() - vpCheckedAt < 15000) return { audio: vpAudio, ojt: vpOjt };
+    vpCheckedAt = Date.now();
+    try { const r = await voicePack.status(VP_AUDIO); vpAudio = (r && r.installed) ? r : null; } catch { vpAudio = null; }
+    try { const r = await voicePack.status(VP_ID); vpOjt = (r && r.installed) ? r : null; } catch { vpOjt = null; }
+    return { audio: vpAudio, ojt: vpOjt };
   }
   async function speak(t) {
     const text = String(t == null ? '' : t).trim();
     if (!text) return;
-    if (!IS_NATIVE) { await speakOnline(text); return; }   // 网页版：在线
-    const r = await tts.speak(text, { engine: S.ttsEngine || '', voice: S.ttsVoice || '' });
-    if (r && r.ja) return;                                  // 本地有真日语引擎：优先本地
-    if (S.ttsFallback === 'online') { await speakOnline(text); return; }
-    if (S.ttsFallback === 'pack') { go('#/voicepack'); return; }
-    // 第一次遇到“没装日语语音”：给两条国内可走的路，记住选择
-    showDialog({
-      title: '未安装日语语音包',
-      actions: [
-        { label: '在线发音', kind: 'main', onClick: async () => { S.ttsFallback = 'online'; save(); await speakOnline(text); } },
-        { label: '语音包', onClick: () => { S.ttsFallback = 'pack'; save(); go('#/voicepack'); } },
-      ],
-    });
+    if (!IS_NATIVE) { try { await speakOnline(text); } catch { toast('发音失败'); } return; }
+    const packs = await activePacks();
+    if (packs.audio) {
+      try {
+        const r = await voicePack.resolve(packs.audio.id, text);
+        if (r && r.found && r.path) { await playSpeakSrc(capFileSrc(r.path)); return; }
+      } catch { /* 查表失败就往下走 */ }
+    }
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+      try { await speakOnline(text); return; } catch { /* 联网失败：继续兜底 */ }
+    }
+    if (packs.ojt) {
+      try {
+        const r = await voicePack.synth(packs.ojt.id, text.slice(0, 300));
+        if (r && r.path) { await playSpeakSrc(capFileSrc(r.path)); return; }
+      } catch { /* 兜底也不行 */ }
+    }
+    toast('发音失败');
   }
-  if (typeof window !== 'undefined') window.__tlSpeak = (t) => speak(t);   // 真机/CDP 测试钩子
+  if (typeof window !== 'undefined') { window.__tlSpeak = (t) => speak(t); window.__tlVpPrompt = () => voicePackPrompt(); }   // 真机/CDP 测试钩子
+  /** 首次打开：没装语音包就问一次「要不要装」，可「不再提醒」 */
+  function voicePackPrompt() {
+    if (!IS_NATIVE || !voicePack.available || S.vpNoAsk) return;
+    voicePack.status(VP_AUDIO).then((r) => {
+      if (r && r.installed) return;
+      showDialog({
+        title: '安装离线语音包？',
+        actions: [
+          { label: '去安装', kind: 'main', onClick: () => go('#/voicepack') },
+          { label: '不再提醒', onClick: () => { S.vpNoAsk = 1; save(); } },
+        ],
+      });
+    }).catch(() => {});
+  }
 
   // ────────────── 音频 ──────────────
   const audio = createAudioEl();
@@ -1757,6 +1788,7 @@ import { icon } from './icons.js?v=20261016f';
     route();
     // 开屏公告：从闸门登录/注册进来时 boot 早就 return 了，这里补一次检查
     if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);
+    setTimeout(voicePackPrompt, 1200);
   }
   function showGate(msg) {
     const g = $('gate'); if (!g) return;
@@ -2226,33 +2258,6 @@ import { icon } from './icons.js?v=20261016f';
     } catch (e) { toast('更新失败：' + ((e && e.message) || e)); }
   }
 
-  /** 「我的 → 发音」：列已装引擎 + 真日语发音，让用户选；不装在线，不走假 ja */
-  async function loadTtsSettings() {
-    const eSel = $('tts-engine'), vSel = $('tts-voice');
-    if (!eSel || !vSel) return;
-    let engines = [];
-    try { const r = await tts.engines(); engines = (r && r.engines) || []; } catch { engines = []; }
-    eSel.innerHTML = `<option value="">自动（系统默认）</option>` + engines.map((x) => `<option value="${esc(x.name)}">${esc(x.label || x.name)}${x.def ? ' · 默认' : ''}</option>`).join('');
-    eSel.value = S.ttsEngine || '';
-    const loadVoices = async () => {
-      let vs = [];
-      let trusted = false;
-      try { const r = await tts.voices(S.ttsEngine || ''); vs = ((r && r.voices) || []).filter((x) => x.genuine); trusted = !!(r && r.trusted); } catch { vs = []; }
-      const usable = vs.length || trusted;
-      vSel.innerHTML = usable
-        ? `<option value="">自动</option>` + vs.map((x) => `<option value="${esc(x.name)}">${esc(x.locale || '')} · ${esc(x.name)}</option>`).join('')
-        : `<option value="">日语未安装</option>`;
-      vSel.disabled = !usable;
-      vSel.value = S.ttsVoice && vs.some((x) => x.name === S.ttsVoice) ? S.ttsVoice : '';
-    };
-    await loadVoices();
-    eSel.onchange = () => { S.ttsEngine = eSel.value; S.ttsVoice = ''; save(); loadVoices(); };
-    vSel.onchange = () => { S.ttsVoice = vSel.value; save(); };
-    if ($('tts-packs')) $('tts-packs').onclick = () => go('#/voicepack');
-    if ($('tts-online')) $('tts-online').onclick = () => { S.ttsFallback = S.ttsFallback === 'pack' ? 'online' : 'pack'; save(); renderMe(); };
-    if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
-  }
-
   function renderMe() {
     const favN = Object.keys(S.fav || {}).filter((k) => Number(S.fav[k]) > 0).length;
     const singN = Object.keys(S.sing || {}).filter((k) => Number(S.sing[k]) > 0).length;
@@ -2271,11 +2276,8 @@ import { icon } from './icons.js?v=20261016f';
       <div class="setrow"><div class="k">整句中文</div><button class="toolbtn ${S.zh !== false ? 'on' : ''}" id="me-zh">${S.zh !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">逐词中文</div><button class="toolbtn ${S.gloss !== false ? 'on' : ''}" id="me-gloss">${S.gloss !== false ? '开' : '关'}</button></div>
       ${IS_NATIVE ? `<div class="sect">发音</div>
-      <div class="setrow"><div class="k">发音引擎</div><select class="sel" id="tts-engine" style="max-width:62%"></select></div>
-      <div class="setrow"><div class="k">日语发音</div><select class="sel" id="tts-voice" style="max-width:62%"></select></div>
-      <div class="setrow"><div class="k">无本地语音时</div><button class="toolbtn ${S.ttsFallback !== 'pack' ? 'on' : ''}" id="tts-online">${S.ttsFallback === 'pack' ? '语音包页' : '在线发音'}</button></div>
-      <div class="setrow"><div class="k">日语语音包</div>
-        <div class="row"><button class="toolbtn" id="tts-packs">语音包</button><button class="toolbtn" id="tts-test">试听</button></div></div>` : ''}
+      <div class="setrow"><div class="k">离线语音包</div><button class="toolbtn" id="tts-packs">语音包</button></div>
+      <div class="setrow"><div class="k">试听</div><button class="toolbtn" id="tts-test">发音</button></div>` : ''}
       <div class="sect">同步</div>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">立即同步</button>
@@ -2323,7 +2325,8 @@ import { icon } from './icons.js?v=20261016f';
     const disp = (key, id) => { const el = $(id); if (el) el.onclick = () => { S[key] = S[key] === false; save(); applyDisplay(); renderMe(); }; };
     disp('ruby', 'me-ruby'); disp('zh', 'me-zh'); disp('gloss', 'me-gloss');
     if ($('me-admin')) $('me-admin').onclick = () => go('#/admin');
-    if ($('tts-engine')) loadTtsSettings();
+    if ($('tts-packs')) $('tts-packs').onclick = () => go('#/voicepack');
+    if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
     $('m-push').onclick = () => pushCloud();
     $('m-pull').onclick = () => pullCloud();
     $('m-auto').onclick = () => {
@@ -2368,102 +2371,59 @@ import { icon } from './icons.js?v=20261016f';
     };
   }
 
-  // ────────────── 管理员（OSS 文件） ──────────────
-  /** App 内「语音包」页：检测系统已装 TTS 引擎 + 官方安装/更新/卸载入口（不托管任何安装包） */
+  // ────────────── 语音包（App 内自管离线日语发音数据） ──────────────
+  /** App 内「语音包」页：从 OSS 下数据包到本地，解压即用；不装 APK、不走系统 */
   async function renderVoicepack() {
     const host = $('view-voicepack'); if (!host) return;
     host.innerHTML = `<div class="row" style="margin-bottom:12px"><button class="toolbtn" id="vp-back">${icon('chevron-left','in')}返回</button></div>
-      <div class="sec-head"><div><div class="sec-title">语音包</div><div class="sec-sub">发音引擎</div></div></div>
-      <div id="vp-list"><div class="meta">检查中…</div></div>
-      ${IS_NATIVE ? `<div class="sect">离线日语引擎</div><div id="vp-packs"><div class="meta">加载中…</div></div>` : ''}
-      <div class="sect">安装</div>
-      <div class="setrow"><div class="k">系统文字转语音</div>
-        <div class="row"><button class="toolbtn on" id="vp-settings">去设置</button></div></div>`;
+      <div class="sec-head"><div><div class="sec-title">语音包</div><div class="sec-sub">离线日语发音</div></div></div>
+      <div id="vp-list"><div class="meta">加载中…</div></div>`;
     $('vp-back').onclick = () => goBack('#/me');
-    $('vp-settings').onclick = async () => { const ok = await tts.openSettings(); if (!ok) toast('打开失败'); };
     const box = $('vp-list');
-    let engines = [];
-    try { const r = await tts.engines(); engines = (r && r.engines) || []; } catch { engines = []; }
-    if (!engines.length) { box.innerHTML = '<div class="empty">无发音引擎</div>'; return; }
-    const rows = [];
-    for (const e of engines) {
-      let vs = [];
-      let trusted = false;
-      try { const r = await tts.voices(e.name); vs = ((r && r.voices) || []).filter((x) => x.genuine); trusted = !!(r && r.trusted); } catch { vs = []; }
-      const usable = vs.length || trusted;
-      const on = (S.ttsEngine || '') === e.name;
-      rows.push(`<div class="item" style="align-items:flex-start">
-        <div class="col"><div class="l1">${esc(e.label || e.name)}${e.def ? '<span class="rd">系统默认</span>' : ''}</div>
-          <div class="l2">${usable ? '日语可用' : '日语未安装'}</div></div>
-        <div class="row" style="flex:0 0 auto">
-          ${usable ? `<button class="toolbtn ${on ? 'on' : ''}" data-use="${esc(e.name)}">${on ? '已启用' : '启用'}</button>` : ''}
-          <button class="toolbtn" data-app="${esc(e.name)}">应用信息</button>
-          <button class="toolbtn" data-del="${esc(e.name)}">卸载</button>
-        </div></div>`);
-    }
-    box.innerHTML = rows.join('');
-    box.querySelectorAll('[data-use]').forEach((el) => (el.onclick = () => { S.ttsEngine = el.dataset.use; S.ttsVoice = ''; save(); toast('已启用：' + el.dataset.use); renderVoicepack(); }));
-    box.querySelectorAll('[data-app]').forEach((el) => (el.onclick = async () => { const ok = await tts.appInfo(el.dataset.app); if (!ok) toast('打开失败'); }));
-    box.querySelectorAll('[data-del]').forEach((el) => (el.onclick = async () => { const ok = await tts.uninstall(el.dataset.del); if (!ok) toast('打开失败'); }));
-    if (IS_NATIVE) loadVoicePacks();
-  }
-
-  /** App 内下载我们 OSS 上的离线日语引擎（非静默：交给系统安装器），支持更新/卸载 */
-  async function loadVoicePacks() {
-    const box = $('vp-packs'); if (!box) return;
+    if (!voicePack.available) { box.innerHTML = '<div class="empty">仅 App 内可用</div>'; return; }
     let packs = [];
     try { const j = await getJson(dataUrl('voice-packs.json')); packs = (j && j.packs) || []; } catch { packs = []; }
-    if (!packs.length) { box.innerHTML = '<div class="meta">暂无</div>'; return; }
+    if (!packs.length) { box.innerHTML = '<div class="empty">暂无</div>'; return; }
     const rows = [];
     for (const p of packs) {
-      let info = { installed: false, versionName: '', versionCode: 0 };
-      try { info = (await tts.packInfo(p.pkg)) || info; } catch { /* 查不到当未装 */ }
-      const hasUp = info.installed && Number(info.versionCode || 0) < Number(p.versionCode || 0);
+      let st = null;
+      try { st = await voicePack.status(p.id); } catch { st = null; }
+      const installed = !!(st && st.installed);
       rows.push(`<div class="item" data-pack="${esc(p.id)}">
         <div class="col"><div class="l1">${esc(p.name)}</div>
-          <div class="l2">${info.installed ? '已安装 ' + esc(info.versionName || p.version) : fmtSize(p.size)}</div>
+          <div class="l2">${installed ? '已安装' : fmtSize(p.size)}</div>
           <div class="bar" id="vp-bar-${esc(p.id)}" hidden><i style="width:0"></i></div></div>
         <div class="row" style="flex:0 0 auto">
-          ${info.installed ? '' : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载并安装</button>`}
-          ${hasUp ? `<button class="toolbtn on" data-dl="${esc(p.id)}">更新</button>` : ''}
-          ${info.installed ? `<button class="toolbtn" data-rm="${esc(p.id)}">卸载</button>` : ''}
+          ${installed
+            ? `<button class="toolbtn" data-test="${esc(p.id)}">试听</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
+            : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载</button>`}
         </div></div>`);
     }
     box.innerHTML = rows.join('');
     const byId = new Map(packs.map((x) => [x.id, x]));
-    box.querySelectorAll('[data-dl]').forEach((el) => (el.onclick = () => {
+    box.querySelectorAll('[data-dl]').forEach((el) => (el.onclick = async () => {
       const p = byId.get(el.dataset.dl); if (!p) return;
+      el.disabled = true;
       const bar = document.getElementById('vp-bar-' + p.id);
       const fill = bar ? bar.querySelector('i') : null;
       if (bar) bar.hidden = false;
-      appUpdater.install(p.url, p.version, (type, d) => {
-        if (type === 'progress' && fill) fill.style.width = (d && d.pct != null ? d.pct : 0) + '%';
-        else if (type === 'done') toast('下载完成，请安装');
-        else if (type === 'error') toast('下载失败');
-      }).catch(() => toast('下载失败'));
-    }));
-    box.querySelectorAll('[data-rm]').forEach((el) => (el.onclick = async () => { const ok = await tts.uninstall(byId.get(el.dataset.rm).pkg); if (!ok) toast('打开失败'); }));
-    // 装好了就自动启用（当前引擎没有日语能力时）
-    for (const p of packs) {
       try {
-        const info = await tts.packInfo(p.pkg);
-        if (!info || !info.installed) continue;
-        const v = await tts.voices(p.pkg);
-        const usable = (v && v.trusted) || (((v && v.voices) || []).some((x) => x.genuine));
-        if (!usable) continue;
-        let curOk = false;
-        if (S.ttsEngine) {
-          const cur = await tts.voices(S.ttsEngine);
-          curOk = !!(cur && cur.trusted) || (((cur && cur.voices) || []).some((x) => x.genuine));
-        }
-        if (!curOk) { S.ttsEngine = p.pkg; S.ttsVoice = ''; save(); }
-      } catch { /* 忽略 */ }
-    }
-  }
-  let vpVisBound = false;
-  function bindVoicepackRefresh() {
-    if (vpVisBound) return; vpVisBound = true;
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && location.hash.startsWith('#/voicepack')) loadVoicePacks(); });
+        await voicePack.install({ id: p.id, url: p.url, sha256: p.sha256, version: p.version, kind: p.kind || 'ojt' }, (ev, d) => {
+          if (ev === 'progress' && fill && d && d.pct != null) fill.style.width = d.pct + '%';
+        });
+        vpCheckedAt = 0;
+        toast('已安装');
+        renderVoicepack();
+      } catch (e) {
+        toast('下载失败');
+        el.disabled = false;
+        if (bar) bar.hidden = true;
+      }
+    }));
+    box.querySelectorAll('[data-rm]').forEach((el) => (el.onclick = async () => {
+      try { await voicePack.remove(el.dataset.rm); vpCheckedAt = 0; toast('已删除'); renderVoicepack(); } catch { toast('删除失败'); }
+    }));
+    box.querySelectorAll('[data-test]').forEach((el) => (el.onclick = () => speak('こんにちは')));
   }
 
   function renderAdmin() {
@@ -2957,30 +2917,26 @@ import { icon } from './icons.js?v=20261016f';
   const go = (h) => { if (String(h || '') !== location.hash) armAllowLeave(); location.hash = h; };        // 自己点的导航不算误触
   const goBack = (fallback) => { armAllowLeave(); if (history.length > 1) history.back(); else go(fallback); };
 
-  // ── 离开学词/跟唱页的二次确认（防左划误触退出；播放不打断）──
-  // 路由是 hash：#/track/... → 主 tab 时先弹确认；全屏播放器开着时返回手势只收播放器。
+  // ── 返回：能回上一页就直接回；只有回不到上一页（会退出 App）才问一句 ──
+  // 路由是 hash：#/track/... → 主 tab 时直接回；全屏播放器开着时返回手势只收播放器。
   let navFrom = '#/home', allowLeaveGuard = false, leaveT = null;
   function armAllowLeave() { allowLeaveGuard = true; clearTimeout(leaveT); leaveT = setTimeout(() => { allowLeaveGuard = false; }, 900); }
-  const LEAVING_TABS = /^#\/(home|learn|songs|mine|me|search|review|admin)(\/|$)/;
   if (typeof window !== 'undefined') window.__tlGuard = () => ({ navFrom, allow: allowLeaveGuard, noGuard: !!window.__NO_GUARD });
   const DETAIL_ROUTE = /^#\/(track|word)\//;
   let lastMainHash = '#/home';                       // 最近一次非详情页：退出详情时的兜底
 
-  /** 离开详情页的二次确认：onStay/onLeave 由调用方按「URL 有没有先走」决定 */
-  function showExitConfirm(from, onStay, onLeave) {
-    const isTrack = String(from).startsWith('#/track/');
-    const tr = isTrack ? curTrack : null;
+  /** 不可回退（再返回就退桌面）：问一次是否退出 App */
+  function askExitApp() {
     showDialog({
-      title: isTrack ? '要退出学词页吗？' : '要返回上一页吗？',
-      body: tr ? esc(tr.title) : '',
+      title: '退出 App？',
       actions: [
-        { label: isTrack ? '继续听' : '留在本页', kind: 'main', onClick: onStay || (() => {}) },
-        { label: '退出', onClick: onLeave || (() => {}) },
+        { label: '退出', kind: 'main', onClick: () => nativeBack.exit() },
+        { label: '取消' },
       ],
     });
   }
 
-  /** 详情页“退出”：优先按历史退回列表，没历史就回最近的主 tab */
+  /** 详情页返回：优先按历史退回列表，没历史就回最近的主 tab */
   function leaveDetail() {
     const fallback = lastMainHash || '#/home';
     if (history.length > 1) goBack(fallback); else go(fallback);
@@ -2992,18 +2948,18 @@ import { icon } from './icons.js?v=20261016f';
       const d = $('dlg'); if (d && !d.hidden) { d.hidden = true; return; }
       const p = $('pop'); if (p && p.classList.contains('on')) { hidePop(); return; }
       const pl = $('player'); if (pl && pl.classList.contains('on')) { pl.classList.remove('on'); return; }
-      const g = $('gate'); if (g && !g.hidden) { nativeBack.exit(); return; }
+      const g = $('gate'); if (g && !g.hidden) { askExitApp(); return; }
       const h = location.hash || '#/home';
-      if (DETAIL_ROUTE.test(h)) { showExitConfirm(h, () => {}, leaveDetail); return; }
-      if (h === '#/home' || h === '') { nativeBack.exit(); return; }
+      if (DETAIL_ROUTE.test(h)) { leaveDetail(); return; }     // 详情页：直接回，不弹窗
+      if (h === '#/home' || h === '') { askExitApp(); return; } // 回不到上一页：问是否退出
       if (history.length > 1) { history.back(); return; }
-      nativeBack.exit();
+      askExitApp();
     } catch (e) { /* 退不出去也别崩 */ }
   };
 
-  function onNavGuard(e) {
+  function onNavGuard() {
     const to = location.hash || '#/home';
-    if (typeof window !== 'undefined' && window.__NO_GUARD) { navFrom = to; return; }   // 自动化测试用：关掉二次确认
+    if (typeof window !== 'undefined' && window.__NO_GUARD) { navFrom = to; return; }   // 自动化测试用
     if (allowLeaveGuard) { allowLeaveGuard = false; navFrom = to; return; }             // 自己点的导航：无条件放行一次
     const from = navFrom;
     navFrom = to;
@@ -3015,11 +2971,7 @@ import { icon } from './icons.js?v=20261016f';
       allowLeaveGuard = true; go(from);
       return;
     }
-    if (DETAIL_ROUTE.test(from) && LEAVING_TABS.test(to)) {
-      // 这里 URL 已经到目标页了：继续听 = 回详情；退出 = 保持现状
-      showExitConfirm(from, () => go(from), () => {});
-      return;
-    }
+    // 其余返回一律直接走，不再二次确认
   }
 
   // ── 侧滑返回：详情页/播放器里左缘右划（真机边缘手势多被系统截走，最终仍走原生 BACK → __tlOnBackPressed）──
@@ -3137,7 +3089,6 @@ import { icon } from './icons.js?v=20261016f';
     $('q-clear').onclick = () => { $('q').value = ''; if (location.hash.startsWith('#/search')) go(lastNonSearch); };
 
     bindAudio();
-    bindVoicepackRefresh();
     setupKeyboardAwareSheet();
     $('playbtn').onclick = (e) => { e.stopPropagation(); togglePlay(); };
     $('mb-meta').onclick = () => openPlayer();
@@ -3169,7 +3120,7 @@ import { icon } from './icons.js?v=20261016f';
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
     if ($('p-speak')) $('p-speak').innerHTML = icon('volume', 'in') + '发音';
-    $('p-speak').onclick = () => speak((popSeg && popSeg.r) || (popWord && (popWord.reading || popWord.word)) || popFallback);
+    $('p-speak').onclick = () => speak((popWord && (popWord.reading || popWord.word)) || (popSeg && popSeg.r) || popFallback);
     $('p-close2').onclick = hidePop;
     $('p-detail').onclick = () => { if (popWord) { const id = popWord.id; hidePop(); go('#/word/' + id); } };
     $('p-edit').onclick = () => {
@@ -3355,6 +3306,7 @@ import { icon } from './icons.js?v=20261016f';
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
     setTimeout(() => gcLocalAudio(), 3000);            // 清掉没人认领的本机音频副本
     if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);   // 静默查一次新版本
+    setTimeout(voicePackPrompt, 1800);
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
     if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {
       setTimeout(() => checkPlaylists({ silent: true }), 9000);
