@@ -1020,3 +1020,10 @@ node .e2e/run-e2e.mjs                              # 全量（所有 check 都�
 - CDP `window.__tlSpeak('さなえ')` → `VoicePack.resolve` 命中 `files/voicepacks/kokoro-ja/audio/<sha1>.mp3`，
   `<audio id=speak-audio>` 播放本地文件（`convertFileSrc`）。
 - 2026-10-16 对比样本（一年签名 URL）：`tts/samples/kokoro-*.mp3` 与 `tts/samples/f01-*.mp3`。
+
+#### 五、2026-10-16 真机收尾（version i）
+
+- 修复 `voice-pack.js` 的 `addListener` 兼容：这个 Capacitor 版本返回的是同步 handle（不是 Promise），旧写法 `.then` 直接 TypeError，导致语音包页「下载」点了没反应；现在两种都兼容。
+- 真机（NOH-AN00）验收：Kokoro 包 30MB 下载 → sha256 → 解压 6357 个 mp3 → `resolve` 命中 → `<audio>` 播放本地文件；
+  OJT 1.12（F01）也走了一遍 UI 下载/解压；`--es vptest` 合成 1.81s WAV。两种包可共存、可单独删。
+- E2E 全量 214/214；Pages 已更新到 `20261016i`（APK 17.8MB，content-length 一致）。
