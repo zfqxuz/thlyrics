@@ -38,6 +38,8 @@
   --accent-ink: #f5b09c;
   --accent-ink-2: #e0826a;
   --moss:      #a8b584;     /* 苔色 */
+  --star:      #e3c069;     /* 山吹（星标）*/ 
+  --star-soft: rgba(227,192,105,.14);
   --moss-soft: rgba(168,181,132,.16);
   --ok:        #94c79a;
   --ok-soft:   rgba(148,199,154,.12);
@@ -102,6 +104,8 @@ body.warm{
   --accent-ink: #b54a3b;
   --accent-ink-2: #9a3a2d;
   --moss:      #7c8a5a;
+  --star:      #c09a3e;     /* 山吹（星标）*/
+  --star-soft: rgba(192,154,62,.13);
   --moss-soft: rgba(124,138,90,.14);
   --ok:        #5a8a64;
   --ok-soft:   rgba(90,138,100,.12);
@@ -969,6 +973,129 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 .updrow .k small{display:block;color:var(--ink-3);font-size:11.5px;margin-top:3px;word-break:break-word;font-family:var(--sans)}
 
 
+
+/* ══════════════════════════════════════════════════════════
+   星标 ★ / 复习（验证式）/ 学词标签化  ——  本轮新增
+   图标全部取自 Lucide v0.468.0 官方，非自绘
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 星标按钮：三处共用一套状态 ── */
+.star{display:grid;place-items:center;border:0;background:transparent;color:var(--ink-3);
+  border-radius:50%;transition:background-color .15s,color .15s;padding:0;cursor:pointer}
+.star:hover{background:var(--star-soft);color:var(--star)}
+.star.on{color:var(--star);background:var(--star-soft)}
+.star svg{stroke-width:2}
+.star.on svg{animation:star-pop .18s cubic-bezier(.2,.8,.2,1)}
+@keyframes star-pop{0%{transform:scale(1)}55%{transform:scale(1.22)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.star.on svg{animation:none}}
+.star.big{width:38px;height:38px;font-size:20px}
+.star.big svg{width:20px;height:20px}
+/* 列表行里的星标：和 .tick 同规格，但激活色是山吹不是苔绿 */
+.tick.star.on{color:var(--star);background:var(--star-soft)}
+/* 抽屉里的星标：跟 .icbtn 同规格 */
+#pop .icbtn.star.on{color:var(--star);background:var(--star-soft)}
+
+/* ── 详情页：标题行 + 星标 ── */
+.whead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.whead .sec-title{flex:1;min-width:0}
+/* 列表行上的「已掌握」小标签 */
+.wtag{display:inline-block;margin-left:8px;padding:1px 6px;border:1px solid var(--hairline);
+  border-radius:5px;font-size:10.5px;font-weight:400;color:var(--ink-3);vertical-align:1px}
+.item.word.known .l1{color:var(--ink-2)}
+/* 错词右上角的小角标 */
+.chip .sup{font-style:normal;font-size:9.5px;margin-left:3px;color:var(--accent-ink);vertical-align:super}
+
+/* ── 学词页：复习巩固条 ── */
+.duebar{
+  display:flex;align-items:center;gap:10px;margin:0 0 18px;padding:11px 0;
+  border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);
+}
+.duebar .t{font-family:var(--serif);font-size:13px;letter-spacing:.06em;color:var(--ink-2)}
+.duebar .n{font-size:12.5px;color:var(--ink);margin-left:auto}
+.duebar .go{padding:0;border:0;background:none;color:var(--accent);font-family:var(--serif);font-size:13px;cursor:pointer}
+.duebar .go:hover{color:var(--accent-2)}
+.duebar.empty .n{color:var(--ink-3);font-size:12px;margin-left:auto;text-align:right;line-height:1.5}
+
+/* ── 我的词页脚 ── */
+.mine-foot{font-size:12px;color:var(--ink-3);padding:12px 0 4px}
+
+/* ── 复习：一屏一题 ── */
+.revwrap{max-width:520px;margin:0 auto}
+.revtop{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.revx{padding:0;border:0;background:none;color:var(--ink-3);font-family:var(--serif);font-size:13px;
+  display:inline-flex;align-items:center;gap:2px;cursor:pointer}
+.revx:hover{color:var(--ink)}
+.revx svg{width:15px;height:15px}
+.revcount{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em}
+.revbar{height:2px;border-radius:2px;background:var(--bar);overflow:hidden;margin:10px 0 0}
+.revbar i{display:block;height:100%;background:var(--accent);transition:width .25s ease}
+.revq{padding:34px 4px 22px;text-align:center;min-height:150px;
+  display:flex;flex-direction:column;justify-content:center;gap:14px}
+.revkind{font-size:11.5px;color:var(--ink-3);letter-spacing:.14em;font-family:var(--serif)}
+.revprompt{color:var(--ink)}
+.revprompt .rw1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:.04em}
+.revprompt .rw2{display:block;font-style:normal;font-size:13px;color:var(--ink-2);margin-top:8px;font-family:var(--serif)}
+.revprompt .rw3{font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.5}
+.revprompt .rw4{display:block;font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.9;letter-spacing:.02em}
+.revprompt .rw4 .blank{color:var(--accent);font-weight:400;letter-spacing:.06em}
+.revprompt .rw5{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);margin-top:8px}
+.rwplay{width:72px;height:72px;border-radius:50%;border:1px solid var(--layer-line);background:var(--surface-2);
+  color:var(--accent);display:inline-grid;place-items:center;margin:0 auto;cursor:pointer;
+  transition:background-color .15s,transform .15s}
+.rwplay:hover{background:var(--hov)}
+.rwplay:active{transform:scale(.96)}
+.rwplay svg{width:30px;height:30px}
+
+/* 选项：整行卡片（学多邻国的"形"，但用我们自己的纸/墨色） */
+.revopts{display:flex;flex-direction:column;gap:9px;padding-bottom:8px}
+.revopt{
+  display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:12px 16px;
+  border:1px solid var(--layer-line);border-radius:13px;background:var(--surface);
+  color:var(--ink);font-size:16px;font-family:var(--sans);text-align:left;cursor:pointer;
+  transition:background-color .15s,border-color .15s,color .15s,opacity .2s;
+}
+.revopt .k{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:1px solid var(--layer-line);
+  display:grid;place-items:center;font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.revopt .t{flex:1;min-width:0}
+.revopt:hover{background:var(--hov);border-color:var(--ink-mute)}
+.revopt:active{transform:scale(.995)}
+.revopt:disabled{cursor:default;transform:none}
+.revopt.right{border-color:var(--ok);background:var(--ok-soft);color:var(--ink)}
+.revopt.right .k{border-color:var(--ok);color:var(--ok-ink)}
+.revopt.wrong{border-color:var(--danger);background:var(--danger-soft);color:var(--ink)}
+.revopt.wrong .k{border-color:var(--danger);color:var(--danger)}
+.revopt.dim{opacity:.4}
+
+/* 底部阻断式反馈条：必须按「继续」才走 */
+.revfeed{
+  display:flex;align-items:center;gap:10px;margin-top:14px;padding:14px 16px;
+  border-radius:13px;border:1px solid var(--layer-line);background:var(--surface-2);
+}
+.revfeed.ok{border-color:var(--ok);background:var(--ok-soft)}
+.revfeed.bad{border-color:var(--danger);background:var(--danger-soft)}
+.revfeed .fi{display:grid;place-items:center;color:var(--ink-2)}
+.revfeed.ok .fi{color:var(--ok-ink)}
+.revfeed.bad .fi{color:var(--danger)}
+.revfeed .fi svg{width:20px;height:20px}
+.revfeed .fm{flex:1;min-width:0;font-size:14px;color:var(--ink)}
+.revfeed .fnext{padding:7px 16px;border:0;border-radius:9px;background:var(--accent);color:#fff8ec;
+  font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.revfeed .fnext:hover{background:var(--accent-2)}
+
+/* 结算 */
+.revdone{text-align:center;padding:52px 0 30px}
+.revdone .rd-t{font-family:var(--serif);font-size:14px;letter-spacing:.18em;color:var(--ink-3)}
+.revdone .rd-big{font-family:var(--serif);font-size:54px;font-weight:600;color:var(--ink);line-height:1.2;margin-top:10px}
+.revdone .rd-big span{font-size:22px;color:var(--ink-3)}
+.revdone .rd-sub{font-size:12.5px;color:var(--ink-2);margin-top:10px;line-height:1.8}
+
+/* 窄屏：选项字号小一档，别把中文释义挤断 */
+@media (max-width:380px){
+  .revopt{font-size:15px;padding:11px 13px;min-height:48px}
+  .revprompt .rw1{font-size:32px}
+  .revprompt .rw4{font-size:17px}
+  .revdone .rd-big{font-size:46px}
+}
 </style>
 </head>
 <body>
@@ -995,7 +1122,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   <nav class="segs" id="tabs">
     <button id="tab-learn" class="on">学词</button>
     <button id="tab-songs">曲库</button>
-    <button id="tab-mine">生词本</button>
+    <button id="tab-mine">我的词</button>
     <button id="tab-me">我的</button>
   </nav>
 
@@ -1106,6 +1233,8 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
         <span class="w3" id="p-romaji"></span>
       </div>
       <div class="r1-r">
+        <!-- 本次唯一的新增：词级星标。发音/已掌握/关闭 一概不动 -->
+        <button class="icbtn star" id="p-star" title="星标" aria-label="星标"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg></button>
         <button class="icbtn" id="p-speak" title="发音"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg></button>
         <button class="icbtn" id="p-known" title="标为已掌握"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button>
         <button class="icbtn" id="p-close2" title="关闭"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
@@ -1143,6 +1272,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017p"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017q"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
