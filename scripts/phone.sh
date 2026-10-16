@@ -31,8 +31,12 @@ case "${1:-}" in
   swipe) $ADB shell input swipe "$2" "$3" "$4" "$5" "${6:-300}" ;;
   key)  $ADB shell input keyevent "$2" ;;
   install)
+    # 华为走 adb install 会弹「风险提示」→ 应用市场广告页，容易卡死（踩过）。
+    # push + pm install 直接过，不需要点屏幕。
     cp "$2" "$WSL_TMP/install.apk"
-    $ADB install -r "$WIN_TMP\\install.apk"
+    $ADB push "$WIN_TMP\\install.apk" /data/local/tmp/_i.apk >/dev/null
+    $ADB shell pm install -r /data/local/tmp/_i.apk 2>&1 | tail -2
+    $ADB shell rm -f /data/local/tmp/_i.apk
     ;;
   start) $ADB shell am start -n com.zfqxuz.thlyrics/.MainActivity ;;
   stop)  $ADB shell am force-stop com.zfqxuz.thlyrics ;;

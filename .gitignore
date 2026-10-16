@@ -20,3 +20,4 @@ app/android/app/src/main/assets/public/
 .e2e/
 node_modules/
 .shots-phone/
+.e2e/android/*.mjs

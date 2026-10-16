@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017c';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017c';
-import { icon } from './icons.js?v=20261017c';
+import { V } from './version.js?v=20261017f';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017f';
+import { icon } from './icons.js?v=20261017f';
 
 (() => {
   'use strict';
@@ -808,25 +808,46 @@ import { icon } from './icons.js?v=20261017c';
     let n = pos + dir;
     if (n < 0) n = lines.length - 1;
     if (n >= lines.length) n = 0;
-    // 循环开着时，上一句/下一句是「换到那句继续循环」，不能悄悄退出循环
-    playFrom(lines[n].i);
+    // 循环开着时，上一句/下一句是「换到那句继续循环」；没循环时就只是挪一句，不能偷偷切进单句
+    playFrom(lines[n].i, false);
   }
-  /** 点句子：从这句继续往下播（不循环）——只有双击/长按/循环键才开单句循环 */
-  function playFrom(i) {
+  /**
+   * 点句子 = 把单句循环切到这一句（README：「点句子从那句开始循环」/ 约束①：单句重复是硬需求）。
+   * 以前这里只在 mode==='loop' 时才循环，其它情况只是「从那句往下播」——
+   * 结果用户在「全曲」模式下点句子，看起来就是「点击播放单句失效了」。
+   * 现在无论当前什么模式，点句子一律切到单句循环（模式也跟着切过去，状态在控件上看得见）；
+   * 想整首连着放就别点句子，用播放键 / 「全曲」开关。
+   */
+  function playFrom(i, forceLoop = true) {
     if (!curLines[i]) return;
     const t = curLines[i].t;
-    if (mode === 'loop') {                       // 循环模式：换到这句继续循环
-      loopLine = i; activeLine = i;
-      if (t != null) jump(t);
-      if (audio.paused) audio.play().catch(() => {});
-      highlight(true); return;
+    // forceLoop=false 用于「上一句 / 下一句」：只挪位置，别偷偷把模式切进单句
+    const toLoop = forceLoop || mode === 'loop';
+    const wasAll = mode !== 'loop';
+    if (toLoop) {
+      if (wasAll && forceLoop) setMode('loop');    // 点句子才切模式；上下句不切
+      loopLine = i;
+    } else {
+      loopLine = null;
     }
     activeLine = i;
     if (t != null) jump(t);
-    highlight(true);
-    if (curTrack) playTrack(curTrack, { at: t });   // 整首模式：从这句继续往下播
-    toast('双击＝单句循环');
+    // 全曲模式挪一句时，音频可能还没挂上（jump 只存了 seekTime，没人消费）→ 交给 playTrack 带上 at
+    const needLoad = audio.getAttribute('data-tid') !== (curTrack && curTrack.id) || !audio.src;
+    if (!toLoop && needLoad) { if (curTrack) playTrack(curTrack, { at: t }); }
+    else if (audio.paused || (wasAll && forceLoop)) audio.play().catch(() => {});
+    highlight(false);
+    armTapScroll();                               // 滚动推迟：否则第一下就把歌词滚走，第二下落不到同一行
+    if (wasAll && forceLoop) toast('单句循环 · 点「全曲」恢复整首');
   }
+  // 单击后不马上滚动，等「双击窗口」过去再滚到当前句 —— 保证双击的第二下落在同一行同一处
+  let tapScrollT = null;
+  function armTapScroll() {
+    clearTimeout(tapScrollT);
+    tapScrollT = setTimeout(() => { tapScrollT = null; highlight(true); }, DBL_MS + 80);
+  }
+  // 双击判定窗：真机上手速普遍 300~500ms，原来 360ms 太紧（踩过：10 次里 8 次判不出来）
+  const DBL_MS = 620;
   let toastTimer = null;
   function toast(msg) {
     setState(msg);
@@ -2675,7 +2696,8 @@ import { icon } from './icons.js?v=20261017c';
         // 词只认「当前这一句」：点别的句里的词 = 先切到那一句，不弹词条（用户要求：
         // 想查别的句的词，先把那句切过来）
         if (li != null && cur >= 0 && li !== Number(cur)) {
-          playFrom(li);
+          // 点「别的句」里的词 = 先把那句切过来（用户要求），但**不动模式**（约束：点词不能冒泡到切换循环行）
+          playFrom(li, false);
           toast('已切到这一句 · 再点词看释义');
           return;
         }
@@ -2692,20 +2714,26 @@ import { icon } from './icons.js?v=20261017c';
       if (!b) return;
       const i = Number(b.dataset.i);
       const now = Date.now();
-      if (now - lastTap < 360 && lastTapIdx === i) { lastTap = 0; setLoop(i); toast('单句循环'); return; }   // 双击 → 切到单句循环
+      if (now - lastTap < DBL_MS && lastTapIdx === i) {          // 双击 → 切到单句循环
+        lastTap = 0; clearTimeout(tapScrollT); tapScrollT = null;
+        setLoop(i); toast('单句循环'); return;
+      }
       lastTap = now; lastTapIdx = i;
       playFrom(i);
     });
-    host.addEventListener('dblclick', (e) => {           // 桌面端双击
+    host.addEventListener('dblclick', (e) => {           // 原生双击（安卓 WebView 会直接给这个）
       const b = e.target.closest('.lblock[data-i]');
-      if (b && !e.target.closest('.w')) setLoop(Number(b.dataset.i));
+      if (b && !e.target.closest('.w')) {
+        clearTimeout(tapScrollT); tapScrollT = null;
+        setLoop(Number(b.dataset.i)); toast('单句循环');
+      }
     });
     host.addEventListener('contextmenu', (e) => { const b = e.target.closest('.lblock[data-i]'); if (b) { e.preventDefault(); setLoop(Number(b.dataset.i)); } });
     host.addEventListener('touchstart', (e) => {
       const b = e.target.closest('.lblock[data-i]');
       if (!b || e.target.closest('.w')) return;
       clearTimeout(pressTimer);
-      pressTimer = setTimeout(() => setLoop(Number(b.dataset.i)), 520);      // 长按 = 单句循环
+      pressTimer = setTimeout(() => { setLoop(Number(b.dataset.i)); toast('单句循环'); }, 420);   // 长按 = 单句循环
     }, { passive: true });
     host.addEventListener('touchend', () => clearTimeout(pressTimer));
     host.addEventListener('touchmove', () => clearTimeout(pressTimer));
