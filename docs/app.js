@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017a';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017a';
-import { icon } from './icons.js?v=20261017a';
+import { V } from './version.js?v=20261017c';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017c';
+import { icon } from './icons.js?v=20261017c';
 
 (() => {
   'use strict';
@@ -2738,7 +2738,7 @@ import { icon } from './icons.js?v=20261017a';
           <div class="col">
             <div class="track-title serif">${esc(t.title)}</div>
             <div class="track-artist">${esc(t.artist)}${t.album ? ' · ' + esc(t.album) : ''}</div>
-            <div class="track-base">原曲：${esc(t.base || '—')} · ${t.lineCount} 行${zhN ? ' · 中文 ' + zhN : ''}</div>
+            <div class="track-base">${t.imp ? `来自歌单：${esc(t.plName || '导入')}` : `原曲：${esc(t.base || '—')}`} · ${t.lineCount} 行${zhN ? ' · 中文 ' + zhN : ''}</div>
           </div>
         </div>
         <div class="track-actions">

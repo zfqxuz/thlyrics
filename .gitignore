@@ -19,3 +19,4 @@ data/myzhtr/
 app/android/app/src/main/assets/public/
 .e2e/
 node_modules/
+.shots-phone/

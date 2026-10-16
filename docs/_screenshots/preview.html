@@ -35,6 +35,7 @@ figcaption{font-size:12.5px;color:var(--ink2);padding:10px 14px;border-top:1px s
 <div class="toolbar">
   <button class="on" data-tab="pages">页面</button>
   <button data-tab="player">跟唱</button>
+  <button data-tab="phone">真机</button>
   <button data-tab="notes">说明</button>
   <div class="toggle">
     <span>主题</span>
@@ -73,6 +74,19 @@ figcaption{font-size:12.5px;color:var(--ink2);padding:10px 14px;border-top:1px s
   <figure><img src="demo-dark-player.png" alt=""><figcaption>跟唱页 · dark</figcaption></figure>
 </div>
 
+<h2 id="phone-title">真机实测（华为 NOH-AN00 · 384×756pt @3x）</h2>
+<p class="lead">不是模拟器截图：adb screencap 直接从手机上抓的（当前版本 20261017c）。</p>
+<div class="row" id="phone">
+  <figure><img src="phone/phone-home-warm.png" alt=""><figcaption>首页 · 暖白</figcaption></figure>
+  <figure><img src="phone/phone-songs-warm.png" alt=""><figcaption>曲库 · 暖白（207 首真实导入）</figcaption></figure>
+  <figure><img src="phone/phone-learn-warm.png" alt=""><figcaption>学词 · 暖白（1609 词库）</figcaption></figure>
+  <figure><img src="phone/phone-track-warm.png" alt=""><figcaption>单曲页 · 暖白</figcaption></figure>
+  <figure><img src="phone/phone-player-highlight.png" alt=""><figcaption>跟唱页 · 当前句高亮</figcaption></figure>
+  <figure><img src="phone/phone-popup-warm.png" alt=""><figcaption>词条弹层 · 暖白</figcaption></figure>
+  <figure><img src="phone/phone-mine-warm.png" alt=""><figcaption>生词本 · 暖白</figcaption></figure>
+  <figure><img src="phone/phone-me-warm.png" alt=""><figcaption>我的 · 暖白</figcaption></figure>
+</div>
+
 <h2>设计要点</h2>
 <div class="row" id="notes" hidden>
   <figure style="padding:18px;background:var(--paper)">
@@ -103,7 +117,7 @@ figcaption{font-size:12.5px;color:var(--ink2);padding:10px 14px;border-top:1px s
   </figure>
 </div>
 
-<p class="foot">β · 20261017a · 等验收后合主干</p>
+<p class="foot">β · 20261017c · 真机已验 · 等验收后合主干</p>
 
 <script>
 const tab = document.querySelectorAll('[data-tab]');
@@ -111,11 +125,13 @@ const groups = {
   pages: ['#pages-title','#pages', '#pages-dark'],
   player: ['#player-title','#player', '#player-dark'],
   notes: ['', '#notes'],
+  phone: ['#phone-title', '#phone'],
 };
 const groupsDark = { pages: '#pages-dark', player: '#player-dark' };
 function show(t) {
   document.querySelectorAll('.row').forEach(el => el.hidden = true);
   if (t === 'notes') { document.getElementById('notes').hidden = false; return; }
+  if (t === 'phone') { document.getElementById('phone-title').hidden = false; document.getElementById('phone').hidden = false; return; }
   document.getElementById(t === 'pages' ? 'pages-title' : 'player-title').hidden = false;
   document.getElementById(t).hidden = false;
   const dark = document.body.classList.contains('dark');

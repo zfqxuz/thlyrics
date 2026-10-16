@@ -23,10 +23,10 @@
 :root{
   --bg:        #171a1f;     /* 夜墨 */
   --bg-2:      #1c1f26;     /* 略提 */
-  --surface:   #1f242d;     /* 卡片/浮层 */
-  --surface-2: #252b35;     /* 高一层 */
-  --line:      rgba(237,229,210,.08);
-  --hairline:  rgba(237,229,210,.05);
+  --surface:   #222833;     /* 卡片/浮层：比 bg 明显一档 */
+  --surface-2: #2b323e;     /* 再高一层 */
+  --line:      rgba(237,229,210,.10);
+  --hairline:  rgba(237,229,210,.06);
   --ink:       #ede5d2;     /* 纸白（带暖） */
   --ink-2:     #a8a294;     /* 灰墨 */
   --ink-3:     #6f6a5e;     /* 淡墨 */
@@ -73,10 +73,11 @@
   --bar:   rgba(237,229,210,.10);
   --grab:  rgba(237,229,210,.20);
   --shadow-sm: 0 1px 3px rgba(0,0,0,.18);
-  --shadow:    0 -8px 28px rgba(0,0,0,.42);
-  --shadow-lg: 0 12px 36px rgba(0,0,0,.45);
+  --shadow:    0 -10px 32px rgba(0,0,0,.55);
+  --shadow-lg: 0 14px 40px rgba(0,0,0,.58);
 
   --sheetline: rgba(237,229,210,.08);
+  --layer-line: rgba(237,229,210,.14);
   --radius: 14px;
   --radius-lg: 18px;
   --radius-xl: 22px;
@@ -121,12 +122,14 @@ body.warm{
   --press: rgba(74,58,42,.08);
   --track: rgba(74,58,42,.10);
   --bar:   rgba(74,58,42,.10);
+  --field: #ebe2cd;     /* 输入框底色 */
   --grab:  rgba(74,58,42,.18);
   --shadow-sm: 0 1px 3px rgba(74,58,42,.10);
-  --shadow:    0 -8px 28px rgba(74,58,42,.18);
-  --shadow-lg: 0 12px 32px rgba(74,58,42,.18);
+  --shadow:    0 -10px 30px rgba(74,58,42,.22);
+  --shadow-lg: 0 14px 36px rgba(74,58,42,.22);
 
   --sheetline: rgba(74,58,42,.10);
+  --layer-line: rgba(74,58,42,.14);   /* 浮层描边：比 hairline 清楚一档 */
 }
 
 /* ── 基础 ── */
@@ -178,14 +181,31 @@ body:not(.warm) .topbar{background:rgba(23,26,31,.72)}
   -webkit-backdrop-filter:blur(14px) saturate(160%);
   backdrop-filter:blur(14px) saturate(160%);
 }
-.brand{font-size:15px;font-weight:600;letter-spacing:.02em;display:flex;align-items:baseline;gap:10px}
-.brand .b1{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:.04em}
-.brand .b2{font-family:var(--serif);font-size:11px;color:var(--ink-3);font-weight:400;letter-spacing:.14em}
-.brand small{color:var(--ink-3);font-weight:400;font-size:11.5px;margin-left:8px}
+.brand{
+  font-size:15px;font-weight:600;letter-spacing:.02em;
+  display:flex;align-items:baseline;gap:9px;
+  min-width:0;overflow:hidden;white-space:nowrap;flex-wrap:nowrap;
+}
+.brand .b1{
+  font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:.04em;
+  white-space:nowrap;flex:0 0 auto;
+}
+.brand .b2{
+  font-family:var(--serif);font-size:10.5px;color:var(--ink-3);font-weight:400;letter-spacing:.10em;
+  white-space:nowrap;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;
+}
+.brand small{
+  color:var(--ink-3);font-weight:400;font-size:11px;
+  white-space:nowrap;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;
+  padding-left:9px;border-left:1px solid var(--hairline);line-height:1.2;
+}
+/* 窄屏：装饰性的日文副标让位，别把「TH Lyrics」和曲库计数挤成两行 */
+@media (max-width:440px){ .brand .b2{display:none} }
+@media (max-width:340px){ #headstat{display:none} }
 
 /* 顶栏图标按钮：去掉边框，纯图标 + press 极浅底色 */
 .iconbtn{
-  width:36px;height:36px;border-radius:50%;
+  width:36px;height:36px;flex:0 0 auto;border-radius:50%;
   border:0;background:transparent;color:var(--ink-2);
   display:grid;place-items:center;font-size:16px;
   transition:background-color .15s ease,color .15s ease,transform .12s ease;
@@ -200,7 +220,7 @@ body:not(.warm) .topbar{background:rgba(23,26,31,.72)}
 .searchbox input{
   width:100%;height:42px;padding:0 38px 0 14px;
   border-radius:21px;border:0;
-  background:var(--surface);color:var(--ink);
+  background:var(--field);color:var(--ink);
   font-size:14px;outline:none;
   transition:background-color .15s;
 }
@@ -341,7 +361,7 @@ main{padding:8px 18px 140px}
 .chip:last-child{margin-right:0}
 .chip.on{color:var(--ink);font-weight:600}
 .chip.on::after{content:"";position:absolute;left:2px;right:2px;bottom:-2px;height:1px;background:var(--accent)}
-.sel{height:34px;padding:0 10px;border-radius:11px;border:0;background:var(--surface);color:var(--ink-2);font-size:var(--fs-sub)}
+.sel{height:34px;padding:0 10px;border-radius:11px;border:0;background:var(--field);color:var(--ink-2);font-size:var(--fs-sub)}
 .toolbtn{
   height:34px;padding:0 14px;border-radius:11px;border:0;
   background:var(--surface);color:var(--ink-2);font-size:var(--fs-sub);
@@ -360,7 +380,7 @@ main{padding:8px 18px 140px}
 }
 .gatecard .gtitle{font-size:22px;font-family:var(--serif);color:var(--ink);font-weight:600;letter-spacing:.02em}
 .gatecard .gsub{font-size:12.5px;color:var(--ink-2);line-height:1.7}
-.gatecard .sel{height:42px;border-radius:12px;border:0;background:var(--surface-2);color:var(--ink);padding:0 12px;font-size:14px}
+.gatecard .sel{height:42px;border-radius:12px;border:0;background:var(--field);color:var(--ink);padding:0 12px;font-size:14px}
 .gatecard .row{display:flex;gap:8px}
 .gatecard .row button{flex:1}
 .gatecard .gmsg{font-size:12px;color:var(--accent-ink);min-height:16px}
@@ -369,7 +389,7 @@ main{padding:8px 18px 140px}
 .accbox.on{border-bottom-color:var(--accent)}
 .accbox .l1{font-size:14px;color:var(--ink);font-family:var(--serif)}
 .accbox .l2{font-size:12px;color:var(--ink-2);line-height:1.7;margin-top:3px}
-.accbox .sel{height:36px;border-radius:11px;border:0;background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px}
+.accbox .sel{height:36px;border-radius:11px;border:0;background:var(--field);color:var(--ink);padding:0 10px;font-size:13px}
 
 /* ── 按钮三档 ── 文字化为主，主按钮用左色块强调而不是"实心按钮" */
 .btn-main{
@@ -433,16 +453,17 @@ body.warm .btn-main{color:#fff8ec}
   background:transparent;
 }
 .herohead .ht{
-  font-family:var(--serif);font-size:28px;line-height:1.32;font-weight:600;
+  font-family:var(--serif);font-size:26px;line-height:1.34;font-weight:600;
   color:var(--ink);letter-spacing:.02em;
 }
+@media (max-width:380px){ .herohead .ht{font-size:23px} }
 .herohead .ht .accent{color:var(--accent)}
 .herohead .ht .sep{display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin:0 4px 4px;vertical-align:middle}
 .herohead .hs{font-size:13px;color:var(--ink-2);margin-top:12px;line-height:1.7}
 .homesearch{display:flex;gap:8px;margin-top:18px}
 .homesearch input{
   flex:1;min-width:0;height:44px;padding:0 14px;border-radius:22px;border:0;
-  background:var(--surface);color:var(--ink);font-size:14px;outline:none;
+  background:var(--field);color:var(--ink);font-size:14px;outline:none;
 }
 .homesearch input::placeholder{color:var(--ink-3)}
 .homesearch input:focus{background:var(--surface-2)}
@@ -483,7 +504,7 @@ body.warm .btn-main{color:#fff8ec}
 #displaybox{
   position:absolute;right:12px;bottom:calc(100% + 12px);z-index:5;
   display:none;min-width:240px;padding:14px 16px;border-radius:14px;
-  border:1px solid var(--line);background:var(--surface);
+  border:1px solid var(--layer-line);background:var(--surface);
   box-shadow:var(--shadow-lg);
 }
 #displaybox.on{display:block}
@@ -554,7 +575,7 @@ body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--i
   display:flex;align-items:center;gap:10px;padding:8px 12px;
   border-radius:16px;
   background:var(--surface);
-  border:1px solid var(--hairline);
+  border:1px solid var(--layer-line);
   box-shadow:var(--shadow-lg);
 }
 #minibar .meta{flex:1;min-width:0;cursor:pointer}
@@ -702,7 +723,7 @@ body:not(.warm) #player .pctl{background:rgba(23,26,31,.85)}
   position:fixed;left:0;right:0;bottom:0;z-index:70;
   transform:translateY(110%);transition:transform .26s cubic-bezier(.2,.8,.2,1),opacity .2s;
   background:var(--surface);border-radius:20px 20px 0 0;
-  border:1px solid var(--hairline);
+  border:1px solid var(--layer-line);
   border-bottom:0;
   box-shadow:var(--shadow);
   max-height:74vh;overflow-y:auto;
@@ -726,7 +747,7 @@ body:not(.warm) #player .pctl{background:rgba(23,26,31,.85)}
 #pop .acts button:hover{color:var(--ink)}
 #pop .acts button.k{color:var(--ok)}
 #pop .acts button.k::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:1px;background:var(--ok)}
-#pop input{width:100%;height:38px;padding:0 12px;border-radius:11px;border:0;background:var(--surface-2);color:var(--ink)}
+#pop input{width:100%;height:38px;padding:0 12px;border-radius:11px;border:0;background:var(--field);color:var(--ink)}
 
 details.src{border-top:1px solid var(--line);margin-top:18px;padding-top:10px}
 details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px 0}
@@ -763,7 +784,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 .avdrop{
   position:absolute;right:0;top:calc(100% + 10px);z-index:60;
   min-width:200px;background:var(--surface);
-  border:1px solid var(--hairline);border-radius:14px;
+  border:1px solid var(--layer-line);border-radius:14px;
   padding:6px;box-shadow:var(--shadow-lg);
 }
 .avdrop[hidden]{display:none}
@@ -805,7 +826,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 
 .code{
   width:100%;min-height:80px;border-radius:12px;border:0;
-  background:var(--surface);color:var(--ink);padding:12px;
+  background:var(--field);color:var(--ink);padding:12px;
   font-size:11.5px;font-family:var(--mono);word-break:break-all;resize:vertical;
 }
 
@@ -873,7 +894,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 #dlg[hidden]{display:none}
 .dlgcard{
   width:100%;max-width:400px;
-  background:var(--surface);border:1px solid var(--hairline);
+  background:var(--surface);border:1px solid var(--layer-line);
   border-radius:18px;padding:22px;
   box-shadow:var(--shadow-lg);
 }
@@ -1061,6 +1082,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </div>
 </div>
 
-<script type="module" src="app.js?v=20261017a"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017c"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
