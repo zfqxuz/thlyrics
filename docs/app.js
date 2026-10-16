@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017n';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017n';
-import { icon } from './icons.js?v=20261017n';
+import { V } from './version.js?v=20261017o';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017o';
+import { icon } from './icons.js?v=20261017o';
 
 (() => {
   'use strict';
@@ -3172,7 +3172,7 @@ import { icon } from './icons.js?v=20261017n';
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
-    if ($('p-speak')) $('p-speak').innerHTML = icon('volume', 'in') + '发音';
+    if ($('p-speak')) $('p-speak').innerHTML = icon('volume');   // 圆图标里只放图标（以前把「发音」两个字也塞进来 → 喇叭下面挂字）
     $('p-speak').onclick = () => speak((popWord && (popWord.reading || popWord.word)) || (popSeg && popSeg.r) || popFallback);
     $('p-close2').onclick = hidePop;
     // 底部「上拉看更多」：点一下展开到 75%；展开态再点标题栏区域可收回
