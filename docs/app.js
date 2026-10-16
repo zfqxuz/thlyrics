@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017o';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017o';
-import { icon } from './icons.js?v=20261017o';
+import { V } from './version.js?v=20261017p';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017p';
+import { icon } from './icons.js?v=20261017p';
 
 (() => {
   'use strict';
@@ -271,9 +271,51 @@ import { icon } from './icons.js?v=20261017o';
     await playSpeakSrc(url);
   }
   const capFileSrc = (p) => (window.Capacitor && window.Capacitor.convertFileSrc ? window.Capacitor.convertFileSrc(p) : p);
+
+  /* 发音音量增益。
+     问题：TTS 音频的母带响度远低于音乐（网易云是响度战争压过的），两边都 volume=1 时
+     听起来「发音比音乐小一截」。HTMLAudio 的 volume 上限是 1.0，放不大 —— 只能用 Web Audio 的 GainNode。
+     坑：createMediaElementSource 对跨源媒体会「污染」(tainted) → 直接变静音。
+     所以先把音频抓成 blob 再用 objectURL（同源），失败就退回普通播放，绝不让发音变哑。 */
+  let speakCtx = null, speakGain = null, speakSrcNode = null, speakGainReady = false;
+  const SPEAK_GAIN = () => { const g = Number(S.voiceGain); return (isFinite(g) && g > 0) ? g : 1.9; };
+  function setupSpeakGain() {
+    if (speakGainReady) return true;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      speakCtx = speakCtx || new AC();
+      speakGain = speakCtx.createGain();
+      speakGain.gain.value = SPEAK_GAIN();
+      speakGain.connect(speakCtx.destination);
+      speakSrcNode = speakCtx.createMediaElementSource(getSpeakAudio());
+      speakSrcNode.connect(speakGain);
+      speakGainReady = true;
+      return true;
+    } catch { speakGainReady = false; return false; }
+  }
   async function playSpeakSrc(src) {
     const el = getSpeakAudio();
     try { el.pause(); } catch { /* 没播过 */ }
+    // 优先：抓成 blob（同源）→ 走 GainNode 放大
+    if (setupSpeakGain()) {
+      try {
+        const resp = await fetch(src);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          if (speakGain) speakGain.gain.value = SPEAK_GAIN();
+          if (speakCtx && speakCtx.state === 'suspended') { try { await speakCtx.resume(); } catch {} }
+          const done = () => { try { URL.revokeObjectURL(url); } catch {} el.removeEventListener('ended', done); };
+          el.addEventListener('ended', done);
+          el.src = url;
+          el.currentTime = 0;
+          await el.play();
+          return;
+        }
+      } catch { /* 落到下面普通播放 */ }
+    }
+    // 兜底：普通播放（音量跟随系统/元素，不再放大）
     el.src = src;
     el.currentTime = 0;
     await el.play();
