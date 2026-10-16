@@ -1,23 +1,21 @@
-node_modules/
-.e2e/node_modules/
-.e2e/root/
-.e2e/debs/
-.e2e/shots/
-data/netease-lyrics/
-.DS_Store
-*.log
-__pycache__/
+# 临时产物
+.design/
+.libs/
+.shots/
+.tmp-*.mjs
 
-# 临时/生成的图片（QQ 登录二维码快照、对齐检查截图）
-qr-qq-login.png
-align-check-*.png
-
-# 原生壳（app/）：Capacitor + Gradle 的产物
-app/node_modules/
-app/android/.gradle/
-app/android/build/
+# build artifacts in app/
 app/android/app/build/
+app/android/build/
+app/android/.gradle/
 app/android/local.properties
-app/android/.idea/
-app/ios/App/Pods/
-.tmp/
+app/node_modules/
+
+# 本地歌词/翻译（不进 git）
+data/lyricsrc/
+data/myzhtr/
+
+# Capacitor sync 产物
+app/android/app/src/main/assets/public/
+.e2e/
+node_modules/

@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261016i';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261016i';
-import { icon } from './icons.js?v=20261016i';
+import { V } from './version.js?v=20261017a';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017a';
+import { icon } from './icons.js?v=20261017a';
 
 (() => {
   'use strict';
@@ -937,15 +937,16 @@ import { icon } from './icons.js?v=20261016i';
     const withAudio = IDX.tracks.filter((t) => t.audio || t.audioOss).length;
     $('view-home').innerHTML = `
       <div class="herohead">
-        <div class="ht">TH Lyrics</div>
+        <div class="ht">今日から、<span class="accent">東方</span>の<br>歌詞で言葉を学ぶ。</div>
+        <div class="hs">——三首歌里挑五个词；先听懂，再背下。</div>
         <div class="homesearch">
           <input id="h-q" placeholder="搜曲名、社团、原曲、词…" autocomplete="off">
           <button id="h-go">搜索</button>
         </div>
         <div class="hln">
-          <button id="h-songs">曲库 ${IDX.tracks.length} 首</button>
+          <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
           <button id="h-words">学词</button>
-          <button id="h-mine">生词本 ${knownN}</button>
+          <button id="h-mine">生词本 <span class="cnt">${knownN}</span></button>
         </div>
       </div>
       ${last ? `<div class="nowcard">
@@ -1052,38 +1053,53 @@ import { icon } from './icons.js?v=20261016i';
     const list = deckList();
     const pct = libN ? Math.round((known / libN) * 100) : 0;
     $('view-learn').innerHTML = `
-      <div class="sec-head">
-        <div>
-          <div class="sec-title">今天学哪些词</div>
-          <div class="sec-sub">已掌握 ${known} / ${libN} 词 · 这一批还有 ${list.length} 个</div>
-        </div>
+      <div class="sec-head learn-head">
+        <div class="serif learn-title">今日から、<span class="accent">${list.length}</span> つの言葉。</div>
+        <div class="learn-sub">已掌握 ${known} / ${libN} 词 · 进度 ${pct}%</div>
       </div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="filtrow">
-        <select class="sel" id="d-range">
-          <option value="all">全部范围</option><option value="c1">标日初级上（1-24课）</option>
-          <option value="c2">标日初级下（25-48课）</option><option value="c3">标日中级</option>
-          <option value="out">标日未收录</option><option value="n45">JLPT N5-N4</option><option value="n123">JLPT N3-N1</option>
-        </select>
-        <select class="sel" id="d-pos">
-          <option value="all">全部词性</option><option value="名詞">名词</option><option value="動詞">动词</option>
-          <option value="形容詞">形容词</option><option value="副詞">副词</option>
-        </select>
-        <select class="sel" id="d-sort">
-          <option value="easy">从易到难</option><option value="freq">最常见</option><option value="az">五十音 ↑</option><option value="azd">五十音 ↓</option>
-        </select>
-        <button class="toolbtn ${S.hideKnown !== false ? 'on' : ''}" id="d-hideknown">隐藏已掌握</button>
+      <div class="bar learn-bar"><i style="width:${pct}%"></i></div>
+      <div class="learn-filters">
+        <div class="learn-filter-row">
+          <span class="filter-label">范围</span>
+          <div class="chips" id="d-range">
+            <button class="chip" data-v="all">全部</button><button class="chip" data-v="c1">初级上</button>
+            <button class="chip" data-v="c2">初级下</button><button class="chip" data-v="c3">中级</button>
+            <button class="chip" data-v="out">未收录</button><button class="chip" data-v="n45">N5-N4</button>
+            <button class="chip" data-v="n123">N3-N1</button>
+          </div>
+        </div>
+        <div class="learn-filter-row">
+          <span class="filter-label">词性</span>
+          <div class="chips" id="d-pos">
+            <button class="chip" data-v="all">全部</button><button class="chip" data-v="名詞">名词</button>
+            <button class="chip" data-v="動詞">动词</button><button class="chip" data-v="形容詞">形容词</button>
+            <button class="chip" data-v="副詞">副词</button>
+          </div>
+        </div>
+        <div class="learn-filter-row">
+          <span class="filter-label">排序</span>
+          <div class="chips" id="d-sort">
+            <button class="chip" data-v="easy">从易到难</button><button class="chip" data-v="freq">最常见</button>
+            <button class="chip" data-v="az">五十音 ↑</button><button class="chip" data-v="azd">五十音 ↓</button>
+          </div>
+        </div>
+        <div class="learn-filter-row">
+          <button class="tlink ${S.hideKnown !== false ? 'on' : ''}" id="d-hideknown">${S.hideKnown !== false ? '● 隐藏已掌握' : '○ 显示已掌握'}</button>
+        </div>
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
       ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里没有可学的词'}</div>` : ''}
       ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个</button></div>` : ''}
 `;
-    $('d-range').value = S.dRange || 'all';
-    $('d-pos').value = S.dPos || 'all';
-    $('d-sort').value = S.dSort || 'easy';
-    $('d-range').onchange = (e) => { S.dRange = e.target.value; save(); deckCount = 30; renderLearn(); };
-    $('d-pos').onchange = (e) => { S.dPos = e.target.value; save(); deckCount = 30; renderLearn(); };
-    $('d-sort').onchange = (e) => { S.dSort = e.target.value; save(); renderLearn(); };
+    [['d-range','dRange'], ['d-pos','dPos'], ['d-sort','dSort']].forEach(([id, key]) => {
+      const host = $(id); if (!host) return;
+      const cur = S[key] || host.querySelector('.chip')?.dataset.v;
+      host.querySelectorAll('.chip').forEach((el) => {
+        const on = el.dataset.v === cur;
+        el.classList.toggle('on', on);
+        el.onclick = () => { S[key] = el.dataset.v; save(); if (key === 'dRange' || key === 'dPos') deckCount = 30; renderLearn(); };
+      });
+    });
     $('d-hideknown').onclick = (e) => { S.hideKnown = S.hideKnown === false; save(); e.target.classList.toggle('on', S.hideKnown !== false); renderLearn(); };
     if ($('d-more')) $('d-more').onclick = () => { deckCount += 30; renderLearn(); };
     wireWords($('view-learn'));
@@ -2714,20 +2730,22 @@ import { icon } from './icons.js?v=20261016i';
     S.lastTrack = t.id; save();
     const zhN = t.lines.filter((l) => l.zh).length;
     $('view-track').innerHTML = `
-      <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">${icon('chevron-left','in')}返回</button></div>
-      <div class="item" style="border:0;padding:0 0 12px;cursor:default">
-        ${t.coverFile ? `<img class="cover big" src="data/${t.coverFile}" alt="">`
-          : (t.coverUrl ? `<img class="cover big" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover big"></div>')}
-        <div class="col">
-          <div class="l1" style="font-size:17px">${esc(t.title)}</div>
-          <div class="l2">${esc(t.artist)} · ${esc(t.album)}</div>
-          <div class="l3">${t.imp ? `来自歌单：${esc(t.plName || '导入')}` : `原曲：${esc(t.base)}`} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''}</div>
+      <div class="track-head">
+        <div class="track-back"><button id="b-back" class="tlink tlink-ghost">‹ ${icon('chevron-left','in')}返回</button></div>
+        <div class="track-meta">
+          ${t.coverFile ? `<img class="cover xl" src="data/${t.coverFile}" alt="">`
+            : (t.coverUrl ? `<img class="cover xl" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover xl"></div>')}
+          <div class="col">
+            <div class="track-title serif">${esc(t.title)}</div>
+            <div class="track-artist">${esc(t.artist)}${t.album ? ' · ' + esc(t.album) : ''}</div>
+            <div class="track-base">原曲：${esc(t.base || '—')} · ${t.lineCount} 行${zhN ? ' · 中文 ' + zhN : ''}</div>
+          </div>
         </div>
-      </div>
-      <div class="row" style="margin:2px 0 10px">
-        <button class="btn-primary" id="t-sing">${icon('play','in')}进入跟唱</button>
-        <button class="toolbtn ${isFav(t.id) ? 'on' : ''}" id="t-fav">${isFav(t.id) ? icon('heart-fill','in') + '已收藏' : icon('heart','in') + '收藏'}</button>
-        <button class="toolbtn ${isSing(t.id) ? 'on' : ''}" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
+        <div class="track-actions">
+          <button class="tlink" id="t-sing">▶ 进入跟唱</button>
+          <button class="tlink-ghost tlink" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
+          <button class="tlink-ghost tlink" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
+        </div>
       </div>
       <div id="t-vocab-pane">
         <div class="chips" id="twchips">

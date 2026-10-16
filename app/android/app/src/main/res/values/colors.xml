@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 兼容旧 styles.xml 引用 -->
+    <color name="colorPrimary">#A52628</color>
+    <color name="colorPrimaryDark">#6a1616</color>
+    <color name="colorAccent">#c1462f</color>
+
+    <!-- 与 docs/ 视觉一致 -->
+    <color name="paper_warm">#fbf7ee</color>
+    <color name="paper_warm_dark">#f4eedf</color>
+    <color name="ink_warm">#3a302a</color>
+    <color name="ink_warm_soft">#756a5d</color>
+    <color name="accent_warm">#b54a3b</color>
+    <color name="accent_warm_2">#9a3a2d</color>
+
+    <!-- 跟 docs 里的 bg 一致：让原生 splash 切到 webview 时不闪屏 -->
+    <color name="splash_background">@color/paper_warm</color>
+</resources>
