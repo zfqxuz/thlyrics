@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017k';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017k';
-import { icon } from './icons.js?v=20261017k';
+import { V } from './version.js?v=20261017l';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017l';
+import { icon } from './icons.js?v=20261017l';
 
 (() => {
   'use strict';
@@ -2693,18 +2693,18 @@ import { icon } from './icons.js?v=20261017k';
         const blk = e.target.closest('.lblock[data-i]');
         const li = blk ? Number(blk.dataset.i) : null;
         const cur = curLineIdx();
-        // 词只认「当前这一句」：点别的句里的词 = 先切到那一句，不弹词条（用户要求：
-        // 想查别的句的词，先把那句切过来）
+        // 点「别的句」里的词：把那句切过来当当前句，但**不动模式、不出声**
+        // （以前这里调 playFrom 会开始播放 → 用户反馈「点词应该暂停才对」）
         if (li != null && cur >= 0 && li !== Number(cur)) {
-          // 点「别的句」里的词 = 先把那句切过来（用户要求），但**不动模式**（约束：点词不能冒泡到切换循环行）
-          playFrom(li, false);
-          toast('已切到这一句 · 再点词看释义');
-          return;
+          if (mode === 'loop') loopLine = li;
+          activeLine = li;
+          highlight(false);
+          armTapScroll();
+        } else if (li != null && cur < 0) {
+          // 还没有「当前句」（歌没在放 / 没时间轴）：先把这一句定成当前句，再开词条
+          activeLine = li; highlight(false);
         }
-        // 还没有「当前句」（歌没在放 / 音源没准备好）：这一下先把这一句定成当前句，再开词条。
-        // 不然一暂停就退回「随便点哪句的词都弹」——用户要的是「词只对当前句可选」。
-        if (li != null && cur < 0) { activeLine = li; highlight(false); }
-        // 同一句里点别的词 = 直接切过去看那个词（查词顺手）；要关就点抽屉外、下拉、或 ✕
+        // 点词一律：暂停 + 开抽屉（查词时不该有声音）—— 续播在收起抽屉时
         const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
         showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '', li,
           ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
