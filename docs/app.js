@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017n';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017n';
-import { icon } from './icons.js?v=20261017n';
+import { V } from './version.js?v=20261017o';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017o';
+import { icon } from './icons.js?v=20261017o';
 
 (() => {
   'use strict';
@@ -2912,7 +2912,8 @@ import { icon } from './icons.js?v=20261017n';
     $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
     $('p-known').classList.toggle('on', !!isKnown(w));
-    $('p-known').title = isKnown(w) ? '取消已掌握' : '标为已掌握';
+    $('p-known').classList.toggle('k', !isKnown(w));
+    $('p-known').textContent = isKnown(w) ? '✓ 已掌握' : '标为已掌握';
     if ($('p-edit')) $('p-edit').textContent = '改释义';
     const st = libStat(w);
     $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), st ? `${st.tracks.size} 首歌 / ${st.n} 次` : ''].filter(Boolean).join(' · ');
@@ -3176,12 +3177,12 @@ import { icon } from './icons.js?v=20261017n';
     $('p-speak').onclick = () => speak((popWord && (popWord.reading || popWord.word)) || (popSeg && popSeg.r) || popFallback);
     $('p-close2').onclick = hidePop;
     // 底部「上拉看更多」：点一下展开到 75%；展开态再点标题栏区域可收回
-    // 点释义就地改；点罗马音就地改 —— 取代原来那排「改释义 / 罗马音」链接
-    const mg = $('p-meaning');
-    if (mg) mg.onclick = () => { const e = $('p-edit'); if (e) e.onclick(); };
-    const rj = $('p-romaji');
-    if (rj) rj.onclick = () => { const e = $('p-roma'); if (e) e.onclick(); };
-
+    const moreBtn2 = $('p-expand2');
+    if (moreBtn2) moreBtn2.onclick = () => {
+      const sh = $('pop'); if (!sh) return;
+      sh.classList.add('expanded');
+      const b = $('p-body'); if (b) b.scrollTop = 0;
+    };
     const expandBtn = $('p-expand');
     if (expandBtn) expandBtn.onclick = () => {
       const sh = $('pop'); if (!sh) return;
