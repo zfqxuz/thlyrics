@@ -1,5 +1,5 @@
 {
-  "version": "20261017t",
+  "version": "20261017u",
   "url": "https://zfqxuz.github.io/thlyrics/dl/thlyrics-beta.apk",
-  "notes": "读音修正 49 条（JMdict 全量比对）+ 词音频包升到 1.1（补上修正词的发音）+ 语音包支持「更新到新版本」+ 复习读音三题型与复习方式配置"
+  "notes": "词音换成阿里云 NLS（voice=tomoka，6366 条全量重生成）+ 词表补录 23 个 JMdict 辞书形 + 430 个「ます形」词性修正 + 读音修正 49 条"
 }

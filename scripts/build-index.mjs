@@ -21,7 +21,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import kuromoji from 'kuromoji';
 import { kanaToRomaji } from './kana-romaji.mjs';
-import { applyReadingFix } from './reading-fix.mjs';
+import { applyReadingFix, applyPosFix } from './reading-fix.mjs';
+import { applyVocabExtras } from './vocab-extras.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW_DIR = path.join(ROOT, 'data', 'raw');
@@ -769,6 +770,10 @@ async function main() {
   // 错读音会直接喂给 TTS，听感上就是「发音不对」。表在 scripts/reading-fix.mjs。
   const fixedN = applyReadingFix(vocab);
   if (fixedN) console.log(`读音修正 ${fixedN} 条`);
+  const extraN = applyVocabExtras(vocab);
+  if (extraN) console.log(`词表补录 ${extraN} 条`);
+  const posN = applyPosFix(vocab);
+  if (posN) console.log(`词性修正 ${posN} 条`);
 
   const index = {
     generatedAt: new Date().toISOString(),

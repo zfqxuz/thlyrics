@@ -49,3 +49,23 @@ export function applyReadingFix(vocab) {
 }
 
 export default applyReadingFix;
+
+/**
+ * 词性修正。
+ * 主要修一类系统性错误：分词器把「休み＋ます」切成两个词，词表却按表面形收了
+ * 「休みます / 行きます / 働きます」并把词性记成「助動詞」——
+ * 结果 430 个动词在「词性：动词」筛选里完全看不到。
+ */
+const MASU = /(ます|ません|ました|ませんでした|ましょう|たい)$/;
+
+export function applyPosFix(vocab) {
+  let n = 0;
+  for (const v of vocab || []) {
+    const w = String(v.word || '');
+    let want = null;
+    if (v.pos === '助動詞' && MASU.test(w)) want = '動詞';   // ます形 → 动词
+    if (v.word === '彷徨く') want = '動詞';
+    if (want && v.pos !== want) { v.pos = want; n += 1; }
+  }
+  return n;
+}
