@@ -1096,6 +1096,26 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   .revprompt .rw4{font-size:17px}
   .revdone .rd-big{font-size:46px}
 }
+
+/* ── 读音填空（输入题）── */
+.revin{display:flex;gap:9px;padding-bottom:8px}
+.revinp{
+  flex:1;min-width:0;height:52px;padding:0 16px;border-radius:13px;
+  border:0;background:var(--field);color:var(--ink);
+  font-size:19px;font-family:var(--serif);letter-spacing:.04em;outline:none;
+  transition:background-color .15s;
+}
+.revinp::placeholder{font-size:13px;letter-spacing:0;color:var(--ink-3);font-family:var(--sans)}
+.revinp:focus{background:var(--surface-2)}
+.revinp:disabled{opacity:.65}
+.revinok{
+  flex:0 0 auto;height:52px;padding:0 20px;border:0;border-radius:13px;
+  background:var(--accent);color:#fff8ec;font-size:14.5px;font-weight:600;font-family:var(--sans);cursor:pointer;
+}
+.revinok:hover{background:var(--accent-2)}
+.revinok:disabled{opacity:.5;cursor:default}
+/* 反馈条里的「读音 · 罗马音」补充信息 */
+.revfeed .fa{display:block;font-size:12px;color:var(--ink-3);margin-top:3px;font-family:var(--serif)}
 </style>
 </head>
 <body>
@@ -1272,6 +1292,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017q"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017r"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

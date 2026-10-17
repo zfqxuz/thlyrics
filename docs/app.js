@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017q';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017q';
-import { icon } from './icons.js?v=20261017q';
+import { V } from './version.js?v=20261017r';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017r';
+import { icon } from './icons.js?v=20261017r';
 
 (() => {
   'use strict';
@@ -46,12 +46,13 @@ import { icon } from './icons.js?v=20261017q';
 
   // ────────────── 本地状态 ──────────────
   let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {},
+    revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false },
     rate: 1, ruby: true, gloss: false, zh: true,
     mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
-  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {};
+  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
     }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
@@ -1130,12 +1131,64 @@ import { icon } from './icons.js?v=20261017q';
   // 呈现是我们自己的：一屏一题、整行卡片选项、底部阻断式反馈条。
   // 题型里有一道「歌词挖空」——只有我们有这个资产（每个词都挂着真实歌词例句）。
   const REVIEW_N = 12;                     // 一轮 12 题
+
+  // 复习方式：让用户自己决定出哪些题。
+  // 默认只开「读音向」三种 —— 中国人学日语最卡的是「汉字怎么读」和「同一个中文在日语里是另一个词」，
+  // 选义/看义选词对这两件事没用（而且是多邻国那套给英语母语者补词汇用的）。
+  const REV_MODES = [
+    ['pick', '选读音', '看词，从 4 个假名里挑对的'],
+    ['type', '读音填空', '看词，写出假名（也认罗马音）'],
+    ['ctx', '上下文填空', '歌词挖空，选缺的那个词'],
+    ['listen', '听音选词', '听发音，挑出这个词'],
+    ['meaning', '选释义', '看词选中文（入门 / 其它外语用）'],
+  ];
+  const REV_MODE_DEFAULT = { pick: true, type: true, ctx: true, listen: false, meaning: false };
+  const revModes = () => Object.assign({}, REV_MODE_DEFAULT, S.revModes || {});
+  const revModeOn = (k) => revModes()[k] !== false;
+  const REV_AVAIL = (k) => k !== 'listen' || typeof navigator === 'undefined' || navigator.onLine !== false;
   let revDeck = [], revI = 0, revQ = null, revStat = { ok: 0, bad: 0, requeue: 0 };
 
   function startReview(n) {
     const want = (Number(n) > 0) ? Math.floor(Number(n)) : REVIEW_N;
     revDeck = dueWords().slice(0, want);
     revI = 0; revQ = null; revStat = { ok: 0, bad: 0, requeue: 0 };
+  }
+
+  /** 用户填的读音算不算对：认平假名/片假名/罗马音，比较时抹掉长音符与促音（初学者常漏） */
+  function readingOk(input, v) {
+    const clean = (x) => norm(x).replace(/[\s\u3000.・·]/g, '').replace(/[ーっ]/g, '');
+    const got = clean(input);
+    if (!got) return false;
+    const cands = [v.reading, v.romaji].filter(Boolean).map(clean);
+    return cands.some((c) => c && (c === got || c.replace(/[んn]$/, '') === got.replace(/[んn]$/, '')));
+  }
+
+  /** 读音干扰项：同首字的词（一字多音，最值得考）、长度接近、词性相近 */
+  function readingDistractors(v, n) {
+    n = n || 3;
+    const base = norm(v.reading || '');
+    const first = String(v.word || '').slice(0, 1);
+    const pool = VOCAB.filter((x) => x.id !== v.id && x.reading
+      && /^[\u3041-\u309f\u30a0-\u30ffー]+$/.test(x.reading) && norm(x.reading) !== base);
+    const score = (x) => {
+      const r = norm(x.reading || '');
+      let sc = 0;
+      if (first && String(x.word || '').slice(0, 1) === first) sc -= 2.5;      // 同首字：形近音不同
+      if (Math.abs(r.length - base.length) <= 1) sc -= 1;                       // 长度接近，更难蒙
+      if (x.pos === v.pos) sc -= .8;
+      sc += Math.abs((Number(x.jl) || 3) - (Number(v.jl) || 3)) * .4;
+      sc += Math.abs((Number(x.diff) || 50) - (Number(v.diff) || 50)) / 300;
+      return sc;
+    };
+    const head = pool.sort((a, b) => score(a) - score(b)).slice(0, 60);
+    const out = [], seen = new Set([base]);
+    while (out.length < n && head.length) {
+      const x = head.splice(Math.floor(Math.random() * head.length), 1)[0];
+      const r = norm(x.reading);
+      if (seen.has(r)) continue;
+      seen.add(r); out.push(x);
+    }
+    return out;
   }
 
   /** 干扰项：同词性 + 难度接近的优先，再从前 60 个里随机挑，避免每次都是同一批 */
@@ -1160,37 +1213,63 @@ import { icon } from './icons.js?v=20261017q';
 
   /** 出一道题。四种题型按词的可出题条件挑，用 revI 轮着来（同一轮里不老是同一种） */
   function makeQuestion(v, i) {
-    const kinds = ['w2m', 'm2w'];
     const ex = examplesFor(v, 1)[0];
-    if (ex) kinds.push('cloze');
-    if (typeof navigator === 'undefined' || navigator.onLine !== false) kinds.push('listen');
+    const hasReading = !!(v.reading && /^[\u3041-\u309f\u30a0-\u30ffー]+$/.test(v.reading));
+    // 可用题型 = 用户勾选的 ∩ 这个词真出得来的
+    let kinds = REV_MODES.map((m) => m[0]).filter((k) => revModeOn(k) && REV_AVAIL(k));
+    kinds = kinds.filter((k) => {
+      if (k === 'ctx') return !!ex;
+      if (k === 'pick' || k === 'type') return hasReading;
+      return true;
+    });
+    if (!kinds.length) kinds = ['pick'];
     const kind = kinds[i % kinds.length];
-    const key = { w2m: 'mean', m2w: 'word', cloze: 'word', listen: 'word' }[kind];
-    const get = (x) => (key === 'mean' ? String(meaningOf(x) || '').trim() : String(x.word || '').trim());
-    const correct = get(v);
-    if (!correct) return makeQuestion(v, i + 1);                 // 没释义的词出不了这题，换一种
-    const wrong = distractors(v, get, 3).map(get);
-    const opts = shuffle([{ t: correct, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
-    let head = '', prompt = '';
-    if (kind === 'w2m') {
-      head = '这个词是什么意思？';
-      prompt = `<b class="rw1">${esc(v.word)}</b>${v.reading ? `<i class="rw2">${esc(v.reading)}</i>` : ''}`;
-    } else if (kind === 'm2w') {
-      head = '下面这句中文，是哪个词？';
-      prompt = `<b class="rw3">${esc(correct)}</b>`;
-    } else if (kind === 'cloze') {
-      head = '这句歌词里，缺的是哪个词？';
+    const play = (silent) => speak(v.reading || v.word, !!silent);
+    const meaning = String(meaningOf(v) || '').trim();
+    const readNote = [v.reading, v.romaji].filter(Boolean).join(' · ');
+    const romajiNote = [v.romaji, meaning].filter(Boolean).join(' · ');      // 答案已经是读音时，补充信息就别再重复读音
+
+    // ── 读音向：看词选读音 ──
+    if (kind === 'pick') {
+      const wrong = readingDistractors(v, 3).map((x) => x.reading);
+      const opts = shuffle([{ t: v.reading, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+      return { v, i, kind, head: '这个词怎么读？', input: false, opts,
+        prompt: `<b class="rw1">${esc(v.word)}</b>${meaning ? `<i class="rw2">${esc(meaning)}</i>` : ''}`,
+        correct: v.reading, answer: romajiNote, done: false, picked: -1, play };
+    }
+    // ── 读音向：自己写出读音 ──
+    if (kind === 'type') {
+      return { v, i, kind, head: '写出它的读音', input: true, opts: null,
+        prompt: `<b class="rw1">${esc(v.word)}</b>${meaning ? `<i class="rw2">${esc(meaning)}</i>` : ''}`,
+        correct: v.reading, answer: romajiNote, done: false, picked: -1, play };
+    }
+    // ── 上下文向：歌词挖空选词（同一句中文可能对应好几个日语词，只有上下文能区分）──
+    if (kind === 'ctx') {
+      const wrong = distractors(v, (x) => String(x.word || '').trim(), 3).map((x) => x.word);
+      const opts = shuffle([{ t: v.word, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
       const line = String(ex.jp || '');
       const at = line.indexOf(v.word);
       const masked = at >= 0
         ? esc(line.slice(0, at)) + '<b class="blank">＿＿</b>' + esc(line.slice(at + v.word.length))
         : esc(line);
-      prompt = `<b class="rw4">${masked}</b>${ex.zh ? `<i class="rw5">${esc(ex.zh)}</i>` : ''}`;
-    } else {
-      head = '听发音，选出这个词';
-      prompt = `<button class="rwplay" id="rev-play" aria-label="再听一次">${icon('volume', 'in')}</button>`;
+      return { v, i, kind, head: '这句歌词里，缺的是哪个词？', input: false, opts,
+        prompt: `<b class="rw4">${masked}</b>${ex.zh ? `<i class="rw5">${esc(ex.zh)}</i>` : ''}`,
+        correct: v.word, answer: [readNote, meaning].filter(Boolean).join(' · '), done: false, picked: -1, play };
     }
-    return { v, i, kind, head, prompt, opts, correct, done: false, picked: -1, play: (silent) => speak(v.reading || v.word, !!silent) };
+    // ── 听音选词 ──
+    if (kind === 'listen') {
+      const wrong = distractors(v, (x) => String(x.word || '').trim(), 3).map((x) => x.word);
+      const opts = shuffle([{ t: v.word, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+      return { v, i, kind, head: '听发音，选出这个词', input: false, opts,
+        prompt: `<button class="rwplay" id="rev-play" aria-label="再听一次">${icon('volume', 'in')}</button>`,
+        correct: v.word, answer: readNote, done: false, picked: -1, play };
+    }
+    // ── 看词选释义（默认关，留给入门 / 以后接其它外语）──
+    const wrong = distractors(v, (x) => String(meaningOf(x) || '').trim(), 3).map((x) => meaningOf(x));
+    const opts = shuffle([{ t: meaning, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+    return { v, i, kind: 'meaning', head: '这个词是什么意思？', input: false, opts,
+      prompt: `<b class="rw1">${esc(v.word)}</b>${v.reading ? `<i class="rw2">${esc(v.reading)}</i>` : ''}`,
+      correct: meaning, answer: readNote, done: false, picked: -1, play };
   }
 
   function renderReview() {
@@ -1230,6 +1309,15 @@ import { icon } from './icons.js?v=20261017q';
     if (!revQ || revQ.i !== revI || revQ.v.id !== v.id) revQ = makeQuestion(v, revI);
     const q = revQ;
     const pct = Math.round((revI / revDeck.length) * 100);
+    const typed = q.input
+      ? `<div class="revin" id="revin">
+           <input class="revinp" id="rev-input" autocomplete="off" autocapitalize="off" autocorrect="off"
+             spellcheck="false" inputmode="text" enterkeyhint="done" placeholder="假名，或罗马音">
+           <button class="revinok" id="rev-submit">提交</button>
+         </div>`
+      : `<div class="revopts" id="revopts">
+           ${q.opts.map((o, k) => `<button class="revopt" data-i="${k}"><span class="k">${k + 1}</span><span class="t">${esc(o.t)}</span></button>`).join('')}
+         </div>`;
     box.innerHTML = `<div class="revwrap">
       <div class="revtop">
         <button class="revx" id="rev-stop">${icon('chevron-left', 'in')}结束</button>
@@ -1240,44 +1328,64 @@ import { icon } from './icons.js?v=20261017q';
         <div class="revkind">${esc(q.head)}</div>
         <div class="revprompt">${q.prompt}</div>
       </div>
-      <div class="revopts" id="revopts">
-        ${q.opts.map((o, k) => `<button class="revopt" data-i="${k}"><span class="k">${k + 1}</span><span class="t">${esc(o.t)}</span></button>`).join('')}
-      </div>
+      ${typed}
       <div class="revfeed" id="revfeed" hidden></div>
     </div>`;
     if ($('rev-play')) $('rev-play').onclick = () => q.play(false);
-    if (q.kind === 'listen') setTimeout(() => { if (revQ === q) q.play(true); }, 260);   // 听音题自动播一次（静默失败：网页版自动播放可能被浏览器拦）
+    if (q.kind === 'listen') setTimeout(() => { if (revQ === q) q.play(true); }, 260);
     box.querySelectorAll('.revopt').forEach((el) => (el.onclick = () => answerReview(Number(el.dataset.i))));
+    if (q.input) {
+      const inp = $('rev-input');
+      if (inp) { inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitTyped(); } }; setTimeout(() => { try { inp.focus(); } catch {} }, 120); }
+      if ($('rev-submit')) $('rev-submit').onclick = () => submitTyped();
+    }
     $('rev-stop').onclick = () => go('#/mine');
   }
 
-  function answerReview(i) {
+  /** 交卷：统一走这里（选择题 / 填空题共用），负责落盘、上色、出反馈条 */
+  function finishQuestion(ok, pickedIdx) {
     const q = revQ;
     if (!q || q.done) return;
-    const opt = q.opts[i];
-    if (!opt) return;
-    q.done = true; q.picked = i;
-    const ok = !!opt.ok;
-    revApply(q.v, ok);                                     // 落盘熟练度/到期；不动「已掌握」（复习不该反向污染它）
+    q.done = true; q.picked = pickedIdx;
+    revApply(q.v, ok);                                     // 落盘熟练度/到期；不动「已掌握」
     if (ok) revStat.ok++;
-    else { revStat.bad++; revStat.requeue++; revDeck.push(q.v); }   // 错题回炉：排到本轮末尾，必须再做对一次
+    else { revStat.bad++; revStat.requeue++; revDeck.push(q.v); }   // 错题回炉：排到本轮末尾
     const box = $('view-review');
     box.querySelectorAll('.revopt').forEach((el, k) => {
       el.disabled = true;
       if (q.opts[k].ok) el.classList.add('right');
-      else if (k === i) el.classList.add('wrong');
+      else if (k === pickedIdx) el.classList.add('wrong');
       else el.classList.add('dim');
     });
+    const inp = $('rev-input'); if (inp) inp.disabled = true;
+    const sub = $('rev-submit'); if (sub) sub.disabled = true;
     const feed = $('revfeed');
     if (!feed) return;
     feed.hidden = false;
     feed.className = 'revfeed ' + (ok ? 'ok' : 'bad');
+    const tip = q.answer ? `<span class="fa">${esc(q.answer)}</span>` : '';
     feed.innerHTML = `<span class="fi">${icon(ok ? 'circle-check' : 'close', 'in')}</span>`
-      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}</span>`
+      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}</span>`
       + `<button class="fnext" id="rev-next">继续</button>`;
     $('rev-next').onclick = () => { revI++; revQ = null; renderReview(); };
-    // 听音题答对了顺手再放一次，把音和义钉在一起（网页版也是走在线 TTS，失败就静默）
-    if (ok && q.kind !== 'listen') { /* 不自动播，避免打扰 */ }
+    try { $('rev-next').focus(); } catch { /* ignore */ }
+    // 读音题答完顺手读一遍，把形和音钉在一起（静默，网页版可能被拦）
+    setTimeout(() => { if (revQ === q) q.play(true); }, 160);
+  }
+
+  function answerReview(i) {
+    const q = revQ;
+    if (!q || q.done || q.input) return;
+    const opt = q.opts[i];
+    if (!opt) return;
+    finishQuestion(!!opt.ok, i);
+  }
+  function submitTyped() {
+    const q = revQ;
+    if (!q || q.done || !q.input) return;
+    const el = $('rev-input');
+    if (!el) return;
+    finishQuestion(readingOk(el.value, q.v), -1);
   }
 
   // 网页版兼容：键盘 1234 选项、回车/空格继续（桌面浏览器也能用）
@@ -2587,6 +2695,10 @@ import { icon } from './icons.js?v=20261017q';
       ${IS_NATIVE ? `<div class="sect">发音</div>
       <div class="setrow"><div class="k">离线语音包</div><button class="toolbtn" id="tts-packs">语音包</button></div>
       <div class="setrow"><div class="k">试听</div><button class="toolbtn" id="tts-test">发音</button></div>` : ''}
+      <div class="sect">复习方式</div>
+      <div class="meta" style="margin:-4px 0 4px">复习按勾选的方式出题（至少留一种）</div>
+      ${REV_MODES.map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
+        <button class="toolbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
       <div class="sect">同步</div>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">立即同步</button>
@@ -2630,6 +2742,13 @@ import { icon } from './icons.js?v=20261017q';
     if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
     if (accPwDo) accPwDo.onclick = () => changePass();
     $('view-me').querySelectorAll('#me-theme button').forEach((el) => (el.onclick = () => { S.theme = el.dataset.v; save(); applyTheme(); renderMe(); }));
+    $('view-me').querySelectorAll('[data-revmode]').forEach((el) => (el.onclick = () => {
+      const k = el.dataset.revmode;
+      const m = revModes();
+      m[k] = !m[k];
+      if (!REV_MODES.some(([x]) => m[x])) { toast('至少留一种复习方式'); return; }
+      S.revModes = m; save(); renderMe();
+    }));
     if ($('me-tsort')) $('me-tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderMe(); };
     const disp = (key, id) => { const el = $(id); if (el) el.onclick = () => { S[key] = S[key] === false; save(); applyDisplay(); renderMe(); }; };
     disp('ruby', 'me-ruby'); disp('zh', 'me-zh'); disp('gloss', 'me-gloss');
