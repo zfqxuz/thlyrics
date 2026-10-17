@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018d';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018d';
-import { icon } from './icons.js?v=20261018d';
+import { V } from './version.js?v=20261018e';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018e';
+import { icon } from './icons.js?v=20261018e';
 
 (() => {
   'use strict';
@@ -68,6 +68,7 @@ import { icon } from './icons.js?v=20261018d';
   }
   function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.sep = S.sep || {}; S.sepOn = S.sepOn || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
+    if (Object.prototype.hasOwnProperty.call(S, 'sepPref')) { delete S.sepPref; kvSetJson(LS_KEY, S); }
     S.searchHist = Array.isArray(S.searchHist) ? S.searchHist : [];
     }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
