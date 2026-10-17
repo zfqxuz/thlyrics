@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zd';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zd';
-import { icon } from './icons.js?v=20261017zd';
+import { V } from './version.js?v=20261017ze';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017ze';
+import { icon } from './icons.js?v=20261017ze';
 
 (() => {
   'use strict';
@@ -3358,14 +3358,17 @@ import { icon } from './icons.js?v=20261017zd';
     const st = S.audio[t.id] || t.audio;
     if (!st || !st.nid) { toast('先绑定音频'); return; }
     const tid = t.id;
-    sepBusy = true; renderSep(); toast('伴奏生成中…');
+    sepBusy = true; renderSep(); toast('伴奏生成中');
     try {
       const r = await sepCall('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
       let url = r && r.url;
       if (!url && r && r.taskId) {
-        // 异步任务：每 2.5 秒问一次，最长 10 分钟
+        // 异步任务：每 2.5 秒问一次，最长 10 分钟；按钮上显示已等了几秒
+        const t0 = Date.now();
         for (let i = 0; i < 240 && !url; i++) {
           await sepSleep(2500);
+          const sec = Math.round((Date.now() - t0) / 1000);
+          const mk = $('sep-make'); if (mk) mk.textContent = `生成中 ${sec}s`;
           const st2 = await sepCall('/sep/status?taskId=' + encodeURIComponent(r.taskId));
           if (st2.status === 'done') url = st2.url;
           else if (st2.status === 'error') throw new Error(st2.error || '生成失败');
