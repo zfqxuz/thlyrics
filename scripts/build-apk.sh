@@ -26,7 +26,7 @@ echo "▶ cap sync"
 (cd app && npx cap sync android >/dev/null)
 
 echo "▶ gradle assembleDebug"
-./app/android/gradlew -p app/android clean assembleDebug --offline -q
+./app/android/gradlew -p app/android clean assembleDebug ${GRADLE_ARGS:---offline -q}
 
 restore
 trap - EXIT

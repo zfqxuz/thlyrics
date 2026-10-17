@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017y';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017y';
-import { icon } from './icons.js?v=20261017y';
+import { V } from './version.js?v=20261017z';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck } from './platform/index.js?v=20261017z';
+import { icon } from './icons.js?v=20261017z';
 
 (() => {
   'use strict';
@@ -22,6 +22,9 @@ import { icon } from './icons.js?v=20261017y';
   // 主下载：和本站同域名（能打开网页就一定下得动；GitHub Releases 的 objects.githubusercontent.com 在国内常被墙）
   const APK_URL = 'https://zfqxuz.github.io/thlyrics/dl/thlyrics.apk';
   const APK_URL_BACKUP = 'https://github.com/zfqxuz/thlyrics/releases/latest/download/thlyrics.apk';
+  // 内容包清单（Pages 上，永远最新；包本体在 OSS，10 年签名）
+  const OTA_MANIFEST = 'https://zfqxuz.github.io/thlyrics/update.json';
+  if (otaAvailable()) otaReady();            // 必须在启动早期调，不然原生层会判失败并回滚
   const POS_KIND = { '名詞': 'n', '動詞': 'v', '形容詞': 'a', '形容動詞': 'na', '副詞': 'adv',
     '助詞': 'prt', '助動詞': 'aux', '接続詞': 'conj', '連体詞': 'rent', '感動詞': 'int', '接頭詞': 'pref', '記号': 'sym' };
   const posKind = (w) => {
@@ -2662,6 +2665,29 @@ import { icon } from './icons.js?v=20261017y';
       ],
     });
   }
+  // ── 内容包热更新（原生壳）：换的只是 docs/，不用装 APK ──
+  let otaState = { version: '', checkedAt: 0, busy: false };
+  async function checkOta(manual) {
+    if (!otaAvailable()) { if (manual) toast('网页版刷新即最新'); return; }
+    if (otaState.busy) { if (manual) toast('正在检查…'); return; }
+    otaState.busy = true;
+    if (manual) toast('检查内容更新…');
+    try {
+      const cur = await otaCurrent();
+      otaState.version = (cur && cur.version) || V;
+      const r = await otaCheck(OTA_MANIFEST, { current: V, apply: manual ? 'now' : 'next' });
+      otaState.checkedAt = Date.now();
+      if (r) toast(manual ? '内容已更新，正在重载' : '内容更新已下载，下次启动生效');
+      else if (manual) toast('内容已是最新');
+    } catch (e) {
+      if (manual) toast('内容更新失败');
+    } finally {
+      otaState.busy = false;
+      if (location.hash.startsWith('#/me')) renderMe();
+    }
+  }
+  if (typeof window !== 'undefined') window.__tlOta = (manual) => checkOta(manual !== false);
+
   async function checkApk(manual) {
     if (!appUpdater.available) { if (manual) toast('网页版请到「我的 → 安卓 App → 下载 APK」'); return; }
     try { apkRemote = await appUpdater.check(); apkCheckedAt = Date.now(); }
@@ -2716,6 +2742,8 @@ import { icon } from './icons.js?v=20261017y';
       ${IS_NATIVE ? `<div class="sect">更新</div>
       <div class="updrow"><div class="k"><b>当前版本</b><small>${V}${apkCheckedAt ? ' · ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
         <button class="toolbtn" id="me-upd">检查更新</button></div>
+      <div class="updrow"><div class="k"><b>内容包</b><small>${esc(otaState.version || V)}${otaState.checkedAt ? ' · ' + new Date(otaState.checkedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
+        <button class="toolbtn" id="me-ota">内容更新</button></div>
       ${apkNewer() && S.updSkip !== apkRemote.version ? `<div class="updrow"><div class="k"><b>新版本 ${esc(apkRemote.version)}</b><small>${esc(apkRemote.notes || '')}</small></div>
         <button class="toolbtn on" id="me-upd-go">下载并安装</button></div>` : ''}` : `<div class="sect">安卓 App</div>
       <div class="setrow"><div class="k">装到手机上</div>
@@ -2736,6 +2764,7 @@ import { icon } from './icons.js?v=20261017y';
       ${ACC && ACC.admin ? `<div class="sect">管理员</div><div class="row" style="margin-top:8px"><button class="toolbtn" id="me-admin">OSS 文件管理</button></div>` : ''}`;
 
     if ($('me-upd')) $('me-upd').onclick = () => checkApk(true);
+    if ($('me-ota')) $('me-ota').onclick = () => checkOta(true);
     if ($('me-upd-go')) $('me-upd-go').onclick = () => installApk();
     const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
     if (accReg) accReg.onclick = () => doAuth('reg');
@@ -3889,6 +3918,7 @@ import { icon } from './icons.js?v=20261017y';
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
     setTimeout(() => gcLocalAudio(), 3000);            // 清掉没人认领的本机音频副本
     if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);   // 静默查一次新版本
+    if (otaAvailable() && !window.__NO_OTA) setTimeout(() => checkOta(false), 3200);             // 静默查一次内容包
     setTimeout(voicePackPrompt, 1800);
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
     if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {

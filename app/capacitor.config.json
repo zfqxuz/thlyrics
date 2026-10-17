@@ -1,5 +1,16 @@
 {
   "appId": "com.zfqxuz.thlyrics",
   "appName": "thlyrics",
-  "webDir": "../docs"
+  "webDir": "../docs",
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": "off",
+      "statsUrl": "",
+      "appReadyTimeout": 20000,
+      "responseTimeout": 120,
+      "resetWhenUpdate": true,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true
+    }
+  }
 }
