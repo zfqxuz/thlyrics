@@ -699,7 +699,7 @@ body:not(.warm) #player .pctl{background:rgba(23,26,31,.85)}
 .chipcycle.on{color:var(--ink)}
 .chipcycle.on::after{content:"";position:absolute;left:4px;right:4px;bottom:-1px;height:1px;background:var(--accent)}
 .chipcycle.on .ic{color:var(--ink)}
-.chipcycle[disabled]{opacity:.38;cursor:default}
+.chipcycle.off{opacity:.38}
 .chipcycle.pend::after{content:"";position:absolute;left:4px;right:4px;bottom:-1px;height:1px;background:var(--accent);opacity:.5;animation:sepPulse 1.2s ease-in-out infinite}
 @keyframes sepPulse{0%,100%{opacity:.15}50%{opacity:.8}}
 
@@ -1291,6 +1291,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017zj"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017zk"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

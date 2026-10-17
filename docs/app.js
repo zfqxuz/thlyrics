@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zj';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zj';
-import { icon } from './icons.js?v=20261017zj';
+import { V } from './version.js?v=20261017zk';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zk';
+import { icon } from './icons.js?v=20261017zk';
 
 (() => {
   'use strict';
@@ -3381,7 +3381,7 @@ import { icon } from './icons.js?v=20261017zj';
     const on = sepPref() && has;
     b.classList.toggle('on', on);
     b.classList.toggle('pend', sepPref() && !has);
-    b.disabled = exhausted;
+    b.classList.toggle('off', exhausted);        // 置灰但**不 disable**：还要能点出提示
     b.title = exhausted ? '每人每天生成的伴奏数量已达上限' : (on ? '伴奏：点一下切回原曲' : '伴奏：点一下切到伴奏');
     const lab = $('p-sep-t');
     if (lab) lab.textContent = exhausted ? '伴奏 · 上限' : (sepPref() ? (has ? '伴奏' : '生成中') : '伴奏');
