@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zf';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zf';
-import { icon } from './icons.js?v=20261017zf';
+import { V } from './version.js?v=20261017zg';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zg';
+import { icon } from './icons.js?v=20261017zg';
 
 (() => {
   'use strict';
@@ -3233,6 +3233,12 @@ import { icon } from './icons.js?v=20261017zf';
           <button class="tlink-ghost tlink" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
           <button class="tlink-ghost tlink" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
         </div>
+        <div class="seprow" id="seprow">
+          <span class="k">伴奏</span>
+          <button class="toolbtn" id="sep-make">生成伴奏</button>
+          <button class="toolbtn" id="sep-toggle" hidden>用伴奏</button>
+          <span class="meta" id="sepinforow"></span>
+        </div>
       </div>
       <div id="t-vocab-pane">
         <div class="chips" id="twchips">
@@ -3251,6 +3257,9 @@ import { icon } from './icons.js?v=20261017zf';
     };
     $('t-fav').onclick = () => { toggleMark('fav', t.id); showTrack(t.id); };
     $('t-mark').onclick = () => { toggleMark('sing', t.id); showTrack(t.id); };
+    $('sep-make').onclick = () => sepMake();
+    $('sep-toggle').onclick = () => sepToggle();
+    renderSep();
     renderTrackWords();
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
     $('b-back').onclick = () => leaveDetailPage('#/songs');
@@ -3990,8 +3999,6 @@ import { icon } from './icons.js?v=20261017zf';
       if (audio.paused) { if (audio.error || audio.readyState === 0) playTrack(curTrack); else audio.play().catch(() => {}); }
       else audio.pause();
     }
-    if ($('sep-make')) $('sep-make').onclick = () => sepMake();
-    if ($('sep-toggle')) $('sep-toggle').onclick = () => sepToggle();
     if (!location.hash) history.replaceState(null, '', '#/home');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
     navFrom = location.hash || '#/home';
     window.addEventListener('hashchange', onNavGuard);                 // 先挂守卫：误触退出要拦下来问一句

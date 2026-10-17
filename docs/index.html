@@ -351,6 +351,9 @@ main{padding:8px 18px 140px}
 .track-title{font-size:22px;font-weight:600;letter-spacing:.02em;color:var(--ink);line-height:1.35}
 .track-artist{font-size:13px;color:var(--ink-2);margin-top:5px}
 .track-base{font-size:11.5px;color:var(--ink-3);margin-top:4px;letter-spacing:.02em}
+.seprow{display:flex;align-items:center;gap:10px;margin:14px 0 2px;flex-wrap:wrap}
+.seprow .k{font-size:12.5px;color:var(--ink-3);letter-spacing:.06em}
+.seprow .meta{margin-left:auto}
 .track-actions{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap}
 .track-actions .tlink{font-family:var(--serif);font-size:13px;padding:0}
 .track-actions #t-sing{color:var(--accent);font-weight:600;font-size:14px}
@@ -1162,11 +1165,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
         <button class="toolbtn" id="pickfile">选本机音频</button>
         <span class="meta" id="localfile"></span>
       </div>
-      <div class="row" id="seprow" hidden>
-        <span class="meta" id="sepinforow"></span>
-        <button class="toolbtn" id="sep-make">生成伴奏</button>
-        <button class="toolbtn" id="sep-toggle" hidden>用伴奏</button>
-      </div>
     </details>
     </div>
 
@@ -1287,6 +1285,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017zf"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017zg"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
