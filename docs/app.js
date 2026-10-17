@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018c';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018c';
-import { icon } from './icons.js?v=20261018c';
+import { V } from './version.js?v=20261018d';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018d';
+import { icon } from './icons.js?v=20261018d';
 
 (() => {
   'use strict';
@@ -61,7 +61,7 @@ import { icon } from './icons.js?v=20261018c';
     showDialog({
       title: '退出登录？',
       actions: [
-        { label: '保留本机数据', kind: 'main', onClick: () => { ACC = null; saveAcc(); S.sepPref = false; save(); renderAv(); if (location.hash.startsWith('#/me')) renderMe(); toast('已回到本机模式'); } },
+        { label: '保留本机数据', kind: 'main', onClick: () => { ACC = null; saveAcc(); save(); renderAv(); if (location.hash.startsWith('#/me')) renderMe(); toast('已回到本机模式'); } },
         { label: '退出并清除', onClick: () => { ACC = null; saveAcc(); S = { known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false }, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true, theme: S.theme || 'dark', tSort: S.tSort || 'new' }; save(); location.hash = '#/home'; location.reload(); } },
       ],
     });
@@ -594,7 +594,7 @@ import { icon } from './icons.js?v=20261018c';
   }
   async function urlFor(track) {
     const sp = (S.sep || {})[track.id];                             // 伴奏模式 + 这首有伴奏 → 走伴奏
-    if (sp && sp.url && S.sepPref && isLoggedIn()) return sp.url;
+    if (sp && sp.url && sepOn(track) && isLoggedIn()) return sp.url;
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st) return null;
@@ -733,7 +733,6 @@ import { icon } from './icons.js?v=20261018c';
     audio.playbackRate = Number(S.rate || 1);
     S.used = 1; save();
     applySepBtn();
-    sepAutoFor(track);                                  // 开着伴奏模式、这首还没伴奏 → 后台生成
     if (opts.at != null) jump(opts.at);
     try { await audio.play(); } catch {}
     $('minibar').classList.add('on');
@@ -3613,10 +3612,11 @@ import { icon } from './icons.js?v=20261018c';
     return '没有音频';
   }
   // ────────────── 伴奏（播放器里一个开关；没有就后台生成，生成完自动切过去） ──────────────
-  let sepBusyId = '', sepLeft = null, sepUnlimited = false, sepTried = new Set();
+  let sepBusyId = '', sepLeft = null, sepUnlimited = false;
   // v2 = 现在这套（UMX 人声分离）；老的无 v 记录（声道相消 / kara2）一律当作没有，点了会重做
   const sepHas = (t) => { const sp = t && (S.sep || {})[t.id]; return !!(sp && sp.url && sp.v === 2); };
-  const sepPref = () => !!S.sepPref;
+  const sepOn = (t) => !!(t && Number((S.sepOn || {})[t.id]) > 0);
+  const setSepOn = (t, on) => { if (!t) return; S.sepOn = S.sepOn || {}; S.sepOn[t.id] = on ? Date.now() : -Date.now(); save(); };
 
   function applySepBtn() {
     const b = $('p-sep'); if (!b) return;
@@ -3630,13 +3630,14 @@ import { icon } from './icons.js?v=20261018c';
     }
     const exhausted = sepLeft === 0 && !sepUnlimited && !sepHas(curTrack);
     const has = sepHas(curTrack);
-    const on = sepPref() && has;
+    const on = sepOn(curTrack) && has;
+    const waiting = sepOn(curTrack) && !has && sepBusyId === (curTrack && curTrack.id);
     b.classList.toggle('on', on);
-    b.classList.toggle('pend', sepPref() && !has);
+    b.classList.toggle('pend', waiting);
     b.classList.toggle('off', exhausted);        // 置灰但**不 disable**：还要能点出提示
-    b.title = exhausted ? '每人每天生成的伴奏数量已达上限' : (on ? '伴奏：点一下切回原曲' : '伴奏：点一下切到伴奏');
+    b.title = exhausted ? '每人每天生成的伴奏数量已达上限' : (on ? '伴奏：点一下切回原曲' : waiting ? '伴奏：点一下取消' : '伴奏：点一下切到伴奏');
     const lab = $('p-sep-t');
-    if (lab) lab.textContent = exhausted ? '伴奏 · 上限' : (sepPref() ? (has ? '伴奏' : '生成中') : '伴奏');
+    if (lab) lab.textContent = exhausted ? '伴奏 · 上限' : (waiting ? '生成中' : '伴奏');
   }
 
   /** 换音源（原曲 ⇄ 伴奏）后从当前位置接着放，不从头开始 */
@@ -3663,7 +3664,7 @@ import { icon } from './icons.js?v=20261018c';
 
   /** 确保这首有伴奏：有就直接用，没有就后台生成，生成完切过去（期间继续播原曲） */
   async function ensureSepFor(t) {
-    if (!t || sepBusyId === t.id || !isLoggedIn()) return;
+    if (!t || sepBusyId === t.id || !isLoggedIn() || !sepOn(t)) return;
     if (sepHas(t)) return;
     const st = S.audio[t.id] || t.audio;
     if (!st || !st.nid) return;
@@ -3684,12 +3685,11 @@ import { icon } from './icons.js?v=20261018c';
       if (!url) throw new Error('没有地址');
       S.sep[t.id] = { url, at: Date.now(), engine: (r && r.engine) || '', v: 2 };
       save();
-      // 还在同一首、且仍然开着伴奏 → 无缝切过去
-      if (sepPref() && curTrack && curTrack.id === t.id) reloadAudioHere();
+      // 还在同一首、而且用户仍选择这首用伴奏 → 无缝切过去
+      if (sepOn(t) && curTrack && curTrack.id === t.id) reloadAudioHere();
       toast('伴奏已就绪');
       refreshSepQuota();
     } catch (e) {
-      sepTried.delete(t.id);
       toast(String((e && e.message) || e));
     } finally {
       sepBusyId = ''; applySepBtn();
@@ -3697,29 +3697,22 @@ import { icon } from './icons.js?v=20261018c';
   }
 
   /** 点播放器里的「伴奏」 */
+  /** 点播放器里的「伴奏」：只影响当前这首，不扩散到下一首 */
   async function onSepClick() {
     const t = curTrack;
     if (!t) return;
     if (!needLogin('登录后可用')) return;
-    if (sepLeft === 0 && !sepUnlimited && !sepHas(t)) { toast('每人每天生成的伴奏数量已达上限'); return; }
-    if (sepPref()) {                                  // 关：回原曲
-      S.sepPref = false; save(); applySepBtn(); reloadAudioHere(); return;
+    if (sepOn(t)) {                                    // 关：回原曲；生成中也取消切换
+      setSepOn(t, false); applySepBtn(); reloadAudioHere(); return;
     }
-    S.sepPref = true; save(); applySepBtn();          // 开
+    if (sepLeft === 0 && !sepUnlimited && !sepHas(t)) { toast('每人每天生成的伴奏数量已达上限'); return; }
+    setSepOn(t, true); applySepBtn();
     if (sepHas(t)) { reloadAudioHere(); return; }
-    toast('正在生成伴奏，请稍后');                     // 没有 → 后台生成，继续放原曲
+    toast('正在生成伴奏，请稍后');
     ensureSepFor(t);
   }
 
-  /** 一首歌开始播时：如果开着伴奏模式但还没有伴奏，就顺手生成 */
-  function sepAutoFor(t) {
-    if (!isLoggedIn() || !sepPref() || !t || sepHas(t) || sepTried.has(t.id) || sepBusyId) return;
-    if (sepLeft === 0 && !sepUnlimited) { S.sepPref = false; save(); applySepBtn(); return; }   // 额度用完：别再反复要
-    sepTried.add(t.id);
-    ensureSepFor(t);
-  }
-
-  if (typeof window !== 'undefined') window.__tlSep = () => ({ busy: sepBusyId, sep: (S.sep || {})[curTrack && curTrack.id] || null, pref: sepPref(), left: sepLeft, unlimited: sepUnlimited });
+  if (typeof window !== 'undefined') window.__tlSep = () => ({ busy: sepBusyId, sep: (S.sep || {})[curTrack && curTrack.id] || null, on: sepOn(curTrack), left: sepLeft, unlimited: sepUnlimited });
 
   function applyDisplay() {
     document.body.classList.toggle('gloss', S.gloss !== false);
