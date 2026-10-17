@@ -19,13 +19,21 @@ const today = () => {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// 后缀是「字典序递增」的：a…z, za…zz, zza…（不能 z 回绕成 a —— 那样版本号会变小）
+function incSuffix(s) {
+  const a = s.split('');
+  for (let i = a.length - 1; i >= 0; i--) {
+    if (a[i] < 'z') { a[i] = String.fromCharCode(a[i].charCodeAt(0) + 1); return a.join(''); }
+    a[i] = 'a';
+  }
+  return s + 'a';
+}
 function next(cur) {
-  const m = String(cur).match(/^(\d{8})([a-z])$/);
+  const m = String(cur).match(/^(\d{8})([a-z]+)$/);
   if (!m) return today() + 'a';
-  const [, date, letter] = m;
+  const [, date, suffix] = m;
   if (today() > date) return today() + 'a';          // 日期往后走了 → 新日期 + a
-  const c = letter.charCodeAt(0);
-  return date + (c >= 122 ? 'a' : String.fromCharCode(c + 1));   // 同日期（或时钟回拨）→ 字母 +1
+  return date + incSuffix(suffix);
 }
 
 const oldV = readV();
