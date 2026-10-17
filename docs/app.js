@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017x';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017x';
-import { icon } from './icons.js?v=20261017x';
+import { V } from './version.js?v=20261017y';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017y';
+import { icon } from './icons.js?v=20261017y';
 
 (() => {
   'use strict';
@@ -353,19 +353,16 @@ import { icon } from './icons.js?v=20261017x';
     // 优先：抓成 blob（同源）→ 走 GainNode 放大
     if (setupSpeakGain()) {
       try {
-        const resp = await fetch(src);
-        if (resp.ok) {
-          const blob = await resp.blob();
-          const url = URL.createObjectURL(blob);
-          if (speakGain) speakGain.gain.value = SPEAK_GAIN();
-          if (speakCtx && speakCtx.state === 'suspended') { try { await speakCtx.resume(); } catch {} }
-          const done = () => { try { URL.revokeObjectURL(url); } catch {} el.removeEventListener('ended', done); };
-          el.addEventListener('ended', done);
-          el.src = url;
-          el.currentTime = 0;
-          await el.play();
-          return;
-        }
+        const blob = await getBlob(src);
+        const url = URL.createObjectURL(blob);
+        if (speakGain) speakGain.gain.value = SPEAK_GAIN();
+        if (speakCtx && speakCtx.state === 'suspended') { try { await speakCtx.resume(); } catch { /* 忽略 */ } }
+        const done = () => { try { URL.revokeObjectURL(url); } catch { /* 忽略 */ } el.removeEventListener('ended', done); };
+        el.addEventListener('ended', done);
+        el.src = url;
+        el.currentTime = 0;
+        await el.play();
+        return;
       } catch { /* 落到下面普通播放 */ }
     }
     // 兜底：普通播放（音量跟随系统/元素，不再放大）

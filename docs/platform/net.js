@@ -3,7 +3,7 @@
  * 分开的三个来源：自己的后端（函数计算）、第三方中继（gdstudio）、站内静态数据。
  * 原生壳里不需要 CORS，行为一致，所以也不需要分实现。
  */
-import { V } from '../version.js?v=20261017x';
+import { V } from '../version.js?v=20261017y';
 
 export const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 / 解析 / 分词
 export const GD = 'https://music-api.gdstudio.xyz/api.php';                             // 第三方中继（仅网易云）
@@ -14,6 +14,15 @@ async function withTimeout(run, ms) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), ms);
   try { return await run(ac.signal); } finally { clearTimeout(timer); }
+}
+
+/** 取二进制（发音增益要把跨源音频抓成同源 blob；失败就抛，调用方自己兜底） */
+export function getBlob(url, { timeout = 20000 } = {}) {
+  return withTimeout(async (signal) => {
+    const r = await fetch(url, { signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.blob();
+  }, timeout);
 }
 
 /** 站内静态数据（带版本号，绕开 Pages 的 10 分钟缓存） */
