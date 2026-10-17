@@ -1268,3 +1268,24 @@ paused=false、currentTime 6s 内推进 5.96s、duration 221s、readyState=4、�
 `kara2.onnx` 是 **UVR-MDX-NET KARA2（主唱 / 和声分离）**，输入本来就该是人声轨。
 拿整首混音喂它，输出和人声几乎一样（实测波形相关度 **0.988**，等于没去）。
 `SEP_ENGINE=side-cancel` 已切回；要上 AI 分轨得换「整曲 → 人声/伴奏」的模型（Open-Unmix / MDX Inst 这类）。
+
+### 2026-10-18：内容包改增量（按文件）
+
+内容包里现在带了 18MB 的 kuromoji 词典，整包每次 16MB 太重，所以改成**按文件增量**：
+
+- `scripts/publish-bundle.py`：
+  - 每个文件按 `sha256` 传到 OSS `bundles/files/<sha256>`（**内容寻址**：同样的内容只传一次，
+    下次发布自动 `HEAD` 跳过）；
+  - `docs/update.json` 里给 `manifest: [{file_name, file_hash, download_url}]`（44 条，约 12KB）
+    **和** 整包 `url`（老客户端兜底）；
+- `docs/platform/ota.js`：有 manifest 就 `download({version, url, manifest})`
+  —— Capgo 只在**本地没有这个 hash** 时才下那个文件（本地 = APK 内置 assets 或
+  `cacheDir/capgo_downloads/<hash>_<name>`），失败自动退回整包；
+- 实测（真机）：`zn → zo` 只传 5 个文件（0.30MB），下载阶段 **0.4 秒**，
+  更新后词典仍在（本地分词正常返回）。
+
+⚠️ 注意：
+- manifest 下载的 bundle `checksum` 是空串（插件对 manifest 不做整包校验），这是正常的；
+- 第一次从「整包」切到「manifest」时本地缓存是空的，会全量下一次（约 16MB）；
+  之后只有真正变了的文件才会下；
+- 词典留在 `docs/vendor/kuromoji/`（随包发、随版本更新），**客户端运行时永远不联网取词典**。
