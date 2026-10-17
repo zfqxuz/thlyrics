@@ -14,6 +14,7 @@
  *   POST /api/login     {name, pass}
  *   GET  /api/me
  *   POST /api/password  {old, new}
+ *   POST /api/recover   {name, code, new}
  *   GET  /api/data
  *   PUT  /api/data      {data}
  */
@@ -133,6 +134,11 @@ async function ossPutJson(key, obj) {
 const rid = (n) => crypto.randomBytes(n).toString('hex');
 const nameOk = (s) => typeof s === 'string' && /^[A-Za-z0-9_\u4e00-\u9fa5-]{2,20}$/.test(s);
 const hashPass = (pass, salt) => crypto.scryptSync(pass, salt, 64).toString('hex');
+const RC_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const recoveryCode = () => { const b = crypto.randomBytes(16); let s = ''; for (let i = 0; i < 16; i++) s += RC_ALPHABET[b[i] % RC_ALPHABET.length]; return s; };
+const fmtRecovery = (s) => String(s || '').replace(/(.{4})(?=.)/g, '$1-');
+const normRecovery = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const hashRecovery = (code, salt) => crypto.scryptSync(normRecovery(code), salt, 32).toString('hex');
 const tokenFor = (uid, name) => {
   const payload = b64(JSON.stringify({ sub: uid, name, exp: Date.now() + TOKEN_DAYS * 864e5 })).replace(/=/g, '');
   return payload + '.' + crypto.createHmac('sha256', ENV.TOKEN_SECRET).update(payload).digest('hex').slice(0, 40);
@@ -1163,13 +1169,15 @@ exports.handler = async (event) => {
       const salt = rid(16);
       const first = Object.keys(index).length === 0;      // 第一个注册的就是管理员
       const avatar = cleanAvatar(body.avatar);
+      const rc = recoveryCode();
       const acct = { uid, name, nameLower: key, salt, hash: hashPass(pass, salt), avatar, createdAt: new Date().toISOString(),
-        admin: first || ADMINS.indexOf(key) >= 0 };
+        recoverySalt: rid(16), admin: first || ADMINS.indexOf(key) >= 0 };
+      acct.recoveryHash = hashRecovery(rc, acct.recoverySalt);
       await ossPutJson(acctKey(uid), acct);
       index[key] = uid;
       await ossPutJson(INDEX_KEY, index);
       if (body.data) await ossPutJson(dataKey(uid), { v: 1, at: new Date().toISOString(), data: body.data });
-      return reply(req, 200, { ok: true, token: tokenFor(uid, name), user: { uid, name, admin: !!acct.admin, avatar: acct.avatar || '' } });
+      return reply(req, 200, { ok: true, token: tokenFor(uid, name), recovery: fmtRecovery(rc), user: { uid, name, admin: !!acct.admin, avatar: acct.avatar || '' } });
     }
 
     if (action === '/login' && method === 'POST') {
@@ -1179,8 +1187,36 @@ exports.handler = async (event) => {
       if (!uid) return reply(req, 401, { error: '用户名或密码不对' });
       const acct = await ossGetJson(acctKey(uid));
       if (!acct || hashPass(pass, acct.salt) !== acct.hash) return reply(req, 401, { error: '用户名或密码不对' });
+      let rc = '';
+      if (!acct.recoveryHash || !acct.recoverySalt) {          // 老账号：登录时补发一次恢复码
+        rc = recoveryCode();
+        acct.recoverySalt = rid(16);
+        acct.recoveryHash = hashRecovery(rc, acct.recoverySalt);
+        await ossPutJson(acctKey(uid), acct);
+      }
       const adm = !!acct.admin || ADMINS.indexOf(String(acct.nameLower || '').toLowerCase()) >= 0;
-      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
+      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), recovery: rc ? fmtRecovery(rc) : undefined, user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
+    }
+
+    if (action === '/recover' && method === 'POST') {
+      const name = String(body.name || '').trim().toLowerCase();
+      const code = normRecovery(body.code);
+      const pass = String(body.new || '');
+      if (!name || !code) return reply(req, 400, { error: '用户名和恢复码都要填' });
+      if (pass.length < 6) return reply(req, 400, { error: '新密码至少 6 位' });
+      const index = (await ossGetJson(INDEX_KEY)) || {};
+      const uid = index[name];
+      if (!uid) return reply(req, 401, { error: '用户名或恢复码不对' });
+      const acct = await ossGetJson(acctKey(uid));
+      if (!acct || !acct.recoverySalt || !acct.recoveryHash || hashRecovery(code, acct.recoverySalt) !== acct.recoveryHash) {
+        return reply(req, 401, { error: '用户名或恢复码不对' });
+      }
+      const rc = recoveryCode();
+      acct.salt = rid(16); acct.hash = hashPass(pass, acct.salt);
+      acct.recoverySalt = rid(16); acct.recoveryHash = hashRecovery(rc, acct.recoverySalt);
+      await ossPutJson(acctKey(uid), acct);
+      const adm = !!acct.admin || ADMINS.indexOf(String(acct.nameLower || '').toLowerCase()) >= 0;
+      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), recovery: fmtRecovery(rc), user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
     }
 
     // 临时：ONNX 分离器在 FC 上的速度标定（只有内部 token 能用）

@@ -55,6 +55,17 @@ import { icon } from './icons.js?v=20261017zs';
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
+  const isLoggedIn = () => !!(ACC && ACC.token);
+  const needLogin = (msg) => { if (isLoggedIn()) return true; showGate(msg || ''); return false; };
+  function logoutFlow() {
+    showDialog({
+      title: '退出登录？',
+      actions: [
+        { label: '保留本机数据', kind: 'main', onClick: () => { ACC = null; saveAcc(); S.sepPref = false; save(); renderAv(); if (location.hash.startsWith('#/me')) renderMe(); toast('已回到本机模式'); } },
+        { label: '退出并清除', onClick: () => { ACC = null; saveAcc(); S = { known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false }, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true, theme: S.theme || 'dark', tSort: S.tSort || 'new' }; save(); location.hash = '#/home'; location.reload(); } },
+      ],
+    });
+  }
   function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.sep = S.sep || {}; S.sepOn = S.sepOn || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
     }
@@ -64,7 +75,7 @@ import { icon } from './icons.js?v=20261017zs';
   /** 只落本机、不排云同步（高频写入用，比如播放位置） */
   const saveLocal = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); };
   // 真机排错用的小钩子（不改状态，只读）：浏览器控制台里 __th() 看当前关键状态
-  if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, lsBytes: (kvGet(LS_KEY) || '').length });
+  if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, tracks: (typeof IDX !== 'undefined' && IDX) ? IDX.tracks.length : -1, lsBytes: (kvGet(LS_KEY) || '').length });
 
   // ── 主题：深色 / 暖白（白天）/ 跟随系统 ──
   const THEMES = [['dark', '深色'], ['warm', '暖白'], ['auto', '跟随系统']];
@@ -156,12 +167,12 @@ import { icon } from './icons.js?v=20261017zs';
   /** 顶栏头像 + 下拉菜单（我的 / 管理员 / 主题开关都收在这里） */
   function renderAv() {
     const btn = $('btn-av');
-    if (btn) btn.innerHTML = avatarHtml(ACC, '');
+    if (btn) btn.innerHTML = isLoggedIn() ? avatarHtml(ACC, '') : '<span class="av">本</span>';
     const d = $('avdrop');
     if (!d) return;
     const light = document.body.classList.contains('warm');
     d.innerHTML = `
-      <div class="mi">${avatarHtml(ACC, 'av24')}<span style="flex:1">${ACC ? esc(ACC.name) : '未登录'}</span></div>
+      <div class="mi">${isLoggedIn() ? avatarHtml(ACC, 'av24') : '<span class="av av24">本</span>'}<span style="flex:1">${isLoggedIn() ? esc(ACC.name) : '本机模式'}</span></div>
       <div class="sep"></div>
       <button class="mi" id="av-theme"><span style="flex:1">${light ? '暖白（白天）' : '深色'}</span><span class="sw ${light ? 'on' : ''}"><i></i></span></button>
       <div class="sep"></div>
@@ -171,7 +182,7 @@ import { icon } from './icons.js?v=20261017zs';
       <button class="mi" id="av-me">${icon('user','in')}我的</button>
       ${ACC && ACC.admin ? `<button class="mi" id="av-admin">${icon('settings','in')}管理员</button>` : ''}
       <div class="sep"></div>
-      <button class="mi" id="av-out">退出登录</button>`;
+      ${isLoggedIn() ? `<button class="mi" id="av-out">退出登录</button>` : `<button class="mi" id="av-login">登录 / 注册</button>`}`;
     const close = () => { d.hidden = true; };
     if ($('av-theme')) $('av-theme').onclick = () => { S.theme = light ? 'dark' : 'warm'; save(); applyTheme(); renderAv(); };
     if ($('av-home')) $('av-home').onclick = () => { close(); go('#/home'); };
@@ -179,7 +190,8 @@ import { icon } from './icons.js?v=20261017zs';
     if ($('av-search')) $('av-search').onclick = () => { close(); $('q').focus(); };
     if ($('av-me')) $('av-me').onclick = () => { close(); go('#/me'); };
     if ($('av-admin')) $('av-admin').onclick = () => { close(); go('#/admin'); };
-    if ($('av-out')) $('av-out').onclick = () => { ACC = null; saveAcc(); close(); renderAv(); showGate(''); };
+    if ($('av-login')) $('av-login').onclick = () => { close(); showGate(''); };
+    if ($('av-out')) $('av-out').onclick = () => { close(); logoutFlow(); };
   }
 
   // ── 收藏 / 会唱（存时间戳，取消标记存负数：同步时按时间戳合并） ──
@@ -544,6 +556,7 @@ import { icon } from './icons.js?v=20261017zs';
   const saveUrlCache = () => { const o = {}; for (const [k, v] of urlCache) if (Date.now() - v.at < URL_TTL) o[k] = v; kvSetJson(UC_KEY, o); };
 
   let stationNid = null, seekTime = null, prepToken = 0, posSavedAt = 0, healing = false;
+  let bindReturnToPlayer = false;
   const setNow = (t) => { const el = $('p-now'); if (el) el.textContent = t; };
   const setState = (t) => {
     const el = $('p-state'); if (el) el.textContent = t || '';
@@ -584,7 +597,7 @@ import { icon } from './icons.js?v=20261017zs';
   }
   async function urlFor(track) {
     const sp = (S.sep || {})[track.id];                             // 伴奏模式 + 这首有伴奏 → 走伴奏
-    if (sp && sp.url && S.sepPref) return sp.url;
+    if (sp && sp.url && S.sepPref && isLoggedIn()) return sp.url;
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st) return null;
@@ -802,7 +815,7 @@ import { icon } from './icons.js?v=20261017zs';
     if (S.order !== playOrder) { S.order = playOrder; save(); }
     const t = $('p-order-t'); if (t) t.textContent = ORDER_NAME[playOrder];
     const ic = $('p-order-ic'); if (ic) ic.innerHTML = icon(ORDER_ICON[playOrder]);
-    const b = $('p-order'); if (b) { b.classList.toggle('on', playOrder !== 'seq'); b.title = '播放顺序：' + ORDER_NAME[playOrder] + '（点一下换下一档）'; }
+    const b = $('p-order'); if (b) { b.classList.toggle('on', playOrder !== 'seq'); b.title = '播放顺序：' + ORDER_NAME[playOrder]; }
     if (!quiet) setState('播放顺序：' + ORDER_NAME[playOrder]);
   }
   function setOrder(o, quiet) { playOrder = ORDERS.includes(o) ? o : 'seq'; applyOrder(quiet); }
@@ -815,10 +828,11 @@ import { icon } from './icons.js?v=20261017zs';
   }
 
   function applyControls() {
-    const a = $('m-all'), l = $('m-loop'), sc = $('p-scope');
+    const a = $('m-all'), l = $('m-loop'), sc = $('p-scope'), le = $('p-loopexit');
     if (a) a.classList.toggle('on', mode !== 'loop');
     if (l) l.classList.toggle('on', mode === 'loop');
     if (sc) sc.setAttribute('aria-checked', mode === 'loop' ? 'true' : 'false');
+    if (le) le.hidden = mode !== 'loop';
     applyOrder(true);
   }
 
@@ -968,6 +982,21 @@ import { icon } from './icons.js?v=20261017zs';
     d.hidden = false;
     d.querySelectorAll('[data-di]').forEach((el) => (el.onclick = () => { const a = acts[Number(el.dataset.di)]; d.hidden = true; if (a && a.onClick) a.onClick(); }));
   }
+  function showPicker(title, items, current, onPick) {
+    const d = $('dlg'); if (!d) return;
+    d.innerHTML = `<div class="dlgcard">
+      <div class="dlgt">${esc(title)}</div>
+      <div class="picklist">${items.map(([k, t]) => `<button class="pickitem${String(k) === String(current) ? ' on' : ''}" data-pk="${esc(k)}">${esc(t)}</button>`).join('')}</div>
+      <div class="dlga"><button class="toolbtn" data-pkcancel>取消</button></div>
+    </div>`;
+    d.hidden = false;
+    d.querySelectorAll('[data-pk]').forEach((el) => (el.onclick = () => {
+      d.hidden = true;
+      const k = el.dataset.pk;
+      if (onPick) onPick(k);
+    }));
+    const c = d.querySelector('[data-pkcancel]'); if (c) c.onclick = () => { d.hidden = true; };
+  }
 
   // ────────────── 数据 ──────────────
   let IDX = null, VOCAB = [], VBY = new Map(), VBYID = new Map(), SURF = new Map(), TRACK = new Map();
@@ -1093,11 +1122,11 @@ import { icon } from './icons.js?v=20261017zs';
       <div class="herohead">
         <div class="ht">今日から、<span class="accent">東方</span>の<br>歌詞で言葉を学ぶ。</div>
         <div class="hs">——三首歌里挑五个词；先听懂，再背下。</div>
-        <div class="hln">
+        ${IDX.tracks.length ? `<div class="hln">
           <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
           <button id="h-words">学词</button>
           <button id="h-mine">我的词 <span class="cnt">${knownN}</span></button>
-        </div>
+        </div>` : ''}
       </div>
       ${last ? `<div class="nowcard">
         <div class="k">NOW LEARNING · 正在学习</div>
@@ -1108,17 +1137,17 @@ import { icon } from './icons.js?v=20261017zs';
         <div class="k">开始</div>
         <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入</button></div>
       </div>` : `<div class="nowcard">
-        <div class="k">曲库是空的</div>
-        <div class="t">导入歌单 / 专辑 / 单曲</div>
-        <div class="acts"><button class="btn-main" id="h-imp">导入</button><button class="btn-ghost" id="h-pick">去曲库</button></div>
+        <div class="k">开始</div>
+        <div class="t">导入第一首歌</div>
+        <div class="acts"><button class="btn-main" id="h-imp">导入第一首歌</button></div>
       </div>`)}
       <div class="hair"></div>
       <div class="sec-sub">今天学这些</div>
-      <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">暂无</span>'}</div>`;
+      <div class="wordstrip">${due.map((v) => { const ex = examplesFor(v, 1)[0]; return `<button data-w="${v.id}"><span style="color:var(--ink3)">${ex ? '♪' : '词'}</span> ${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`; }).join('') || '<span class="meta">暂无</span>'}</div>`;
     const goHome = (h) => { location.hash = h; };
-    $('h-songs').onclick = () => goHome('#/songs');
-    $('h-words').onclick = () => goHome('#/learn');
-    $('h-mine').onclick = () => goHome('#/mine');
+    if ($('h-songs')) $('h-songs').onclick = () => goHome('#/songs');
+    if ($('h-words')) $('h-words').onclick = () => goHome('#/learn');
+    if ($('h-mine')) $('h-mine').onclick = () => goHome('#/mine');
     if ($('h-continue')) $('h-continue').onclick = () => { pendingPlayId = last.id; pendingResumeId = last.id; goHome('#/track/' + last.id); };
     if ($('h-pick')) $('h-pick').onclick = () => goHome('#/songs');
     if ($('h-imp')) $('h-imp').onclick = () => { impState.open = true; goHome('#/songs'); };
@@ -1152,6 +1181,8 @@ import { icon } from './icons.js?v=20261017zs';
   const revModeOn = (k) => revModes()[k] !== false;
   const REV_AVAIL = (k) => k !== 'listen' || typeof navigator === 'undefined' || navigator.onLine !== false;
   let revDeck = [], revI = 0, revQ = null, revStat = { ok: 0, bad: 0, requeue: 0 };
+  let revFrom = '#/mine', revSize = REVIEW_N;
+  const revCount = () => (Number(revSize) > 0 ? Number(revSize) : 9999);
 
   function startReview(n) {
     const want = (Number(n) > 0) ? Math.floor(Number(n)) : REVIEW_N;
@@ -1291,7 +1322,7 @@ import { icon } from './icons.js?v=20261017zs';
         $('e-rlearn').onclick = () => go('#/learn');
         return;
       }
-      startReview(REVIEW_N);
+      startReview(revCount());
     }
     // 一轮结束 → 结算
     if (revI >= revDeck.length) {
@@ -1304,10 +1335,10 @@ import { icon } from './icons.js?v=20261017zs';
         </div>
         <div class="row" style="justify-content:center;gap:10px;margin-top:6px">
           <button class="toolbtn" id="rev-again">${icon('rotate-ccw', 'in')}再来一轮</button>
-          <button class="toolbtn" id="rev-mine">回我的词</button>
+          <button class="toolbtn" id="rev-mine">${revFrom === '#/learn' ? '回学词' : '回我的词'}</button>
         </div></div>`;
-      $('rev-again').onclick = () => { startReview(REVIEW_N); renderReview(); };
-      $('rev-mine').onclick = () => go('#/mine');
+      $('rev-again').onclick = () => { startReview(revCount()); renderReview(); };
+      $('rev-mine').onclick = () => go(revFrom);
       return;
     }
     const v = revDeck[revI];
@@ -1327,6 +1358,7 @@ import { icon } from './icons.js?v=20261017zs';
       <div class="revtop">
         <button class="revx" id="rev-stop">${icon('chevron-left', 'in')}结束</button>
         <span class="revcount">${revI + 1} / ${revDeck.length}</span>
+        <button class="revx" id="rev-settings">设置</button>
       </div>
       <div class="revbar"><i style="width:${pct}%"></i></div>
       <div class="revq">
@@ -1344,7 +1376,36 @@ import { icon } from './icons.js?v=20261017zs';
       if (inp) { inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitTyped(); } }; setTimeout(() => { try { inp.focus(); } catch {} }, 120); }
       if ($('rev-submit')) $('rev-submit').onclick = () => submitTyped();
     }
-    $('rev-stop').onclick = () => go('#/mine');
+    $('rev-stop').onclick = () => go(revFrom);
+    if ($('rev-settings')) $('rev-settings').onclick = () => showRevSettings();
+  }
+
+  function showRevSettings() {
+    const d = $('dlg'); if (!d) return;
+    const m = revModes();
+    const sizes = [[10, '10 题'], [12, '12 题'], [20, '20 题'], [0, '全部']];
+    d.innerHTML = `<div class="dlgcard">
+      <div class="dlgt">复习设置</div>
+      <div class="meta" style="margin-top:12px">题型</div>
+      <div class="picklist">${REV_MODES.map(([k, t]) => `<button class="pickitem${m[k] !== false ? ' on' : ''}" data-rmode="${k}">${t}</button>`).join('')}</div>
+      <div class="meta" style="margin-top:12px">题量</div>
+      <div class="picklist">${sizes.map(([k, t]) => `<button class="pickitem${Number(revSize) === k ? ' on' : ''}" data-rsize="${k}">${t}</button>`).join('')}</div>
+      <div class="dlga"><button class="btn-main" data-rdone>完成</button></div>
+    </div>`;
+    d.hidden = false;
+    d.querySelectorAll('[data-rmode]').forEach((el) => (el.onclick = () => {
+      const k = el.dataset.rmode;
+      const cur = revModes();
+      cur[k] = !cur[k];
+      if (!REV_MODES.some(([x]) => cur[x])) { toast('至少留一种复习方式'); return; }
+      S.revModes = cur; save(); showRevSettings();
+    }));
+    d.querySelectorAll('[data-rsize]').forEach((el) => (el.onclick = () => {
+      revSize = Number(el.dataset.rsize) || 0;
+      startReview(revCount()); revI = 0; revQ = null; revStat = { ok: 0, bad: 0, requeue: 0 };
+      d.hidden = true; renderReview();
+    }));
+    const done = d.querySelector('[data-rdone]'); if (done) done.onclick = () => { d.hidden = true; };
   }
 
   /** 交卷：统一走这里（选择题 / 填空题共用），负责落盘、上色、出反馈条 */
@@ -1369,9 +1430,13 @@ import { icon } from './icons.js?v=20261017zs';
     feed.hidden = false;
     feed.className = 'revfeed ' + (ok ? 'ok' : 'bad');
     const tip = q.answer ? `<span class="fa">${esc(q.answer)}</span>` : '';
+    const ex = examplesFor(q.v, 1)[0];
+    const lyric = ex ? `<span class="fa">${esc(ex.jp)}</span>` : '';
+    const hear = ex ? `<button class="toolbtn" id="rev-hear" style="height:28px;margin-top:6px">听例句</button>` : '';
     feed.innerHTML = `<span class="fi">${icon(ok ? 'circle-check' : 'close', 'in')}</span>`
-      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}</span>`
+      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}${lyric}${hear}</span>`
       + `<button class="fnext" id="rev-next">继续</button>`;
+    if (ex) { const hb = $('rev-hear'); if (hb) hb.onclick = () => pvPlay(ex.tid, ex.li); }
     $('rev-next').onclick = () => { revI++; revQ = null; renderReview(); };
     try { $('rev-next').focus(); } catch { /* ignore */ }
     // 读音题答完顺手读一遍，把形和音钉在一起（静默，网页版可能被拦）
@@ -1482,7 +1547,7 @@ import { icon } from './icons.js?v=20261017zs';
         el.onclick = () => { S.dTag = el.dataset.v; save(); deckCount = 30; forgetScroll('#/learn'); renderLearn(); };
       });
     }
-    if ($('d-duego')) $('d-duego').onclick = () => { startReview(REVIEW_N); go('#/review'); };
+    if ($('d-duego')) $('d-duego').onclick = () => { revFrom = '#/learn'; startReview(revCount()); go('#/review'); };
     if ($('d-more')) $('d-more').onclick = () => { deckCount += 30; renderLearn(); };
     wireWords($('view-learn'));
   }
@@ -2004,7 +2069,7 @@ import { icon } from './icons.js?v=20261017zs';
   // 所以两台设备各改各的也不会互相抹掉。
   const SYNC_DEBOUNCE = 1800;
   const SYNC_MIN_GAP = 30000;        // 自动同步最短间隔：别让高频操作把整份状态反复推上去
-  let lastSyncAt = 0, lastSyncJson = '';
+  let lastSyncAt = 0, lastSyncJson = '', syncDirty = false;
   const DEV_KEY = 'thlyrics.dev.v1';
   var syncCfg = null, syncTimer = null, syncBusy = false, syncQueued = false, syncErr = '', applying = false;
   const devId = (() => { let d = kvGet(DEV_KEY); if (!d) { d = Math.random().toString(36).slice(2, 10); kvSet(DEV_KEY, d); } return d || 'x'; })();
@@ -2111,7 +2176,9 @@ import { icon } from './icons.js?v=20261017zs';
   }
 
   function queueSync() {
-    if (applying || S.autoSync === false || !ACC || !ACC.token) return;
+    if (!isLoggedIn()) return;
+    syncDirty = true;
+    if (applying || S.autoSync === false) return;
     clearTimeout(syncTimer);
     const gap = Math.max(0, SYNC_MIN_GAP - (Date.now() - lastSyncAt));
     syncTimer = setTimeout(() => { syncNow({ auto: true }); }, Math.max(SYNC_DEBOUNCE, gap));
@@ -2127,10 +2194,10 @@ import { icon } from './icons.js?v=20261017zs';
       const payloadJson = JSON.stringify(payload);
       const sig = hashStr(payloadJson) + ':' + payloadJson.length;
       if (!opts.force) {
-        if (payloadJson === lastSyncJson) { syncBusy = false; return true; }        // 内存里没变：不发
+        if (payloadJson === lastSyncJson) { syncDirty = false; syncBusy = false; return true; }        // 内存里没变：不发
         if (sig === S.syncHash) {                                                   // 本地自上次同步没变 → 只问一个哨兵
           const meta = await apiCall('/data/meta').catch(() => null);
-          if (meta && meta.at && meta.at === S.syncAt) { syncBusy = false; return true; }
+          if (meta && meta.at && meta.at === S.syncAt) { syncDirty = false; syncBusy = false; return true; }
         }
       }
       lastSyncAt = Date.now();
@@ -2149,6 +2216,7 @@ import { icon } from './icons.js?v=20261017zs';
         lastSyncJson = JSON.stringify(userState(S));   // 服务端合并后的状态才是下一次的比较基准
       }
       applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; S.syncHash = sig; save(); applying = false;
+      syncDirty = false;
       syncErr = '';
       if (opts.auto && gained > 0) toast(`已从账号取回 ${gained} 首导入的歌`);
       return true;
@@ -2165,19 +2233,20 @@ import { icon } from './icons.js?v=20261017zs';
 
   function refreshSyncMsg() { const el = $('syncmsg'); if (el) el.textContent = syncMsgHtml(); }
   function syncMsgHtml() {
-    const logged = !!(ACC && ACC.token);
-    const who = logged ? '账号 ' + esc(ACC.name) : '未登录';
-    if (!logged) return '未登录';
-    if (S.autoSync === false) return '同步已关 · ' + who;
+    const logged = isLoggedIn();
+    if (!logged) return '本机模式 · 数据只保存在本机';
+    const who = '账号 ' + esc(ACC.name);
     if (syncBusy) return '同步中… · ' + who;
     if (syncErr) return '同步失败：' + esc(syncErr) + ' · ' + who;
+    if (S.autoSync === false) return (syncDirty ? '待同步' : '自动同步已关') + ' · ' + who;
+    if (syncDirty) return '待同步 · ' + who;
     if (S.syncAt) return '已同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who;
     return '等待同步… · ' + who;
   }
 
   // ────────────── 账号（注册 / 登录 / 退出 / 改密码） ──────────────
   function accHtml() {
-    if (ACC && ACC.token) {
+    if (isLoggedIn()) {
       return `<div class="accbox on">
         <div class="row" style="gap:10px;align-items:center">
           ${avatarHtml(ACC, 'av48')}
@@ -2193,14 +2262,12 @@ import { icon } from './icons.js?v=20261017zs';
         </div>
         <div class="row" style="margin-top:8px"><button class="toolbtn" id="acc-pw">改密码</button></div>`;
     }
-    return `<div class="accbox"><div class="col"><div class="l1">登录 / 注册</div></div>
-      <div class="row" style="margin-top:8px">
-        <input class="sel" id="acc-name" placeholder="用户名" style="flex:1;min-width:100px;height:38px" autocomplete="username">
-        <input class="sel" id="acc-pass" type="password" placeholder="密码（≥6 位）" style="flex:1;min-width:100px;height:38px" autocomplete="current-password">
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button class="toolbtn on" id="acc-reg">注册并登录</button>
-        <button class="toolbtn" id="acc-login">登录</button>
+    return `<div class="accbox">
+      <div class="l1">本机模式</div>
+      <div class="l2">数据只保存在本机</div>
+      <div class="row" style="margin-top:10px">
+        <button class="toolbtn on" id="acc-login">登录</button>
+        <button class="toolbtn" id="acc-reg">注册</button>
       </div></div>`;
   }
 
@@ -2252,31 +2319,41 @@ import { icon } from './icons.js?v=20261017zs';
     apply();
   }
 
-  // ────────────── 登录闸门（没登录不让用） ──────────────
+  // ────────────── 登录 / 账号恢复 ──────────────
   function gateMsg(t) { const el = $('g-msg'); if (el) el.textContent = t || ''; }
   let gateAvatar = '';                                    // 注册时选的头像
-  function afterLogin() {
+  function closeGate() {
     const g = $('gate'); if (g) g.hidden = true;
     document.body.classList.remove('gated');
+  }
+  function afterLogin() {
+    closeGate();
+    renderAv();
     route();
-    // 开屏公告：从闸门登录/注册进来时 boot 早就 return 了，这里补一次检查
     if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);
+    setTimeout(refreshSepQuota, 1200);
     setTimeout(voicePackPrompt, 1200);
   }
   function showGate(msg) {
     const g = $('gate'); if (!g) return;
     g.hidden = false;
     document.body.classList.add('gated');
-    g.innerHTML = `<div class="gatecard">
-      <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">TH Lyrics</div>
+    g.innerHTML = `<div class="gatecard" style="position:relative">
+      <button class="gclose" id="g-close" aria-label="关闭">×</button>
+      <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">登录 / 注册</div>
+      <div class="gsub">登录后云同步</div>
       <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选）</span></label>
       <input type="file" id="g-av" accept="image/*" hidden>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
       <input class="sel" id="g-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
       <div class="row"><button class="btn-primary" id="g-login">登录</button><button class="toolbtn" id="g-reg">注册新账号</button></div>
       <div class="gmsg" id="g-msg">${esc(msg || '')}</div>
+      <button class="toolbtn" id="g-forgot">忘记密码</button>
+      <button class="toolbtn" id="g-guest">继续本机使用</button>
     </div>`;
     gateAvatar = '';
+    if ($('g-close')) $('g-close').onclick = closeGate;
+    if ($('g-guest')) $('g-guest').onclick = closeGate;
     if ($('g-av')) $('g-av').onchange = (e) => pickAvatar(e.target.files[0], (url) => {
       gateAvatar = url;
       const p = $('g-avp');
@@ -2284,8 +2361,75 @@ import { icon } from './icons.js?v=20261017zs';
     });
     $('g-login').onclick = () => authFrom('login', 'g-name', 'g-pass', afterLogin);
     $('g-reg').onclick = () => authFrom('reg', 'g-name', 'g-pass', afterLogin);
+    if ($('g-forgot')) $('g-forgot').onclick = () => showRecoveryForm();
     const onKey = (e) => { if (e.key === 'Enter') authFrom('login', 'g-name', 'g-pass', afterLogin); };
     $('g-name').onkeydown = onKey; $('g-pass').onkeydown = onKey;
+  }
+
+  function showRecoveryForm(msg) {
+    const g = $('gate'); if (!g) return;
+    g.hidden = false;
+    document.body.classList.add('gated');
+    g.innerHTML = `<div class="gatecard" style="position:relative">
+      <button class="gclose" id="g-rclose" aria-label="关闭">×</button>
+      <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">找回密码</div>
+      <input class="sel" id="g-rname" placeholder="用户名" autocomplete="username">
+      <input class="sel" id="g-rcode" placeholder="恢复码" autocomplete="one-time-code">
+      <input class="sel" id="g-rpass" type="password" placeholder="新密码（至少 6 位）" autocomplete="new-password">
+      <input class="sel" id="g-rpass2" type="password" placeholder="确认新密码" autocomplete="new-password">
+      <div class="row"><button class="btn-primary" id="g-rsubmit">重置密码</button><button class="toolbtn" id="g-rback">返回登录</button></div>
+      <div class="gmsg" id="g-msg">${esc(msg || '')}</div>
+    </div>`;
+    if ($('g-rclose')) $('g-rclose').onclick = closeGate;
+    if ($('g-rback')) $('g-rback').onclick = () => showGate('');
+    const submit = async () => {
+      const name = ($('g-rname').value || '').trim();
+      const code = ($('g-rcode').value || '').trim();
+      const p1 = ($('g-rpass').value || ''), p2 = ($('g-rpass2').value || '');
+      if (!name || !code) { gateMsg('用户名和恢复码都要填'); return; }
+      if (p1.length < 6) { gateMsg('新密码至少 6 位'); return; }
+      if (p1 !== p2) { gateMsg('两次密码不一样'); return; }
+      setLoad(true, '重置中…');
+      try {
+        const res = await apiCall('/recover', { method: 'POST', body: { name, code, new: p1 } });
+        ACC = { token: res.token, name: res.user.name, uid: res.user.uid, admin: !!res.user.admin, avatar: res.user.avatar || '' };
+        saveAcc(); renderAv(); setLoad(false);
+        showRecoveryCode(res.recovery, async () => {
+          toast('密码已重置');
+          await syncNow({ auto: true });
+          afterLogin();
+        });
+      } catch (e) {
+        setLoad(false);
+        gateMsg('重置失败：' + e.message);
+      }
+    };
+    if ($('g-rsubmit')) $('g-rsubmit').onclick = submit;
+    ['g-rname', 'g-rcode', 'g-rpass', 'g-rpass2'].forEach((id) => { const el = $(id); if (el) el.onkeydown = (e) => { if (e.key === 'Enter') submit(); }; });
+  }
+
+  function showRecoveryCode(code, done) {
+    if (!code) { if (done) done(); return; }
+    const d = $('dlg'); if (!d) { if (done) done(); return; }
+    d.hidden = false;
+    d.innerHTML = `<div class="dlgcard">
+      <div class="dlgt">恢复码</div>
+      <div class="gcode">${esc(code)}</div>
+      <div class="row" style="margin-top:12px"><button class="toolbtn" id="rc-copy">复制</button><button class="toolbtn" id="rc-dl">下载</button></div>
+      <label class="gcheck"><input type="checkbox" id="rc-ok"> 我已保存恢复码</label>
+      <div class="dlga"><button class="btn-main" id="rc-done" disabled>完成</button></div>
+    </div>`;
+    const chk = $('rc-ok'), fin = $('rc-done');
+    if (chk && fin) chk.onchange = () => { fin.disabled = !chk.checked; };
+    if ($('rc-copy')) $('rc-copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(code); toast('已复制'); } catch { toast('复制失败'); }
+    };
+    if ($('rc-dl')) $('rc-dl').onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['TH Lyrics 恢复码\n' + code + '\n'], { type: 'text/plain' }));
+      a.download = 'thlyrics-recovery.txt'; document.body.appendChild(a); a.click(); a.remove();
+    };
+    if (fin) fin.onclick = () => { if (fin.disabled) return; d.hidden = true; if (done) done(); };
   }
 
   async function authFrom(kind, nSel, pSel, after) {
@@ -2301,8 +2445,12 @@ import { icon } from './icons.js?v=20261017zs';
       saveAcc(); renderAv();
       setLoad(false);
       toast(kind === 'reg' ? `注册好了，欢迎 ${res.user.name}` : `已登录：${res.user.name}`);
-      if (after) { await syncNow({ auto: true }); after(); }   // 闸门里登录：拉一次再放行
-      else { await syncNow({ auto: true }); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); }
+      const finish = async () => {
+        if (after) { await syncNow({ auto: true }); after(); }
+        else { await syncNow({ auto: true }); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); }
+      };
+      if (res.recovery) showRecoveryCode(res.recovery, finish);
+      else await finish();
     } catch (e) {
       setLoad(false);
       const msg = (kind === 'reg' ? '注册失败：' : '登录失败：') + e.message;
@@ -2324,7 +2472,7 @@ import { icon } from './icons.js?v=20261017zs';
 
   async function pushCloud() {
     if (importing) return;
-    if (!ACC || !ACC.token) { toast('先登录才能同步'); return; }
+    if (!needLogin('登录后可云同步')) return;
     if (syncBusy) { toast('同步中'); return; }
     setLoad(true, '同步到云端…');
     const ok = await syncNow({ manual: true, force: true });
@@ -2335,15 +2483,16 @@ import { icon } from './icons.js?v=20261017zs';
   }
   async function pullCloud() {
     if (importing) return;
-    if (!ACC || !ACC.token) { toast('先登录才能同步'); return; }
+    if (!needLogin('登录后可云同步')) return;
     if (syncBusy) { toast('同步中'); return; }
+    if (!confirm('从云端恢复？')) return;
     const impB = Object.keys(S.imp || {}).length, kB = knownCount();
-    setLoad(true, '从云端拉取…');
-    const ok = await syncNow({ manual: true, force: true });   // 拉取必须真发一次，不能因为「内容没变」就跳过
+    setLoad(true, '从云端恢复…');
+    const ok = await syncNow({ manual: true, force: true });   // 恢复必须真发一次，不能因为「内容没变」就跳过
     setLoad(false);
-    if (!ok) { toast('拉取失败：' + syncErr); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); return; }
+    if (!ok) { toast('恢复失败：' + syncErr); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); return; }
     const d1 = Object.keys(S.imp || {}).length - impB, d2 = knownCount() - kB;
-    toast(d1 || d2 ? `已拉回：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '云端和本机一样');
+    toast(d1 || d2 ? `已恢复：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '云端和本机一样');
     if (location.hash.startsWith('#/me')) renderMe(); else renderMine();
   }
 
@@ -2650,7 +2799,7 @@ import { icon } from './icons.js?v=20261017zs';
     if ($('e-mlearn')) $('e-mlearn').onclick = () => go('#/learn');
     if ($('e-mreview')) $('e-mreview').onclick = () => go('#/review');
     if ($('m-known-go')) $('m-known-go').onclick = () => { S.dTag = 'known'; save(); go('#/learn'); };
-    if ($('m-review')) $('m-review').onclick = () => { startReview(REVIEW_N); go('#/review'); };
+    if ($('m-review')) $('m-review').onclick = () => { revFrom = '#/mine'; startReview(revCount()); go('#/review'); };
   }
 
   // ── 分享码：只带「歌单/专辑/单曲的来源」，对方导入时重新解析 ──
@@ -2785,12 +2934,12 @@ import { icon } from './icons.js?v=20261017zs';
       <div class="meta" style="margin:-4px 0 4px">复习按勾选的方式出题（至少留一种）</div>
       ${REV_MODES.map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
         <button class="toolbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
-      <div class="sect">同步</div>
-      <div class="row" style="margin-top:8px">
-        <button class="toolbtn" id="m-push">立即同步</button>
-        <button class="toolbtn" id="m-pull">从云端拉回</button>
+      <div class="sect">云同步</div>
+      ${isLoggedIn() ? `<div class="row" style="margin-top:8px">
+        <button class="toolbtn" id="m-push">同步</button>
+        <button class="toolbtn" id="m-pull">云端恢复…</button>
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
-      </div>
+      </div>` : `<div class="setrow"><div class="k">登录后可用</div><button class="toolbtn on" id="m-login">登录 / 注册</button></div>`}
       ${IS_NATIVE ? `<div class="sect">更新</div>
       <div class="updrow"><div class="k"><b>当前版本</b><small>${V}${apkCheckedAt ? ' · ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
         <button class="toolbtn" id="me-upd">检查更新</button></div>
@@ -2804,7 +2953,7 @@ import { icon } from './icons.js?v=20261017zs';
       <div class="sect">数据</div>
       <div class="setrow"><div class="k">导出 / 导入</div>
         <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
-      <div class="setrow"><div class="k">清空进度</div><button class="btn-danger" id="m-clear">清空</button></div>
+      <div class="setrow"><div class="k">${isLoggedIn() ? '清空进度' : '清空本机数据'}</div><button class="btn-danger" id="m-clear">清空</button></div>
       <div class="sect">分享歌单</div>
       <textarea class="code" id="sh-code" placeholder="分享码">${esc(shCode)}</textarea>
       <div class="row" style="margin-top:8px">
@@ -2819,9 +2968,9 @@ import { icon } from './icons.js?v=20261017zs';
     if ($('me-ota')) $('me-ota').onclick = () => checkOta(true);
     if ($('me-upd-go')) $('me-upd-go').onclick = () => installApk();
     const accReg = $('acc-reg'), accLogin = $('acc-login'), accOut = $('acc-out');
-    if (accReg) accReg.onclick = () => doAuth('reg');
-    if (accLogin) accLogin.onclick = () => doAuth('login');
-    if (accOut) accOut.onclick = () => { ACC = null; saveAcc(); renderAv(); toast('已退出登录'); showGate(''); };
+    if (accReg) accReg.onclick = () => showGate('');
+    if (accLogin) accLogin.onclick = () => showGate('');
+    if (accOut) accOut.onclick = () => logoutFlow();
     if ($('acc-av')) $('acc-av').onclick = () => $('acc-avf').click();
     if ($('acc-avf')) $('acc-avf').onchange = (e) => pickAvatar(e.target.files[0], async (url) => {
       try { await apiCall('/avatar', { method: 'POST', body: { avatar: url } }); ACC.avatar = url; saveAcc(); renderAv(); toast('头像已换'); renderMe(); }
@@ -2844,9 +2993,10 @@ import { icon } from './icons.js?v=20261017zs';
     if ($('me-admin')) $('me-admin').onclick = () => go('#/admin');
     if ($('tts-packs')) $('tts-packs').onclick = () => go('#/voicepack');
     if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
-    $('m-push').onclick = () => pushCloud();
-    $('m-pull').onclick = () => pullCloud();
-    $('m-auto').onclick = () => {
+    if ($('m-login')) $('m-login').onclick = () => showGate('');
+    if ($('m-push')) $('m-push').onclick = () => pushCloud();
+    if ($('m-pull')) $('m-pull').onclick = () => pullCloud();
+    if ($('m-auto')) $('m-auto').onclick = () => {
       S.autoSync = S.autoSync === false;
       applying = true; save(); applying = false;
       renderMe();
@@ -2863,7 +3013,11 @@ import { icon } from './icons.js?v=20261017zs';
       inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
-    if ($('m-clear')) $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清')) return; S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.star = {}; S.rev = {}; S.clearedAt = Date.now(); save(); renderMe(); };
+    if ($('m-clear')) $('m-clear').onclick = () => {
+      const q = isLoggedIn() ? '清空进度？云端也会一起清' : '清空本机数据？';
+      if (!confirm(q)) return;
+      S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.star = {}; S.rev = {}; S.clearedAt = Date.now(); save(); renderMe();
+    };
     const shStat = $('sh-stat');
     if ($('sh-gen')) $('sh-gen').onclick = async () => {
       const code = shareCode();
@@ -3211,6 +3365,8 @@ import { icon } from './icons.js?v=20261017zs';
         // 点别的句、或者还没有当前句（没播 / 没时间轴）→ 一律跳转播放那一句，不弹词条（用户要求）。
         if (li != null && (cur < 0 || li !== Number(cur))) {
           playFrom(li, false);                 // 切句 + 播放；forceLoop=false 不动模式
+          wEl.classList.add('hint');
+          setTimeout(() => wEl.classList.remove('hint'), 900);
           toast('已切到这一句 · 再点词看释义');
           return;                              // ← 关键：直接结束，不开抽屉
         }
@@ -3380,6 +3536,14 @@ import { icon } from './icons.js?v=20261017zs';
 
   function applySepBtn() {
     const b = $('p-sep'); if (!b) return;
+    if (!isLoggedIn()) {
+      b.classList.remove('on', 'pend');
+      b.classList.add('off');
+      b.title = '登录后可用';
+      const lab = $('p-sep-t');
+      if (lab) lab.textContent = '伴奏 · 登录';
+      return;
+    }
     const exhausted = sepLeft === 0 && !sepUnlimited && !sepHas(curTrack);
     const has = sepHas(curTrack);
     const on = sepPref() && has;
@@ -3405,6 +3569,7 @@ import { icon } from './icons.js?v=20261017zs';
 
   const sepSleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function refreshSepQuota() {
+    if (!isLoggedIn()) { sepLeft = null; sepUnlimited = false; applySepBtn(); return; }
     try {
       const q = await sepApi('/sep/quota');
       if (q) { sepLeft = Number(q.left); sepUnlimited = !!q.unlimited; }
@@ -3414,7 +3579,7 @@ import { icon } from './icons.js?v=20261017zs';
 
   /** 确保这首有伴奏：有就直接用，没有就后台生成，生成完切过去（期间继续播原曲） */
   async function ensureSepFor(t) {
-    if (!t || sepBusyId === t.id) return;
+    if (!t || sepBusyId === t.id || !isLoggedIn()) return;
     if (sepHas(t)) return;
     const st = S.audio[t.id] || t.audio;
     if (!st || !st.nid) return;
@@ -3437,6 +3602,7 @@ import { icon } from './icons.js?v=20261017zs';
       save();
       // 还在同一首、且仍然开着伴奏 → 无缝切过去
       if (sepPref() && curTrack && curTrack.id === t.id) reloadAudioHere();
+      toast('伴奏已就绪');
       refreshSepQuota();
     } catch (e) {
       sepTried.delete(t.id);
@@ -3450,6 +3616,7 @@ import { icon } from './icons.js?v=20261017zs';
   async function onSepClick() {
     const t = curTrack;
     if (!t) return;
+    if (!needLogin('登录后可用')) return;
     if (sepLeft === 0 && !sepUnlimited && !sepHas(t)) { toast('每人每天生成的伴奏数量已达上限'); return; }
     if (sepPref()) {                                  // 关：回原曲
       S.sepPref = false; save(); applySepBtn(); reloadAudioHere(); return;
@@ -3462,7 +3629,7 @@ import { icon } from './icons.js?v=20261017zs';
 
   /** 一首歌开始播时：如果开着伴奏模式但还没有伴奏，就顺手生成 */
   function sepAutoFor(t) {
-    if (!sepPref() || !t || sepHas(t) || sepTried.has(t.id) || sepBusyId) return;
+    if (!isLoggedIn() || !sepPref() || !t || sepHas(t) || sepTried.has(t.id) || sepBusyId) return;
     if (sepLeft === 0 && !sepUnlimited) { S.sepPref = false; save(); applySepBtn(); return; }   // 额度用完：别再反复要
     sepTried.add(t.id);
     ensureSepFor(t);
@@ -3507,8 +3674,9 @@ import { icon } from './icons.js?v=20261017zs';
       $('p-word').textContent = fallback || '';
       $('p-reading').textContent = rd ? '（' + rd + '）' : '';
       $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || (seg && seg.y) || '';
-      $('p-meaning').textContent = (mine && mine.m) || '暂无释义';
+      $('p-meaning').textContent = (mine && mine.m) || '暂无释义 · 补充';
       $('p-meta').textContent = [POSNAME[seg && seg.k], mine ? '自补释义' : ''].filter(Boolean).join(' · ');
+      const ce0 = $('p-editclear'); if (ce0) ce0.hidden = !(mine && mine.m);
       $('p-known').style.display = 'none';
       if ($('p-star')) $('p-star').style.display = 'none';          // 自补的词没有 id，挂不上星标
       const sp = $('p-speak'); if (sp) sp.style.display = 'none';   // 没收录的词没有标准读音可发
@@ -3528,6 +3696,7 @@ import { icon } from './icons.js?v=20261017zs';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
     $('p-known').classList.toggle('on', !!isKnown(w));
     $('p-known').title = isKnown(w) ? '取消已掌握' : '标为已掌握';
+    const ce1 = $('p-editclear'); if (ce1) ce1.hidden = !(S.notes[w.id] && S.notes[w.id].meaning);
     if ($('p-star')) {
       $('p-star').style.display = '';
       $('p-star').classList.toggle('on', isStar(w));
@@ -3764,7 +3933,7 @@ import { icon } from './icons.js?v=20261017zs';
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
     if (v === 'search') { show('view-search'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
     if (v === 'home') { show('view-home'); return renderHome(); }
-    if (v === 'review') { show('view-review'); if (revDeck.length && revI >= revDeck.length) startReview(REVIEW_N); return renderReview(); }
+    if (v === 'review') { show('view-review'); if (revDeck.length && revI >= revDeck.length) startReview(revCount()); return renderReview(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
     if (v === 'mine') { show('view-mine'); return renderMine(); }
     if (v === 'me') { show('view-me'); return renderMe(); }
@@ -3855,18 +4024,20 @@ import { icon } from './icons.js?v=20261017zs';
     $('p-next').onclick = () => step(1);
     // 单句 / 全曲：合成一个开关，点一下换边（两个半区都看得见当前是哪一档）
     $('p-scope').onclick = () => { const to = mode === 'loop' ? 'all' : 'loop'; setMode(to); toast(to === 'loop' ? '单句循环' : '全曲播放'); };
-    $('p-order').onclick = () => cycleOrder();
+    $('p-order').onclick = () => showPicker('播放顺序', [['seq', '顺序'], ['loop', '循环'], ['shuffle', '随机']], playOrder, (k) => setOrder(k));
+    if ($('p-loopexit')) $('p-loopexit').onclick = () => { setMode('all'); toast('已退出单句循环'); };
     $('b-display').onclick = (e) => { e.stopPropagation(); const b = $('displaybox'); b.classList.toggle('on'); };
     $('b-gloss').onclick = () => { S.gloss = S.gloss === false; save(); applyDisplay(); };
     $('b-zh').onclick = () => { S.zh = S.zh === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
     $('b-ruby').onclick = () => { S.ruby = S.ruby === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
     $('p-seek').oninput = (e) => { if (audio.duration) jump((Number(e.target.value) / 1000) * audio.duration); };
     $('p-rate').onclick = () => {
-      const rates = [1, .9, .8, .7, .6, 1.1];
-      const i = rates.indexOf(Number(S.rate || 1));
-      const r = rates[(i + 1) % rates.length];
-      S.rate = r; save(); audio.playbackRate = r; $('p-rate').textContent = r.toFixed(1) + 'x';
-      toast('语速 ' + r.toFixed(1) + 'x');
+      const rates = [0.6, 0.7, 0.8, 0.9, 1, 1.1];
+      showPicker('倍速', rates.map((r) => [String(r), r.toFixed(1) + 'x']), String(Number(S.rate || 1)), (k) => {
+        const r = Number(k);
+        S.rate = r; save(); audio.playbackRate = r; $('p-rate').textContent = r.toFixed(1) + 'x';
+        toast('语速 ' + r.toFixed(1) + 'x');
+      });
     };
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
@@ -3891,11 +4062,15 @@ import { icon } from './icons.js?v=20261017zs';
     const grab = document.querySelector('#pop .grab');
     if (grab) grab.onclick = () => $('pop').classList.remove('expanded');
     $('p-edit').onclick = () => {
-      if (!popWord) return;
+      if (!popWord && !popFallback) return;
       const r = $('p-editrow');
       const opening = r.hidden;
       r.hidden = !opening;
-      if (opening) { $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus(); }
+      if (opening) {
+        const mine = popWord ? meaningOf(popWord) : ((userWord(popSeg, popFallback) || {}).m || '');
+        $('p-editinput').value = mine;
+        $('p-editinput').focus();
+      }
     };
     $('p-editinput').onkeydown = (e) => {
       if (e.key !== 'Enter') return;
@@ -3951,6 +4126,15 @@ import { icon } from './icons.js?v=20261017zs';
       else hidePop();
       toast(drop ? '已还原' : '这一处的罗马音已更新');
     };
+    if ($('p-editclear')) $('p-editclear').onclick = () => {
+      if (popWord) delete S.notes[popWord.id];
+      else if (popFallback) delete S.words[userWordKey(popSeg, popFallback)];
+      save();
+      const r = $('p-editrow'); if (r) r.hidden = true;
+      refreshLyricsNow();
+      showPop(popWord, popFallback, popSeg);
+      toast('已清除自定义释义');
+    };
     $('p-romasave').onclick = () => saveRoma(false);
     $('p-romareset').onclick = () => saveRoma(true);
     $('p-romainput').onkeydown = (e) => { if (e.key === 'Enter') saveRoma(false); };
@@ -4005,8 +4189,7 @@ import { icon } from './icons.js?v=20261017zs';
         sh.style.transition = ''; sh.style.transform = '';
         y0 = null; dy = 0;
         if (d > 80) {
-          if (sh.classList.contains('expanded')) sh.classList.remove('expanded');  // 先收回一阶段
-          else hidePop();                                                          // 再拉就关
+          hidePop();
         } else if (d < -40) {
           sh.classList.add('expanded');
           if (body) body.scrollTop = 0;
@@ -4029,6 +4212,7 @@ import { icon } from './icons.js?v=20261017zs';
       if (e.key === 'Escape') { $('player').classList.remove('on'); hidePop(); }
     });
     $('p-nosrc').onclick = () => {
+      bindReturnToPlayer = true;
       $('player').classList.remove('on');
       const box = $('srcbox');
       if (box) { box.open = true; box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -4048,6 +4232,7 @@ import { icon } from './icons.js?v=20261017zs';
       audio.removeAttribute('src');
       toast('已绑定本机音频，正在起播…');
       playTrack(curTrack);
+      if (bindReturnToPlayer) { bindReturnToPlayer = false; openPlayer(); }
     };
     $('nidsave').onclick = () => {
       if (!curTrack) return;
@@ -4060,6 +4245,7 @@ import { icon } from './icons.js?v=20261017zs';
       else if (m) S.audio[curTrack.id] = { type: 'netease', nid: m[1] };
       else { alert('没识别出歌曲 ID（网易云数字 ID 或 QQ 歌曲 mid 都行）'); return; }
       save(); $('srcinfo').textContent = describeSource(curTrack); toast('已绑定');
+      if (bindReturnToPlayer) { bindReturnToPlayer = false; openPlayer(); playTrack(curTrack); }
     };
     function togglePlay() {
       if (!curTrack) return;
@@ -4071,17 +4257,17 @@ import { icon } from './icons.js?v=20261017zs';
       if (audio.paused) { if (audio.error || audio.readyState === 0) playTrack(curTrack); else audio.play().catch(() => {}); }
       else audio.pause();
     }
-    if (!location.hash) history.replaceState(null, '', '#/home');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
+    if (!location.hash) history.replaceState(null, '', '#/home');
     navFrom = location.hash || '#/home';
-    window.addEventListener('hashchange', onNavGuard);                 // 先挂守卫：误触退出要拦下来问一句
-    window.addEventListener('hashchange', route);                     // 闸门也要挂：登录后靠它路由
-    if (!ACC || !ACC.token) { showGate(); return; }   // 必须登录才能用
+    window.addEventListener('hashchange', onNavGuard);
+    window.addEventListener('hashchange', route);
     route();
     if (!location.hash.startsWith('#/track/')) restoreBar();   // 开屏页显示上次那首（暂停，点了才播）
-    // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
-    if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
-    setTimeout(refreshSepQuota, 1500);                  // 伴奏额度（每天 3 首；管理员不限）
-    apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; ACC.avatar = r.user.avatar || ACC.avatar || ''; saveAcc(); renderAv(); if (location.hash.startsWith('#/mine')) renderMine(); else if (location.hash.startsWith('#/me') || location.hash.startsWith('#/admin')) route(); } }).catch(() => {});
+    if (isLoggedIn() && S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
+    if (isLoggedIn()) {
+      setTimeout(refreshSepQuota, 1500);                // 伴奏额度（每天 3 首；管理员不限）
+      apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; ACC.avatar = r.user.avatar || ACC.avatar || ''; saveAcc(); renderAv(); if (location.hash.startsWith('#/mine')) renderMine(); else if (location.hash.startsWith('#/me') || location.hash.startsWith('#/admin')) route(); } }).catch(() => {});
+    }
     // 老数据补分词：只补没有 segs 的（静默，慢一点没关系）；测试里不跑
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);
     setTimeout(() => gcLocalAudio(), 3000);            // 清掉没人认领的本机音频副本

@@ -394,6 +394,14 @@ main{padding:8px 18px 140px}
 .gatecard .row{display:flex;gap:8px}
 .gatecard .row button{flex:1}
 .gatecard .gmsg{font-size:12px;color:var(--accent-ink);min-height:16px}
+.gclose{position:absolute;right:10px;top:8px;width:32px;height:32px;border:0;background:transparent;color:var(--ink-3);font-size:22px;line-height:1;cursor:pointer}
+.gcode{margin-top:14px;padding:14px 12px;border-radius:12px;background:var(--field);color:var(--ink);font-family:var(--mono);font-size:18px;letter-spacing:.08em;text-align:center;word-break:break-all}
+.gcheck{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--ink-2)}
+.gcheck input{width:16px;height:16px;accent-color:var(--accent)}
+#dlg .dlga .btn-main:disabled{opacity:.45;cursor:default}
+.picklist{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.pickitem{height:42px;border:0;border-radius:11px;background:var(--field);color:var(--ink-2);font-size:13px;text-align:left;padding:0 14px}
+.pickitem.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 
 .accbox{margin:var(--sp-4) 0 var(--sp-2);padding:0 0 var(--sp-4);border-bottom:1px solid var(--line)}
 .accbox.on{border-bottom-color:var(--accent)}
@@ -617,12 +625,18 @@ body.gloss .line .g{display:block;font-size:9.5px;line-height:1.25;color:var(--i
   font-size:11.5px;line-height:1.4;color:var(--ink-3);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+#player .loopexit{
+  align-self:flex-start;margin:6px 18px 0;height:26px;padding:0 10px;border-radius:999px;border:0;
+  background:var(--accent-soft);color:var(--accent-ink);font-size:11.5px;
+}
+#player .loopexit[hidden]{display:none}
 #player .plyrics{
   flex:1 1 auto;min-height:0;overflow-y:auto;
   padding:14px 18px 24px;
   -webkit-overflow-scrolling:touch;
   scroll-padding-bottom:24px;
 }
+.w.hint{background:var(--accent-soft);border-radius:4px}
 #player .pctl{
   flex:0 0 auto;position:relative;
   border:0;
@@ -1202,6 +1216,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
     <button class="toolbtn" id="p-nosrc" hidden>绑定音频</button>
   </div>
   <div class="pstate" id="p-state2"></div>
+  <button class="loopexit" id="p-loopexit" hidden>单句循环 · 退出</button>
   <div class="plyrics focus" id="plyric"></div>
   <div class="pctl">
     <div class="seekrow">
@@ -1220,7 +1235,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
       <button class="scope2" id="p-scope" role="switch" aria-checked="false" title="点一下切换：全曲 / 单句">
         <span class="half on" id="m-all">全曲</span><span class="half" id="m-loop">单句</span>
       </button>
-      <button class="chipcycle" id="p-order" title="播放顺序：点一下换下一档">
+      <button class="chipcycle" id="p-order" title="播放顺序">
         <span class="ic" id="p-order-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1" /> <circle cx="19" cy="12" r="1" /> <circle cx="5" cy="12" r="1" /></svg></span><span id="p-order-t">顺序</span>
       </button>
       <button class="chipcycle" id="p-sep" title="伴奏：点一下切换">
@@ -1264,7 +1279,7 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
     <button hidden id="p-roma"></button>
     <!-- 点释义就地改；点罗马音就地改 -->
     <div class="mg" id="p-meaning" title="点一下改释义"></div>
-    <div class="row" id="p-editrow" hidden><input id="p-editinput" placeholder="写你自己的释义，回车保存"></div>
+    <div class="row" id="p-editrow" hidden><input id="p-editinput" placeholder="写你自己的释义，回车保存"><button class="toolbtn" id="p-editclear" hidden>清除</button></div>
     <div class="mt" id="p-meta"></div>
     <div id="p-romabox" hidden>
       <div class="meta" id="p-romahint">选一个，或自己写</div>
