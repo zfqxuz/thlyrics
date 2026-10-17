@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018e';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018e';
-import { icon } from './icons.js?v=20261018e';
+import { V } from './version.js?v=20261018f';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018f';
+import { icon } from './icons.js?v=20261018f';
 
 (() => {
   'use strict';
@@ -493,7 +493,7 @@ import { icon } from './icons.js?v=20261018e';
     };
     const hit = pvCache.get(t.id);
     if (hit && Date.now() - hit.at < 18 * 60 * 1000) { start(hit.url); return; }
-    urlFor(t).then((url) => { if (!url) throw new Error('取不到音频地址'); pvCache.set(t.id, { url, at: Date.now() }); start(url); })
+    urlFor(t, { original: true }).then((url) => { if (!url) throw new Error('取不到音频地址'); pvCache.set(t.id, { url, at: Date.now() }); start(url); })
       .catch((e) => { if (my === pvSeq && pvKey === key) { pvKey = ''; refreshPvUI(); toast('试听失败：' + ((e && e.message) || '取不到音频')); } });
   }
   if (typeof window !== 'undefined') window.__tlPv = () => ({ key: pvKey, on: pvOn, seq: pvSeq, paused: pvAudio.paused, src: pvAudio.src, ready: pvAudio.readyState });
@@ -593,9 +593,9 @@ import { icon } from './icons.js?v=20261018e';
     try { const j = await gdJson(`types=lyric&source=netease&id=${encodeURIComponent(nid)}`); if (j) return j; } catch {}
     return null;
   }
-  async function urlFor(track) {
-    const sp = (S.sep || {})[track.id];                             // 伴奏模式 + 这首有伴奏 → 走伴奏
-    if (sp && sp.url && sepOn(track) && isLoggedIn()) return sp.url;
+  async function urlFor(track, opts = {}) {
+    const sp = (S.sep || {})[track.id];                             // 只有主播放器才允许走伴奏；例句试听永远原曲
+    if (!opts.original && sp && sp.url && sepOn(track) && isLoggedIn()) return sp.url;
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st) return null;
@@ -3231,7 +3231,7 @@ import { icon } from './icons.js?v=20261018e';
       </div>
       <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
       <div class="bar" style="margin:14px 0 0"><i style="width:${level(v) * 20}%"></i></div>
-      <div style="font-size:17px;margin-top:14px;color:#ffe9df" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
+      <div class="word-mean" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
       <div class="row" style="margin-top:14px">
         <button class="btn-primary" id="w-play">${icon('volume','in')}发音</button>
         <button class="toolbtn${isKnown(v) ? ' on' : ''}" id="w-known">${isKnown(v) ? '已掌握' : '标为已掌握'}</button>
