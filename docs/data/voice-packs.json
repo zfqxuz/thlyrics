@@ -3,11 +3,11 @@
     {
       "id": "kokoro-ja",
       "name": "Kokoro 日语",
-      "version": "1.0",
+      "version": "1.1",
       "kind": "audio",
-      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-1.0.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107489375&Signature=uZpGqsTFne71FiLYDYsjYM5Nhtk%3D",
-      "size": 31568868,
-      "sha256": "0588c8359b06741cd3f839cbe831a25ad44a794285868e31cc3e8996089fe617",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-1.1.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107579711&Signature=U7JNEN%2BGqZtWFbpMmZeClk6oqqo%3D",
+      "size": 31532281,
+      "sha256": "95aaa2c57effef06099139d1d297f578b33a6201e522bbcf88307724f5c62382",
       "source": "https://huggingface.co/hexgrad/Kokoro-82M",
       "license": "Apache-2.0"
     },

@@ -21,3 +21,4 @@ app/android/app/src/main/assets/public/
 node_modules/
 .shots-phone/
 .e2e/android/*.mjs
+__pycache__/

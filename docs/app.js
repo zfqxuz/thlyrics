@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017r';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017r';
-import { icon } from './icons.js?v=20261017r';
+import { V } from './version.js?v=20261017t';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017t';
+import { icon } from './icons.js?v=20261017t';
 
 (() => {
   'use strict';
@@ -2817,14 +2817,19 @@ import { icon } from './icons.js?v=20261017r';
       let st = null;
       try { st = await voicePack.status(p.id); } catch { st = null; }
       const installed = !!(st && st.installed);
+      // 已装但版本落后 → 给「更新」入口（以前只判断装没装，1.0 永远看不到 1.1）
+      const oldVer = installed ? String(st.version || '') : '';
+      const canUpd = installed && oldVer && String(p.version) !== oldVer;
       rows.push(`<div class="item" data-pack="${esc(p.id)}">
         <div class="col"><div class="l1">${esc(p.name)}</div>
-          <div class="l2">${installed ? '已安装' : fmtSize(p.size)}</div>
+          <div class="l2">${installed ? (canUpd ? `已安装 ${esc(oldVer)} · 可更新 ${esc(p.version)}（${fmtSize(p.size)}）` : '已安装') : fmtSize(p.size)}</div>
           <div class="bar" id="vp-bar-${esc(p.id)}" hidden><i style="width:0"></i></div></div>
         <div class="row" style="flex:0 0 auto">
-          ${installed
-            ? `<button class="toolbtn" data-test="${esc(p.id)}">试听</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
-            : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载</button>`}
+          ${canUpd
+            ? `<button class="toolbtn on" data-dl="${esc(p.id)}">更新</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
+            : installed
+              ? `<button class="toolbtn" data-test="${esc(p.id)}">试听</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
+              : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载</button>`}
         </div></div>`);
     }
     box.innerHTML = rows.join('');
