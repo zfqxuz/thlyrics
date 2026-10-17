@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017ze';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017ze';
-import { icon } from './icons.js?v=20261017ze';
+import { V } from './version.js?v=20261017zf';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zf';
+import { icon } from './icons.js?v=20261017zf';
 
 (() => {
   'use strict';
@@ -1979,6 +1979,8 @@ import { icon } from './icons.js?v=20261017ze';
 
   /** 账号 API（函数计算）：带 token 的 JSON 调用（实现在 platform/net.js） */
   const apiCall = (path, opts = {}) => netApiCall(path, Object.assign({}, opts, { token: ACC && ACC.token }));
+  /** 伴奏函数（独立域名，同样的 token） */
+  const sepApi = (path, opts = {}) => sepCall(path, Object.assign({}, opts, { token: ACC && ACC.token }));
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
@@ -3360,7 +3362,7 @@ import { icon } from './icons.js?v=20261017ze';
     const tid = t.id;
     sepBusy = true; renderSep(); toast('伴奏生成中');
     try {
-      const r = await sepCall('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
+      const r = await sepApi('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
       let url = r && r.url;
       if (!url && r && r.taskId) {
         // 异步任务：每 2.5 秒问一次，最长 10 分钟；按钮上显示已等了几秒
@@ -3369,7 +3371,7 @@ import { icon } from './icons.js?v=20261017ze';
           await sepSleep(2500);
           const sec = Math.round((Date.now() - t0) / 1000);
           const mk = $('sep-make'); if (mk) mk.textContent = `生成中 ${sec}s`;
-          const st2 = await sepCall('/sep/status?taskId=' + encodeURIComponent(r.taskId));
+          const st2 = await sepApi('/sep/status?taskId=' + encodeURIComponent(r.taskId));
           if (st2.status === 'done') url = st2.url;
           else if (st2.status === 'error') throw new Error(st2.error || '生成失败');
         }
