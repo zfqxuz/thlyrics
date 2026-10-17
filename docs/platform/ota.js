@@ -58,10 +58,24 @@ export async function otaCheck(manifestUrl, { current = '', apply = 'next', time
   if (!m || !m.version || !m.url) return null;
   if (!newer(m.version, current)) return null;
   const t0 = Date.now();
-  const b = await Promise.race([
-    p.download({ url: m.url, version: String(m.version), checksum: m.sha256 }),
-    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
-  ]);
+  // 有 manifest 就走增量：本地已有同 hash 的文件不会再下（词典 18MB 只在第一次出现）
+  const opts = m.manifest && m.manifest.length
+    ? { url: m.url, version: String(m.version), manifest: m.manifest }
+    : { url: m.url, version: String(m.version), checksum: m.sha256 };
+  let b = null;
+  try {
+    b = await Promise.race([
+      p.download(opts),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
+    ]);
+  } catch (e) {
+    if (!opts.manifest) throw e;
+    // 增量失败就退回整包（别把更新卡死）
+    b = await Promise.race([
+      p.download({ url: m.url, version: String(m.version), checksum: m.sha256 }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
+    ]);
+  }
   const spent = Date.now() - t0;
   if (!b || !b.id) return null;
   // 网络太慢、或者用户已经关掉 App：这次先不切，留着下次再说

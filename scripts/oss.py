@@ -81,3 +81,17 @@ def delete(key):
     req.add_header('Authorization', f'OSS {AK}:{sig}')
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.status
+
+def exists(key):
+    """HEAD：对象在不在（用来做内容寻址去重，避免重复上传同一个文件）"""
+    date = email.utils.formatdate(usegmt=True)
+    sts = '\n'.join(['HEAD', '', '', date, f'/{BUCKET}/{key}'])
+    sig = base64.b64encode(hmac.new(SK.encode(), sts.encode(), hashlib.sha1).digest()).decode()
+    req = urllib.request.Request(f'https://{HOST}/{urllib.parse.quote(key)}', method='HEAD')
+    req.add_header('Date', date)
+    req.add_header('Authorization', f'OSS {AK}:{sig}')
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status == 200
+    except urllib.error.HTTPError as e:
+        return e.code == 200
