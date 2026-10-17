@@ -24,6 +24,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { genForms } from './lang-forms.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'docs', 'data');
@@ -240,6 +241,20 @@ function buildLang(L, store) {
     pairs[id] = c.zh;
     funcIds.push(id);
     if (rank) bandIds.get(bandOf(rank)).push(id);
+  }
+  // 生成活用形/复数额外别名（只挂词库里没有独立词条、也没被前面的词条占用的形）
+  const taken = new Set(entries.map((e) => e.word.toLowerCase()));
+  for (const e of entries) {
+    if ((e.freq || 999999) > 12000) continue;
+    const forms = genForms(L.id, e).filter((f) => {
+      const k = f.toLowerCase();
+      if (taken.has(k)) return false;
+      taken.add(k);
+      return true;
+    });
+    if (!forms.length) continue;
+    const cur = String((e.forms || {}).exchange || '');
+    e.forms = { exchange: [cur, ...forms.map((f) => 'f:' + f)].filter(Boolean).join('/') };
   }
   entries.sort((a, b) => (a.freq - b.freq) || a.word.localeCompare(b.word));
   const byId = new Map(entries.map((x) => [x.id, x]));

@@ -140,3 +140,102 @@ export function detectTrackLangs(lines, primary) {
   }
   return [...new Set(out)];
 }
+
+// ────────────── UI 文案 ──────────────
+// 词条以「中文原文」为 key：没翻译的字符串直接回落到中文，不会出现空标签。
+const DICTS = new Map();      // localeId → { 中文: 译文 }
+let curLocale = 'zh-CN';
+const LOCALE_FILES = new Set(UI_LOCALES.map((x) => x.id));
+
+function normalizeLocale(tag) {
+  if (!tag) return 'zh-CN';
+  if (LOCALE_FILES.has(tag)) return tag;
+  const base = String(tag).toLowerCase().split('-')[0];
+  const hit = UI_LOCALES.find((x) => x.lang === base);
+  return hit ? hit.id : 'zh-CN';
+}
+
+/** 写入某语言的文案表（拉取由调用方走 platform/net.js 完成） */
+export function setDict(localeTag, obj) {
+  const id = normalizeLocale(localeTag);
+  DICTS.set(id, obj || {});
+  if (curLocale === id) PATTERNS.delete(id);
+  return id;
+}
+
+/** 切到某语言（没载入文案表时先按中文显示，等 setDict 补上） */
+export function useLocale(localeTag) {
+  curLocale = normalizeLocale(localeTag);
+  return curLocale;
+}
+
+/** 是否已经有这门语言的文案表 */
+export const hasDict = (localeTag) => DICTS.has(normalizeLocale(localeTag));
+
+export const currentLocale = () => curLocale;
+
+/** 翻译一条 UI 文案：有译文用译文，没有就原样返回中文 */
+export function t(text) {
+  if (curLocale === 'zh-CN') return text;
+  const d = DICTS.get(curLocale);
+  return (d && d[text]) || text;
+}
+
+/** 带占位符的文案：{n} 匹配数字，{x} 匹配任意文字；整句不匹配时按“片段”逐条替换 */
+const PATTERNS = new Map();     // localeId → [[regex, 模板]]
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function buildPatterns(id, d) {
+  const out = [];
+  for (const [key, val] of Object.entries(d)) {
+    if (!key.includes('{n}') && !key.includes('{x}')) continue;
+    const src = key.split(/(\{n\}|\{x\})/).map((part) => (
+      part === '{n}' ? '(\\d+)' : part === '{x}' ? '(.+?)' : escRe(part)
+    )).join('');
+    out.push([key, new RegExp(src, 'g'), val]);
+  }
+  out.sort((a, b) => b[0].length - a[0].length);     // 长的先换，避免被短片段抢先
+  PATTERNS.set(id, out);
+  return out;
+}
+function applyPatterns(id, text) {
+  let list = PATTERNS.get(id);
+  if (!list) list = buildPatterns(id, DICTS.get(id) || {});
+  let out = text;
+  for (const [, rx, val] of list) {
+    out = out.replace(rx, (...args) => {
+      const caps = args.slice(1, args.length - 2);
+      let i = 0;
+      return val.replace(/\{(?:n|x)\}/g, () => caps[i++] != null ? caps[i - 1] : '');
+    });
+  }
+  return out === text ? null : out;
+}
+
+/** 需要换语言的静态节点：data-i18n 里的值就是中文原文 */
+export function translateNode(root) {
+  if (!root || curLocale === 'zh-CN') return;
+  const d = DICTS.get(curLocale);
+  if (!d) return;
+  const walk = (node) => {
+    if (node.nodeType === 3) {
+      const raw = node.nodeValue;
+      const key = raw && raw.trim();
+      if (key && d[key]) { node.nodeValue = raw.replace(key, d[key]); return; }
+      if (key) {
+        const hit = applyPatterns(curLocale, key);
+        if (hit) node.nodeValue = raw.replace(key, hit);
+      }
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    if (node.hasAttribute && node.hasAttribute('data-no-i18n')) return;
+    const tag = node.tagName;
+    if (tag === 'SCRIPT' || tag === 'STYLE') return;
+    for (const attr of ['placeholder', 'title', 'aria-label']) {
+      const val = node.getAttribute && node.getAttribute(attr);
+      if (val && d[val]) node.setAttribute(attr, d[val]);
+    }
+    for (const child of [...node.childNodes]) walk(child);
+  };
+  walk(root);
+}

@@ -7,25 +7,39 @@ const native = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNat
 const plugin = (native && cap.Plugins) ? cap.Plugins.Tts : null;
 const web = (typeof window !== 'undefined' && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 
-let jaVoice = null;
+const VOICES = new Map();          // 语言前缀 → 嗓子（ja / en / fr …）
 let voicesReady = null;
-const pickVoice = () => { if (web) jaVoice = (web.getVoices() || []).find((v) => (v.lang || '').toLowerCase().startsWith('ja')) || null; };
+/** 按语言前缀挑嗓子：ja-JP → ja，en-US → en；没有就返回 null（别拿中文嗓子顶上去） */
+const pickVoices = () => {
+  if (!web) return;
+  VOICES.clear();
+  for (const v of (web.getVoices() || [])) {
+    const tag = String(v.lang || '').toLowerCase();
+    const base = tag.split('-')[0];
+    if (!base) continue;
+    if (!VOICES.has(base) || tag === base) VOICES.set(base, v);
+  }
+};
+const voiceFor = (lang) => {
+  const tag = String(lang || 'ja-JP').toLowerCase();
+  return VOICES.get(tag.split('-')[0]) || null;
+};
 /** 浏览器第一次拿到的 voices 可能是空数组（异步加载）；等一小会儿再判断，避免把有日语包误判成没有 */
 function ensureVoices() {
   if (!web) return Promise.resolve();
-  pickVoice();
-  if (jaVoice) return Promise.resolve();
+  pickVoices();
+  if (VOICES.size) return Promise.resolve();
   if (!voicesReady) {
     voicesReady = new Promise((resolve) => {
       let done = false;
-      const finish = () => { if (done) return; done = true; pickVoice(); resolve(); };
+      const finish = () => { if (done) return; done = true; pickVoices(); resolve(); };
       try { web.addEventListener('voiceschanged', finish, { once: true }); } catch { /* 忽略 */ }
       setTimeout(finish, 1200);
     });
   }
-  return voicesReady.then(() => { pickVoice(); });
+  return voicesReady.then(() => { pickVoices(); });
 }
-if (web) { pickVoice(); try { web.onvoiceschanged = pickVoice; } catch { /* 忽略 */ } }
+if (web) { pickVoices(); try { web.onvoiceschanged = pickVoices; } catch { /* 忽略 */ } }
 
 export const tts = {
   /** 有没有朗读能力（网页端浏览器不一定有） */
@@ -88,7 +102,20 @@ export const tts = {
     return false;
   },
 
-  /** 读一段日文。opts = { engine, voice }；ja=false 表示没有真日语嗓子（前端提示去装） */
+  /** 已有哪些语言的嗓子（网页端）：['ja','en',…] */
+  async langs() {
+    if (plugin && plugin.voices) {
+      try {
+        const r = await plugin.voices({ engine: '' });
+        return [...new Set(((r && r.voices) || []).map((v) => String(v.lang || '').toLowerCase().split('-')[0]).filter(Boolean))];
+      } catch { return []; }
+    }
+    if (!web) return [];
+    await ensureVoices();
+    return [...VOICES.keys()];
+  },
+
+  /** 读一段文字；opts = { engine, voice, lang }。matched=false 表示这门语言没有嗓子（前端提示去装） */
   async speak(text, opts = {}) {
     const lang = (opts && opts.lang) || 'ja-JP';
     const engine = (opts && opts.engine) || '';
@@ -103,21 +130,22 @@ export const tts = {
           new Promise((res) => setTimeout(() => res({ __timeout: 1 }), 4000)),
         ])) || {};
         if (r.__timeout) return { ok: false, error: '朗读超时' };
-        return { ok: true, ja: !!r.ja, voice: r.voice || '', engine: r.engine || '' };
+        return { ok: true, ja: !!r.ja, matched: r.ja !== false, lang, voice: r.voice || '', engine: r.engine || '' };
       } catch (e) { return { ok: false, error: (e && e.message) || '朗读失败' }; }
     }
     if (web) {
       await ensureVoices();
-      // 没装日语包时不要读：系统会用默认（中文）嗓子把日文汉字读成中文音，用户听到的就是"发音是中文"
-      if (!jaVoice) return { ok: true, ja: false };
+      // 这门语言没嗓子时不要读：系统会拿默认（中文）嗓子硬读，用户听到的就是“发音是中文”
+      const v = voiceFor(lang);
+      if (!v) return { ok: true, matched: false, ja: false, lang };
       try {
         web.cancel();
         const u = new SpeechSynthesisUtterance(t);
         u.lang = lang;
-        u.voice = jaVoice;
+        u.voice = v;
         u.rate = 0.9;
         web.speak(u);
-        return { ok: true, ja: true };
+        return { ok: true, matched: true, ja: lang.toLowerCase().startsWith('ja'), lang, voice: v.name || '' };
       } catch (e) { return { ok: false, error: (e && e.message) || '朗读失败' }; }
     }
     return { ok: false, error: '这个环境不支持朗读' };

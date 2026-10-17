@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018o';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018o';
-import { icon } from './icons.js?v=20261018o';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs } from './i18n.js?v=20261018o';
+import { V } from './version.js?v=20261018r';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018r';
+import { icon } from './icons.js?v=20261018r';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018r';
 
 (() => {
   'use strict';
@@ -119,6 +119,24 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const l = userLocale();
     if (document.documentElement) document.documentElement.lang = l.id;
     syncThemeColor();
+    loadLocaleDict(l.id).then(() => { applyI18n(); }).catch(() => {});
+  }
+  /** 载入界面文案表（zh-CN 直接用中文原文，不发请求） */
+  async function loadLocaleDict(id) {
+    useLocale(id);
+    if (id === 'zh-CN' || hasDict(id)) return;
+    try {
+      const dict = await getJson(`locales/${id}.json?v=${V}`);
+      setDict(id, dict);
+    } catch { setDict(id, {}); }
+  }
+  /** 界面文案：按当前用户区域翻一遍（没翻到的保持中文，不会出现空标签） */
+  function applyI18n(root) { try { translateNode(root || document.body); } catch { /* 文案只是锦上添花 */ } }
+  let i18nQueued = false;
+  function scheduleI18n() {
+    if (i18nQueued || currentLocale() === 'zh-CN') return;
+    i18nQueued = true;
+    requestAnimationFrame(() => { i18nQueued = false; applyI18n(); });
   }
   /** 学习语言不能等于用户区域语言（默认列表里会隐藏；这里只做兜底） */
   function learnLangList() { return LEARN_LANGS.filter((x) => x.id !== userLang()); }
@@ -439,9 +457,21 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     try { const r = await voicePack.status(VP_ID); vpOjt = (r && r.installed) ? r : null; } catch { vpOjt = null; }
     return { audio: vpAudio, ojt: vpOjt };
   }
-  async function speak(t, silent) {
+  async function speak(t, silent, lang) {
     const text = String(t == null ? '' : t).trim();
     if (!text) return;
+    const lg = lang || 'ja-JP';
+    // 非日语：先走系统/浏览器的对应语言嗓子（日语那套离线包读不了法语俄语）
+    if (!lg.toLowerCase().startsWith('ja')) {
+      try {
+        const r = await tts.speak(text, { lang: lg });
+        if (r && r.ok && r.matched) return;
+        if (r && r.ok && r.matched === false && !silent) toast(`没有 ${lg} 的语音，去「语音包」看看`);
+        return;
+      } catch { /* 落到在线合成 */ }
+      if (!IS_NATIVE) { try { await speakOnline(text); } catch { if (!silent) toast('发音失败'); } }
+      return;
+    }
     if (!IS_NATIVE) { try { await speakOnline(text); } catch { if (!silent) toast('发音失败'); } return; }
     const packs = await activePacks();
     if (packs.audio) {
@@ -462,7 +492,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (!silent) toast('发音失败');
   }
   /** 读词：日语读假名，其它语言读原词（不要读音标） */
-  const speakWord = (v, silent) => speak(v && v.lang === 'ja' ? (v.reading || v.word) : (v && v.word), !!silent);
+  const speakWord = (v, silent) => {
+    if (!v) return speak('', silent);
+    if (v.lang === 'ja' || !v.lang) return speak(v.reading || v.word, !!silent, 'ja-JP');
+    const ttsTag = (LEARN_LANGS.find((x) => x.id === v.lang) || {}).tts || 'en-US';
+    return speak(v.word, !!silent, ttsTag);
+  };
   if (typeof window !== 'undefined') { window.__tlSpeak = (t) => speak(t, true); window.__tlVpPrompt = () => voicePackPrompt(); }   // 真机/CDP 测试钩子
   /** 首次打开：没装语音包就问一次「要不要装」，可「不再提醒」 */
   function voicePackPrompt() {
@@ -2364,6 +2399,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   window.__tlVid = (w, lang) => ((lang ? VBYL.get(lang + ':' + String(w).toLowerCase()) : null) || VBY.get(w) || {}).id;
   window.__tlLookup = (w, lang) => { const v = lookupWord(w, lang); return v ? { id: v.id, word: v.word, meaning: v.meaning } : null; };
   window.__tlScope = () => ({ learnLang: S.learnLang, options: scopeOptions() });
+  window.__tlDbg = () => ({ tracks: IDX ? IDX.tracks.length : -1, imp: Object.keys(S.imp || {}), vocab: VOCAB.length, libw: LIBW.size, deck: deckList().length });
   window.__tlLine = (text, lang) => wordsCompactLine(text, lang);
   window.__tlPack = (lang) => ensureLangPack(lang).then(() => ({ ready: langPackReady(lang), n: (VOCAB.filter((v) => v.lang === lang) || []).length, lists: PACK_LISTS.get(lang) || null }));
   // ────────────── 云端持久化（预签名 URL，无后端） ──────────────
@@ -3442,10 +3478,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function renderVoicepack() {
     const host = $('view-voicepack'); if (!host) return;
     host.innerHTML = `<div class="row" style="margin-bottom:12px"><button class="toolbtn" id="vp-back">${icon('chevron-left','in')}返回</button></div>
-      <div class="sec-head"><div><div class="sec-title">语音包</div><div class="sec-sub">离线日语发音</div></div></div>
+      <div class="sec-head"><div><div class="sec-title">语音包</div><div class="sec-sub">按语言装，装了哪个读哪个</div></div></div>
+      <div id="vp-langs"><div class="meta">加载中…</div></div>
+      <div class="hair"></div>
       <div id="vp-list"><div class="meta">加载中…</div></div>`;
     $('vp-back').onclick = () => goBack('#/me');
     const box = $('vp-list');
+    renderVoiceLangs();
     if (!voicePack.available) { box.innerHTML = '<div class="empty">仅 App 内可用</div>'; return; }
     let packs = [];
     try { const j = await getJson(dataUrl('voice-packs.json')); packs = (j && j.packs) || []; } catch { packs = []; }
@@ -3495,6 +3534,31 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       try { await voicePack.remove(el.dataset.rm); vpCheckedAt = 0; toast('已删除'); renderVoicepack(); } catch { toast('删除失败'); }
     }));
     box.querySelectorAll('[data-test]').forEach((el) => (el.onclick = () => speak('こんにちは')));
+  }
+
+  /** 语音语言清单：默认 ja-JP / en-US，其余给“去装系统语音”的入口（App 不能静默装引擎数据） */
+  async function renderVoiceLangs() {
+    const host = $('vp-langs'); if (!host) return;
+    let have = [];
+    try { have = await tts.langs(); } catch { have = []; }
+    const web = !IS_NATIVE;
+    const rows = LEARN_LANGS.map((L) => {
+      const base = L.tts.split('-')[0].toLowerCase();
+      const ok = have.indexOf(base) >= 0;
+      const def = L.id === 'ja' || L.id === 'en';
+      return `<div class="item"><div class="col">
+          <div class="l1">${esc(langLabel(L.id, userLocale().id))}${def ? ' · 默认' : ''}</div>
+          <div class="l2">${esc(L.tts)} · ${ok ? '已安装' : '未安装'}</div></div>
+        <div class="row" style="flex:0 0 auto">${ok ? '' : `<button class="toolbtn" data-vlang="${esc(L.id)}">安装</button>`}</div></div>`;
+    });
+    host.innerHTML = `<div class="sec-sub" style="margin-bottom:6px">语音语言${web ? ' · 浏览器自带' : ' · 系统语音'}</div>` + rows.join('');
+    host.querySelectorAll('[data-vlang]').forEach((el) => (el.onclick = async () => {
+      el.disabled = true;
+      const ok = (await tts.openInstall()) || (await tts.openSettings());
+      el.disabled = false;
+      if (!ok) toast(web ? '浏览器无语音' : '打不开安装入口');
+      renderVoiceLangs();
+    }));
   }
 
   function renderAdmin() {
@@ -4704,4 +4768,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     }
   }
   boot();
+  if (typeof MutationObserver === 'function') {
+    const mo = new MutationObserver((records) => {
+      if (currentLocale() === 'zh-CN') return;
+      let hit = false;
+      for (const r of records) if (r.addedNodes && r.addedNodes.length) { hit = true; break; }
+      if (hit) scheduleI18n();
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+  }
 })();
