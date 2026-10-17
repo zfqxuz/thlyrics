@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zi';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zi';
-import { icon } from './icons.js?v=20261017zi';
+import { V } from './version.js?v=20261017zj';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zj';
+import { icon } from './icons.js?v=20261017zj';
 
 (() => {
   'use strict';
@@ -583,8 +583,8 @@ import { icon } from './icons.js?v=20261017zi';
     return null;
   }
   async function urlFor(track) {
-    const sp = (S.sep || {})[track.id];                             // 伴奏：生成了并且开关打开就走它
-    if (sp && sp.url && Number((S.sepOn || {})[track.id]) > 0) return sp.url;
+    const sp = (S.sep || {})[track.id];                             // 伴奏模式 + 这首有伴奏 → 走伴奏
+    if (sp && sp.url && S.sepPref) return sp.url;
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st) return null;
@@ -721,6 +721,8 @@ import { icon } from './icons.js?v=20261017zi';
     }
     audio.playbackRate = Number(S.rate || 1);
     S.used = 1; save();
+    applySepBtn();
+    sepAutoFor(track);                                  // 开着伴奏模式、这首还没伴奏 → 后台生成
     if (opts.at != null) jump(opts.at);
     try { await audio.play(); } catch {}
     $('minibar').classList.add('on');
@@ -3279,12 +3281,6 @@ import { icon } from './icons.js?v=20261017zi';
           <button class="tlink-ghost tlink" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
           <button class="tlink-ghost tlink" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
         </div>
-        <div class="seprow" id="seprow">
-          <span class="k">伴奏</span>
-          <button class="toolbtn" id="sep-make">生成伴奏</button>
-          <button class="toolbtn" id="sep-toggle" hidden>用伴奏</button>
-          <span class="meta" id="sepinforow"></span>
-        </div>
       </div>
       <div id="t-vocab-pane">
         <div class="chips" id="twchips">
@@ -3303,9 +3299,6 @@ import { icon } from './icons.js?v=20261017zi';
     };
     $('t-fav').onclick = () => { toggleMark('fav', t.id); showTrack(t.id); };
     $('t-mark').onclick = () => { toggleMark('sing', t.id); showTrack(t.id); };
-    $('sep-make').onclick = () => sepMake();
-    $('sep-toggle').onclick = () => sepToggle();
-    renderSep();
     renderTrackWords();
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
     $('b-back').onclick = () => leaveDetailPage('#/songs');
@@ -3376,27 +3369,24 @@ import { icon } from './icons.js?v=20261017zi';
     if (s && s.nid) return `音频：${s.type === 'tencent' ? 'QQ音乐' : '网易云'}${s.trial ? ' · 试听片段（约 30 秒）' : ''}`;
     return '没有音频';
   }
-  // ────────────── 伴奏（服务端去人声） ──────────────
-  let sepBusy = false;
-  function renderSep() {
-    const row = $('seprow'); if (!row) return;
-    const t = curTrack;
-    if (!t) { row.hidden = true; return; }
-    row.hidden = false;
-    const sp = (S.sep || {})[t.id];
-    const on = Number((S.sepOn || {})[t.id]) > 0;
-    const info = $('sepinforow'), mk = $('sep-make'), tg = $('sep-toggle');
-    if (sp && sp.url) {
-      if (info) info.textContent = on ? '伴奏播放中' : '伴奏已生成';
-      if (mk) mk.textContent = '重做';
-      if (tg) { tg.hidden = false; tg.textContent = on ? '用原曲' : '用伴奏'; tg.classList.toggle('on', on); }
-    } else {
-      if (info) info.textContent = '';
-      if (mk) mk.textContent = sepBusy ? '生成中…' : '生成伴奏';
-      if (tg) tg.hidden = true;
-    }
-    if (mk) mk.disabled = sepBusy;
+  // ────────────── 伴奏（播放器里一个开关；没有就后台生成，生成完自动切过去） ──────────────
+  let sepBusyId = '', sepLeft = null, sepUnlimited = false, sepTried = new Set();
+  const sepHas = (t) => !!(t && (S.sep || {})[t.id] && (S.sep || {})[t.id].url);
+  const sepPref = () => !!S.sepPref;
+
+  function applySepBtn() {
+    const b = $('p-sep'); if (!b) return;
+    const exhausted = sepLeft === 0 && !sepUnlimited && !sepHas(curTrack);
+    const has = sepHas(curTrack);
+    const on = sepPref() && has;
+    b.classList.toggle('on', on);
+    b.classList.toggle('pend', sepPref() && !has);
+    b.disabled = exhausted;
+    b.title = exhausted ? '每人每天生成的伴奏数量已达上限' : (on ? '伴奏：点一下切回原曲' : '伴奏：点一下切到伴奏');
+    const lab = $('p-sep-t');
+    if (lab) lab.textContent = exhausted ? '伴奏 · 上限' : (sepPref() ? (has ? '伴奏' : '生成中') : '伴奏');
   }
+
   /** 换音源（原曲 ⇄ 伴奏）后从当前位置接着放，不从头开始 */
   function reloadAudioHere() {
     const t = curTrack; if (!t) return;
@@ -3406,26 +3396,32 @@ import { icon } from './icons.js?v=20261017zi';
     audio.removeAttribute('data-tid');
     audio.removeAttribute('src');
     try { audio.load(); } catch { /* 忽略 */ }
-    playTrack(t, at > 1 ? { at } : {}).then(() => { if (!was) audio.pause(); sepRenderSoon(); });
+    playTrack(t, at > 1 ? { at } : {}).then(() => { if (!was) audio.pause(); });
   }
-  const sepRenderSoon = () => setTimeout(renderSep, 300);
+
   const sepSleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  async function sepMake() {
-    const t = curTrack; if (!t || sepBusy) return;
-    const st = S.audio[t.id] || t.audio;
-    if (!st || !st.nid) { toast('先绑定音频'); return; }
-    const tid = t.id;
-    sepBusy = true; renderSep(); toast('伴奏生成中');
+  async function refreshSepQuota() {
     try {
-      const r = await sepApi('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
+      const q = await sepApi('/sep/quota');
+      if (q) { sepLeft = Number(q.left); sepUnlimited = !!q.unlimited; }
+    } catch { /* 拿不到就不显示上限 */ }
+    applySepBtn();
+  }
+
+  /** 确保这首有伴奏：有就直接用，没有就后台生成，生成完切过去（期间继续播原曲） */
+  async function ensureSepFor(t) {
+    if (!t || sepBusyId === t.id) return;
+    if (sepHas(t)) return;
+    const st = S.audio[t.id] || t.audio;
+    if (!st || !st.nid) return;
+    sepBusyId = t.id; applySepBtn();
+    try {
+      const r = await sepApi('/sep', { method: 'POST', body: { trackId: t.id, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
       let url = r && r.url;
+      if (typeof r.left === 'number') { sepLeft = r.left; sepUnlimited = !!r.unlimited; }
       if (!url && r && r.taskId) {
-        // 异步任务：每 2.5 秒问一次，最长 10 分钟；按钮上显示已等了几秒
-        const t0 = Date.now();
         for (let i = 0; i < 240 && !url; i++) {
           await sepSleep(2500);
-          const sec = Math.round((Date.now() - t0) / 1000);
-          const mk = $('sep-make'); if (mk) mk.textContent = `生成中 ${sec}s`;
           const st2 = await sepApi('/sep/status?taskId=' + encodeURIComponent(r.taskId));
           if (st2.status === 'done') url = st2.url;
           else if (st2.status === 'error') throw new Error(st2.error || '生成失败');
@@ -3433,24 +3429,41 @@ import { icon } from './icons.js?v=20261017zi';
         if (!url) throw new Error('生成超时');
       }
       if (!url) throw new Error('没有地址');
-      S.sep[tid] = { url, at: Date.now(), engine: (r && r.engine) || 'side-cancel' };
-      S.sepOn[tid] = Date.now();
+      S.sep[t.id] = { url, at: Date.now(), engine: (r && r.engine) || '' };
       save();
-      toast('伴奏好了');
-      if (curTrack && curTrack.id === tid) reloadAudioHere();
+      // 还在同一首、且仍然开着伴奏 → 无缝切过去
+      if (sepPref() && curTrack && curTrack.id === t.id) reloadAudioHere();
+      refreshSepQuota();
     } catch (e) {
+      sepTried.delete(t.id);
       toast(String((e && e.message) || e));
     } finally {
-      sepBusy = false; renderSep();
+      sepBusyId = ''; applySepBtn();
     }
   }
-  function sepToggle() {
-    const t = curTrack; if (!t) return;
-    const on = Number((S.sepOn || {})[t.id]) > 0;
-    S.sepOn[t.id] = on ? -Date.now() : Date.now();
-    save(); renderSep(); reloadAudioHere();
+
+  /** 点播放器里的「伴奏」 */
+  async function onSepClick() {
+    const t = curTrack;
+    if (!t) return;
+    if (sepLeft === 0 && !sepUnlimited && !sepHas(t)) { toast('每人每天生成的伴奏数量已达上限'); return; }
+    if (sepPref()) {                                  // 关：回原曲
+      S.sepPref = false; save(); applySepBtn(); reloadAudioHere(); return;
+    }
+    S.sepPref = true; save(); applySepBtn();          // 开
+    if (sepHas(t)) { reloadAudioHere(); return; }
+    toast('正在生成伴奏，请稍后');                     // 没有 → 后台生成，继续放原曲
+    ensureSepFor(t);
   }
-  if (typeof window !== 'undefined') window.__tlSep = () => ({ busy: sepBusy, sep: (S.sep || {})[curTrack && curTrack.id] || null, on: Number((S.sepOn || {})[curTrack && curTrack.id]) > 0 });
+
+  /** 一首歌开始播时：如果开着伴奏模式但还没有伴奏，就顺手生成 */
+  function sepAutoFor(t) {
+    if (!sepPref() || !t || sepHas(t) || sepTried.has(t.id) || sepBusyId) return;
+    sepTried.add(t.id);
+    ensureSepFor(t);
+  }
+
+  if (typeof window !== 'undefined') window.__tlSep = () => ({ busy: sepBusyId, sep: (S.sep || {})[curTrack && curTrack.id] || null, pref: sepPref(), left: sepLeft, unlimited: sepUnlimited });
 
   function applyDisplay() {
     document.body.classList.toggle('gloss', S.gloss !== false);
@@ -3463,6 +3476,7 @@ import { icon } from './icons.js?v=20261017zi';
   }
   function openPlayer() {
     if (!curTrack) return;
+    applySepBtn();
     renderLyrics($('plyric'), curTrack); bindLyrics($('plyric'));
     applyDisplay();
     $('player').classList.add('on');
@@ -3822,6 +3836,7 @@ import { icon } from './icons.js?v=20261017zi';
     $('mb-prev').onclick = (e) => { e.stopPropagation(); stepTrack(-1); };
     $('mb-next').onclick = (e) => { e.stopPropagation(); stepTrack(1); };
     $('p-close').onclick = () => $('player').classList.remove('on');
+    if ($('p-sep')) $('p-sep').onclick = () => onSepClick();
     $('p-play').onclick = () => togglePlay();
     $('p-ptrack').onclick = () => stepTrack(-1);
     $('p-ntrack').onclick = () => stepTrack(1);
@@ -4054,6 +4069,7 @@ import { icon } from './icons.js?v=20261017zi';
     if (!location.hash.startsWith('#/track/')) restoreBar();   // 开屏页显示上次那首（暂停，点了才播）
     // 打开页面先跟账号对一次：本机空的就恢复，本机有的就并上去
     if (S.autoSync !== false) setTimeout(() => syncNow({ auto: true }), 600);
+    setTimeout(refreshSepQuota, 1500);                  // 伴奏额度（每天 3 首；管理员不限）
     apiCall('/me').then((r) => { if (r && r.user) { ACC.name = r.user.name; ACC.admin = !!r.user.admin; ACC.avatar = r.user.avatar || ACC.avatar || ''; saveAcc(); renderAv(); if (location.hash.startsWith('#/mine')) renderMine(); else if (location.hash.startsWith('#/me') || location.hash.startsWith('#/admin')) route(); } }).catch(() => {});
     // 老数据补分词：只补没有 segs 的（静默，慢一点没关系）；测试里不跑
     if (!window.__NO_BACKFILL && Object.keys(S.imp || {}).length) setTimeout(() => backfillSegs(), 4000);

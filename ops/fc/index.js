@@ -1077,13 +1077,14 @@ exports.handler = async (event) => {
           return reply(req, 200, { ok: true, taskId: act.taskId, status: cur.status, reused: true });
         }
       }
+      const acct = await ossGetJson(acctKey(me.sub)).catch(() => null);
+      const unlimited = !!((acct && acct.admin) || ADMINS.indexOf(String(me.name || '').toLowerCase()) >= 0);
       const qt = await sepQuota(me.sub);
-      if (qt.cur.n >= SEP_DAILY) return reply(req, 429, { error: `今天已经做了 ${SEP_DAILY} 首，明天再来` });
+      if (!unlimited && qt.cur.n >= SEP_DAILY) return reply(req, 429, { error: `今天已经做了 ${SEP_DAILY} 首，明天再来` });
       const taskId = crypto.randomBytes(9).toString('hex');
       const tk = { taskId, uid: me.sub, trackId, src, id, status: 'queued', at: Date.now() };
       await ossPutJson(sepTaskKey(taskId), tk);
-      qt.cur.n += 1;
-      await ossPutJson(qt.key, qt.cur);
+      if (!unlimited) { qt.cur.n += 1; await ossPutJson(qt.key, qt.cur); }
       await ossPutJson(sepActiveKey(me.sub), { taskId, at: Date.now() });
       try {
         await fcInvokeAsync({
@@ -1095,7 +1096,7 @@ exports.handler = async (event) => {
         await ossPutJson(sepTaskKey(taskId), Object.assign(tk, { status: 'error', error: '任务启动失败' }));
         return reply(req, 500, { error: '任务启动失败：' + String((e && e.message) || e) });
       }
-      return reply(req, 200, { ok: true, taskId, status: 'queued', left: SEP_DAILY - qt.cur.n });
+      return reply(req, 200, { ok: true, taskId, status: 'queued', left: unlimited ? 999 : SEP_DAILY - qt.cur.n, unlimited });
     }
 
     if (action === '/sep/status') {
@@ -1108,8 +1109,10 @@ exports.handler = async (event) => {
 
     // 查今天还剩几次（前端显示用）
     if (action === '/sep/quota') {
+      const acct = await ossGetJson(acctKey(me.sub)).catch(() => null);
+      const unlimited = !!((acct && acct.admin) || ADMINS.indexOf(String(me.name || '').toLowerCase()) >= 0);
       const qt = await sepQuota(me.sub);
-      return reply(req, 200, { ok: true, left: Math.max(0, SEP_DAILY - qt.cur.n), total: SEP_DAILY });
+      return reply(req, 200, { ok: true, left: unlimited ? 999 : Math.max(0, SEP_DAILY - qt.cur.n), total: SEP_DAILY, unlimited });
     }
 
     if (action === '/me') {

@@ -699,6 +699,9 @@ body:not(.warm) #player .pctl{background:rgba(23,26,31,.85)}
 .chipcycle.on{color:var(--ink)}
 .chipcycle.on::after{content:"";position:absolute;left:4px;right:4px;bottom:-1px;height:1px;background:var(--accent)}
 .chipcycle.on .ic{color:var(--ink)}
+.chipcycle[disabled]{opacity:.38;cursor:default}
+.chipcycle.pend::after{content:"";position:absolute;left:4px;right:4px;bottom:-1px;height:1px;background:var(--accent);opacity:.5;animation:sepPulse 1.2s ease-in-out infinite}
+@keyframes sepPulse{0%,100%{opacity:.15}50%{opacity:.8}}
 
 .modechip{
   height:28px;padding:0 0;border:0;background:transparent;color:var(--ink-2);
@@ -1220,6 +1223,9 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
       <button class="chipcycle" id="p-order" title="播放顺序：点一下换下一档">
         <span class="ic" id="p-order-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1" /> <circle cx="19" cy="12" r="1" /> <circle cx="5" cy="12" r="1" /></svg></span><span id="p-order-t">顺序</span>
       </button>
+      <button class="chipcycle" id="p-sep" title="伴奏：点一下切换">
+        <span class="ic" id="p-sep-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></span><span id="p-sep-t">伴奏</span>
+      </button>
       <button class="chipcycle" id="b-display" title="更多设置"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12h11" /> <path d="M10 18h11" /> <path d="M10 6h11" /> <path d="M4 10h2" /> <path d="M4 6h1v4" /> <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" /></svg></button>
     </div>
     <div id="displaybox">
@@ -1285,6 +1291,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017zi"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017zj"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
