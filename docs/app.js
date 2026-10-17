@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018b';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018b';
-import { icon } from './icons.js?v=20261018b';
+import { V } from './version.js?v=20261018c';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018c';
+import { icon } from './icons.js?v=20261018c';
 
 (() => {
   'use strict';
@@ -3762,6 +3762,7 @@ import { icon } from './icons.js?v=20261018b';
       $('p-meta').textContent = [POSNAME[seg && seg.k], mine ? '自补释义' : ''].filter(Boolean).join(' · ');
       if ($('p-editinput')) $('p-editinput').placeholder = '补这个词的释义';
       const ce0 = $('p-editclear'); if (ce0) ce0.hidden = !(mine && mine.m);
+      const mc0 = $('p-meanclear'); if (mc0) mc0.hidden = !(mine && mine.m);
       $('p-known').style.display = 'none';
       if ($('p-star')) $('p-star').style.display = 'none';          // 自补的词没有 id，挂不上星标
       const sp = $('p-speak'); if (sp) sp.style.display = 'none';   // 没收录的词没有标准读音可发
@@ -3782,6 +3783,7 @@ import { icon } from './icons.js?v=20261018b';
     $('p-known').classList.toggle('on', !!isKnown(w));
     $('p-known').title = isKnown(w) ? '取消已掌握' : '标为已掌握';
     const ce1 = $('p-editclear'); if (ce1) ce1.hidden = !(S.notes[w.id] && S.notes[w.id].meaning);
+    const mc1 = $('p-meanclear'); if (mc1) mc1.hidden = !(S.notes[w.id] && S.notes[w.id].meaning);
     if ($('p-star')) {
       $('p-star').style.display = '';
       $('p-star').classList.toggle('on', isStar(w));
@@ -4227,7 +4229,7 @@ import { icon } from './icons.js?v=20261018b';
       else hidePop();
       toast(drop ? '已还原' : '这一处的罗马音已更新');
     };
-    if ($('p-editclear')) $('p-editclear').onclick = () => {
+    const clearMeaning = () => {
       if (popWord) delete S.notes[popWord.id];
       else if (popFallback) delete S.words[userWordKey(popSeg, popFallback)];
       save();
@@ -4236,6 +4238,8 @@ import { icon } from './icons.js?v=20261018b';
       showPop(popWord, popFallback, popSeg);
       toast('已清除自定义释义');
     };
+    if ($('p-editclear')) $('p-editclear').onclick = clearMeaning;
+    if ($('p-meanclear')) $('p-meanclear').onclick = clearMeaning;
     $('p-romasave').onclick = () => saveRoma(false);
     $('p-romareset').onclick = () => saveRoma(true);
     $('p-romainput').onkeydown = (e) => { if (e.key === 'Enter') saveRoma(false); };
