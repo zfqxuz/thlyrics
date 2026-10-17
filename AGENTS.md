@@ -1174,3 +1174,59 @@ force-stop → 重启 → 仍是 20261017za（持久化 OK）
   `scripts/build-apk.sh` 现在支持 `GRADLE_ARGS="-q"` 走联网。
 - APK 体积 10.5MB → 12MB（插件）。
 - `docs/update.json` 会被发布，但**不要**打进内容包（排除掉，避免包内清单版本自相矛盾）。
+
+### 2026-10-17：伴奏生成（去人声）—— FC 异步任务 + 声道相消 + 两级缓存
+
+#### 一、先说清楚这一版是什么档次
+
+- 引擎是 **声道相消（side-cancel）**：`side=(L-R)/2` 把人声抵掉，再把 140Hz 以下的中置
+  用两级 biquad 低通加回去（保住底鼓/贝斯），最后 192kbps MP3。
+- **不是 AI 分轨**。Demucs/MDX 那类要容器镜像（torch ~2GB），本机没有 docker daemon、
+  ACR 也没开通 → 打不了包。所以先上这一版，接口和缓存都留好了，之后换引擎只改 `vocalCut()`。
+- 质量事实：一首 3~5 分钟的歌，中置人声在 400Hz 以上能量约 **-9dB**（不是消失），
+  伴奏会偏"空"。**别在页面上写"AI 分离"**。
+
+#### 二、接口（都要登录）
+
+| 接口 | 作用 |
+|---|---|
+| `POST /api/sep {trackId,src,id}` | 提交。命中 L1 缓存直接回 url；已有排队/跑着的任务回同一个 taskId；每人每天 3 首 |
+| `GET  /api/sep/status?taskId=` | 轮询：`queued / running / done / error` |
+| `POST /api/sep/run` | **内部**异步落点，只认 `x-sep-token`（HMAC(TOKEN_SECRET,'sep-run-v1')），别对外 |
+| `GET  /api/sep/quota` | 今天还剩几次 |
+
+- **异步**：`/api/sep` 写任务 → 用 FC OpenAPI（V3 签名、`x-fc-invocation-type: Async`）调自己
+  → 立刻返回 taskId。函数超时调到 **300s**（原来 60s 不够）。
+- **两级缓存**：
+  - L1 来源缓存 `sep/cache/<sha1(src:id)>.json` —— 同一首歌第二次直接给 url；
+  - L2 内容缓存 `sep/out/<sha256(音频)>.mp3` —— 同一段音频（换 id / 换平台 / 别人转过）直接复用，0 成本。
+- 配额 `sep/quota/<uid>.json`（按北京时间算天）；并发限制 `sep/active/<uid>.json`（同时只跑一个）。
+
+#### 三、前端
+
+- `S.sep[trackId] = {url, at, engine}`、`S.sepOn[trackId] = ±ts`（和 star 同构），两个都进了前后端合并白名单。
+- `urlFor()` 最前面判「有伴奏 + 开关打开」→ 直接返回伴奏地址，播放器其它逻辑一行没动。
+- 入口在单曲页/我的页共用的「音频来源与设置」里：`生成伴奏 / 重做 / 用伴奏 ⇄ 用原曲`，
+  换源后从当前位置接着放（`reloadAudioHere()`）。
+- 生成中是**轮询**（2.5s × 240 次），不是长连接；退出页面也不影响后台跑完。
+
+#### 四、顺带修的一个数据 bug（很严重）
+
+FC 的 `mergeStates()` 之前**没有 star / rev** —— 客户端一直在传，服务端合并时直接丢掉，
+换设备/清缓存后星标和复习档案就没了。现在前后端字段完全对齐
+（known/notes/audio/imp/del/fav/sing/roma/words/**star**/**rev**/**sep**/**sepOn**/clearedAt）。
+以后加新的同步字段，**两边都要改**，否则就是静默丢数据。
+
+#### 五、真机验证（NOH-AN00，内容包 20261017zb）
+
+```
+提交 → queued（0.35s 返回）→ 27s 后 done → 播 src 是 OSS 的 sep/out/*.mp3
+paused=false、currentTime 6s 内推进 5.96s、duration 221s、readyState=4、无 error
+```
+
+#### 六、部署注意
+
+- `ops/deploy-fc.py` 现在会把 `mpg123-decoder` / `@breezystack/lamejs` 及其依赖一起打进 zip
+  （约 1MB），FC 里用 **动态 import()**（index.js 本身仍是 CJS）。
+- 想提速度：`vocalCut` 单线程跑 lamejs 编码，占大头（本地 6~17s，FC 上 ~30s）；
+  加内存/CPU 对单线程帮助有限，真要快就换 wasm 编码器或原生 ffmpeg。
