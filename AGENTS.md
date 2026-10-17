@@ -1131,3 +1131,46 @@ node .e2e/run-e2e.mjs                              # 全量（所有 check 都�
 `.e2e/run-e2e.mjs` 里还在等 `#view-learn .sec-sub` 这类旧选择器，**在 β 页面上第 6 条就崩**。
 上一轮的验收是靠 `.e2e/android/cdp.mjs` 的临时脚本 + 真机跑通的，不是这套。
 在把 E2E 选择器补齐之前，**不要拿"E2E 全绿"当 β 之后的验收证据**。
+
+### 2026-10-17：内容热更新（Capgo Updater）—— 前端改动不再装 APK
+
+**用户痛点**：华为纯净模式锁死（`pure_mode_state=1` 改不了），每装一次 APK 都要手点确认。
+结论：只有**原生壳**变了才需要装包；前端 `docs/` 走热更新。
+
+#### 一、机制（手动流程，不接 Capgo 云）
+
+- 插件 `@capgo/capacitor-updater@8.53.0`（对应 Capacitor 8），`app/capacitor.config.json` 里
+  `autoUpdate: "off"`、`statsUrl: ""` —— **不走 Capgo 云端**，只用它的下载/切换能力。
+- 清单是我们自己的 `docs/update.json`：`{version,url,size,sha256}`，包在
+  `thlyrics-audio/bundles/thlyrics-<V>.zip`（10 年签名 URL）。
+- `docs/platform/ota.js`：
+  - `otaReady()` —— **每次启动必须调**（`notifyAppReady`），否则原生层 20s 后判定失败并回滚；
+  - `otaCheck(url,{current,apply})` —— 版本只升不降（字符串比较），`download()` → `next()`（下次启动生效）
+    或 `set()`（立即重载）。
+  - 启动 3.2s 后静默检查（`next`），「我的 → 更新 → 内容包 → 内容更新」是手动立即更新。
+- 发布：`node scripts/bump-version.mjs` → `python3 scripts/publish-bundle.py` → commit/push。
+  `publish-bundle.py` 打包 `docs/`（排除 `dl/`、`_screenshots/`、`update.json`）→ 传 OSS → 写 `docs/update.json`。
+- **版本号后缀改成字典序递增**：`…x → …y → …z → …za → …zb`（以前的 z→a 回绕会让新版本变小，
+  OTA 会把它当降级拒掉）。`docs/version.js` 的 V 就是内容包版本。
+
+#### 二、OSS 桶的 Referer 策略
+
+Capgo 的下载器（OkHttp）**不带 Referer**，而桶有 Referer 白名单 → 403。
+已把桶改成 `allowEmptyReferer=true`（带错误 Referer 的站点仍然 403，签名 URL 仍然要签名）。
+改的时候注意：`aliyun_oss_bucket_referer` 会**整体替换**名单。
+
+#### 三、真机验证（NOH-AN00）
+
+```
+装 APK（内含 20261017z）→ 启动 → current()=builtin, notifyAppReady 成功
+发布 20261017za → 点「内容更新」→ 下载 1.30MB → set() 重载
+再查：bundle.version=20261017za, status=success, 首页/数据正常
+force-stop → 重启 → 仍是 20261017za（持久化 OK）
+```
+
+#### 四、坑
+
+- `cap sync` 之后再 `gradlew`：新插件的 `okhttp` 依赖本地没缓存，`--offline` 会失败；
+  `scripts/build-apk.sh` 现在支持 `GRADLE_ARGS="-q"` 走联网。
+- APK 体积 10.5MB → 12MB（插件）。
+- `docs/update.json` 会被发布，但**不要**打进内容包（排除掉，避免包内清单版本自相矛盾）。
