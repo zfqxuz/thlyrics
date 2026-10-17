@@ -222,6 +222,20 @@ export function translateNode(root) {
       const key = raw && raw.trim();
       if (key && d[key]) { node.nodeValue = raw.replace(key, d[key]); return; }
       if (key) {
+        // 「介词 · 最高频 1000 · 1 首歌 / 1 次」这种拼接文案：先按 · 切段逐段翻，
+        // 避免整句的模式替换把某一段吃掉一半（曾经把「1 首歌 / 1 次」换成「1 songs」）
+        if (/\s·\s/.test(key)) {
+          let changed = false;
+          const done = key.split(/\s*·\s*/).map((part) => {
+            const t = part.trim();
+            if (!t) return part;
+            if (d[t]) { changed = true; return d[t]; }
+            const p2 = applyPatterns(curLocale, t);
+            if (p2) { changed = true; return p2; }
+            return part;
+          });
+          if (changed) { node.nodeValue = raw.replace(key, done.join(' · ')); return; }
+        }
         const hit = applyPatterns(curLocale, key);
         if (hit) node.nodeValue = raw.replace(key, hit);
       }
