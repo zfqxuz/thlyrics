@@ -1074,3 +1074,60 @@ node .e2e/run-e2e.mjs                              # 全量（所有 check 都�
 - 真机（NOH-AN00）验收：Kokoro 包 30MB 下载 → sha256 → 解压 6357 个 mp3 → `resolve` 命中 → `<audio>` 播放本地文件；
   OJT 1.12（F01）也走了一遍 UI 下载/解压；`--es vptest` 合成 1.81s WAV。两种包可共存、可单独删。
 - E2E 全量 214/214；Pages 已更新到 `20261016i`（APK 17.8MB，content-length 一致）。
+
+### 2026-10-17：β 视觉重设计转正（main）+ 星标/复习三题型/阿里云词音/词表 6604
+
+`beta/visual-redesign`（21 个提交）已合进 `main` 并上线。前端版本 `20261017y`，
+`docs/apk.json` 指向 `docs/dl/thlyrics.apk`（APK 内前端 = `20261017w`，真机验收过的那个包）。
+
+#### 一、视觉（这条是基线，别再改回去）
+
+- **日式轻小说风**：暖纸 `#fbf7ee` / 夜墨 `#171a1f`，思源宋/ヒラギノ明朝做扉页与标题，
+  正文苹方/Noto Sans JP + `font-feature-settings:"palt"`。
+- **去容器**：顶栏/Tabs/chip/按钮/词条弹层一律无硬边框 —— 文字色 + hover 极浅底色 + active 下划线。
+  剩下的分隔只用发丝线 `--hairline`。
+- **图标一律 Lucide**（子集内联在 `docs/icons.js`），不写文字符号、不挂 CDN。
+- 本机预览页：`docs/_screenshots/preview.html`（5 主路由 × 2 主题 + 跟唱页 + 词条弹层 + 真机图）。
+  这个页面在 `docs/` 下会被发布；它的文案也过 `check-copy`，加字要短。
+
+#### 二、星标 + 学词标签化
+
+- `S.star = { <wordId>: ±ts }`，和 `known` 同构（正=标了，负=取消），**前后端合并白名单都加了 `star`**。
+- 入口三处且只有三处：词抽屉词头最左、学词列表行、词条详情页。抽屉里其余控件位置尺寸**不许动**
+  （用户明确要求"播放器里那个单词抽屉仅有一个新增就是支持单词星标，其余任何都不要改"）。
+- 学词筛选从「● 隐藏已掌握」换成标签行：`[未掌握][已掌握][★星标][错词]`，**默认未掌握**。
+- 详情页翻页上下文 `wordNav`（ids + from + scroll）进入时定格：标已掌握后上/下一词不再消失，
+  两端置灰不跳行；详情页内翻词用 `history.replaceState`，返回走 `wordNav.from`（回上一页，不是上一个词）。
+
+#### 三、复习 = 验证式（不是自评）
+
+- 一屏一题、整行卡片选项、底部阻断式反馈条、答错回炉；`REVIEW_N = 12`。
+- 五题型 `REV_MODES`：`pick` 选读音 / `type` 读音填空 / `ctx` 歌词挖空 / `listen` 听音选词 / `meaning` 选释义。
+  默认只开前三个（读音向）；后两个留给入门和其它外语。
+- 「我的 → 复习方式」里逐项开关，至少留一种；存 `S.revModes`。
+- 复习牌组 `dueWords()`：**星标词 + 错词**优先，按到期时间穿插；**不再自动把词标成已掌握**。
+
+#### 四、发音：词音换阿里云 NLS（tomoka），包 2.1
+
+- 生成脚本 `scripts/gen-voicepack-nls.py`（阿里云智能语音，appkey 由环境变量传，别写进仓库）。
+- 产物 `thlyrics-audio/tts/kokoro-ja-2.1.zip`（**沿用 kokoro-ja 的包 id/格式**：`index.json` + `audio/<sha1>.mp3`，
+  6460 条），`docs/data/voice-packs.json` 里 version 2.1。
+- 词义/读音全部对过 JMdict；补词脚本 `scripts/vocab-extras.mjs`，读音修正 `scripts/reading-fix.mjs`。
+
+#### 五、词表 6604 / 分词版本
+
+- 词表 6446 → **6604**（+158 高频遗漏词，Top200 里裁掉绑定语素与活用残留）。
+- `SEG_V` 2 → 3：升版本会强制所有已导入曲目用新词典重切（`/api/segment`），正常现象、会慢一次。
+- 顶栏计数抽成 `updateHeadStat()`，放在 `indexLibrary()` 末尾；`backfillSegs()` 改成 while 循环补完。
+
+#### 六、门禁
+
+- `playSpeakSrc` 的裸 `fetch` 已收进 `platform/net.getBlob()`（发音 1.9x 增益要抓同源 blob，
+  抓不到就退回普通播放，绝不能变哑）。
+- `npm run check` 双绿。
+
+#### 七、⚠️ E2E 套件对 β 视觉已过时
+
+`.e2e/run-e2e.mjs` 里还在等 `#view-learn .sec-sub` 这类旧选择器，**在 β 页面上第 6 条就崩**。
+上一轮的验收是靠 `.e2e/android/cdp.mjs` 的临时脚本 + 真机跑通的，不是这套。
+在把 E2E 选择器补齐之前，**不要拿"E2E 全绿"当 β 之后的验收证据**。
