@@ -2,14 +2,14 @@
   "packs": [
     {
       "id": "kokoro-ja",
-      "name": "Kokoro 日语",
-      "version": "1.0",
+      "name": "日语词音（阿里云）",
+      "version": "2.1",
       "kind": "audio",
-      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-1.0.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107489375&Signature=uZpGqsTFne71FiLYDYsjYM5Nhtk%3D",
-      "size": 31568868,
-      "sha256": "0588c8359b06741cd3f839cbe831a25ad44a794285868e31cc3e8996089fe617",
-      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
-      "license": "Apache-2.0"
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-2.1.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107588701&Signature=LWgIgi9ToGFATZBCL%2BZRMaVZSt0%3D",
+      "size": 29430387,
+      "sha256": "276ef19cb9dcbe8663e7375a583737808b13addb02756b74ba9540c2e7d2e84a",
+      "source": "https://help.aliyun.com/zh/isi/",
+      "license": "阿里云智能语音交互（NLS）· voice=tomoka"
     },
     {
       "id": "openjtalk-ja",

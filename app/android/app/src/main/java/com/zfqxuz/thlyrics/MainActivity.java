@@ -1,12 +1,35 @@
 package com.zfqxuz.thlyrics;
 
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+
+import androidx.core.view.WindowCompat;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 让 webview 延伸到状态栏 / 导航栏：CSS 里用 env(safe-area-inset-*) 自动适配
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        // 状态栏图标 = 深色（warm 主题背景是浅纸色；dark 主题时 webview 会重设文字色）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            var ctrl = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+            ctrl.setAppearanceLightStatusBars(true);
+            ctrl.setAppearanceLightNavigationBars(true);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+            getWindow().setStatusBarContrastEnforced(false);
+        }
         registerPlugin(MediaSessionPlugin.class);
         registerPlugin(AppUpdaterPlugin.class);
         registerPlugin(LocalAudioPlugin.class);

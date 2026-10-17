@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261016i';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261016i';
-import { icon } from './icons.js?v=20261016i';
+import { V } from './version.js?v=20261017y';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017y';
+import { icon } from './icons.js?v=20261017y';
 
 (() => {
   'use strict';
@@ -45,12 +45,14 @@ import { icon } from './icons.js?v=20261016i';
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, rate: 1, ruby: true, gloss: false, zh: true,
+  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {},
+    revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false },
+    rate: 1, ruby: true, gloss: false, zh: true,
     mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
-  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {};
+  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
     }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
@@ -242,6 +244,57 @@ import { icon } from './icons.js?v=20261016i';
   };
   const toggleKnown = (w) => { if (!w) return; if (isKnown(w)) S.known[w.id] = -Date.now(); else S.known[w.id] = Date.now(); save(); };
 
+  // ── 星标（★）──
+  // 和「已掌握」刻意做成同构（正=标了，负=取消）:这样云端合并可以直接复用 known 那套「时间戳取大」的规则。
+  // 但语义相反 —— 已掌握是做减法（别给我看了），星标是做加法（下次还要给我）。
+  const isStar = (w) => !!(w && Number((S.star || {})[w.id]) > 0);
+  const starAt = (w) => (w ? Number((S.star || {})[w.id]) || 0 : 0);
+  const toggleStar = (w) => { if (!w) return; S.star = S.star || {}; S.star[w.id] = isStar(w) ? -Date.now() : Date.now(); save(); };
+
+  // ── 复习档案：一个词一条 { s 熟练度0..5, e 累计错次, d 下次到期, t 最后作答 } ──
+  // 只有「星标 ∪ 错词」会进复习池；这里的排期只决定它们「什么时候」再出现。
+  const REV_GAP = [30 * 60e3, 24 * 3600e3, 2 * 24 * 3600e3, 4 * 24 * 3600e3, 7 * 24 * 3600e3, 15 * 24 * 3600e3];
+  const revOf = (w) => (w && S.rev && S.rev[w.id]) || null;
+  const errOf = (w) => Math.max(0, Number((revOf(w) || {}).e) || 0);          // 累计答错次数（只增不减）
+  const memoOf = (w) => Math.max(0, Number((revOf(w) || {}).s) || 0);          // 熟练度 0..5
+  // 「错词」= 错过、而且还没练回来。出池条件：连答对两次（s 涨到 2）——「常见错误词汇」才攒得住，
+  // 不然答错一次再蒙对一次就抹掉了（这正是第一版实现的问题）。
+  const inErrPool = (w) => errOf(w) > 0 && memoOf(w) < 2;
+  /** 该复习了吗：错词一律算到期（每天都会出现，直到练回来）；没记录的（刚星的）也算到期 */
+  const isDue = (w) => {
+    if (!w) return false;
+    if (inErrPool(w)) return true;
+    const r = revOf(w);
+    if (!r) return true;
+    return (Number(r.d) || 0) <= Date.now();
+  };
+  /** 一次作答落盘：答对 s+1；答错 错次+1、s-2（比多邻国温和，不一次清零） */
+  function revApply(w, ok) {
+    if (!w) return null;
+    S.rev = S.rev || {};
+    const r = Object.assign({ s: 0, e: 0, d: 0, t: 0 }, revOf(w));
+    if (ok) { r.s = Math.min(5, (Number(r.s) || 0) + 1); }
+    else { r.e = (Number(r.e) || 0) + 1; r.s = Math.max(0, (Number(r.s) || 0) - 2); }
+    r.t = Date.now();
+    r.d = r.t + REV_GAP[Math.max(0, Math.min(5, Number(r.s) || 0))];
+    S.rev[w.id] = r;
+    save();
+    return r;
+  }
+  /** 复习池：星标 ∪ 错词，只留「到期」的；错词按错次降序、星标按加入时间倒序，两串交替取 */
+  function dueWords() {
+    const star = VOCAB.filter((v) => isStar(v) && isDue(v)).sort((a, b) => starAt(b) - starAt(a));
+    const err = VOCAB.filter((v) => inErrPool(v) && isDue(v))
+      .sort((a, b) => errOf(b) - errOf(a) || (Number((revOf(b) || {}).t) || 0) - (Number((revOf(a) || {}).t) || 0));
+    const out = [], seen = new Set();
+    let i = 0, j = 0;
+    while (i < err.length || j < star.length) {
+      if (i < err.length) { const v = err[i++]; if (!seen.has(v.id)) { seen.add(v.id); out.push(v); } }
+      if (j < star.length) { const v = star[j++]; if (!seen.has(v.id)) { seen.add(v.id); out.push(v); } }
+    }
+    return out;
+  }
+
   // 旧版本往 IndexedDB 绑过本机音频文件，功能已下线：开机清一次，别留垃圾
   dropLegacyDB('thlyrics');
 
@@ -271,9 +324,48 @@ import { icon } from './icons.js?v=20261016i';
     await playSpeakSrc(url);
   }
   const capFileSrc = (p) => (window.Capacitor && window.Capacitor.convertFileSrc ? window.Capacitor.convertFileSrc(p) : p);
+
+  /* 发音音量增益。
+     问题：TTS 音频的母带响度远低于音乐（网易云是响度战争压过的），两边都 volume=1 时
+     听起来「发音比音乐小一截」。HTMLAudio 的 volume 上限是 1.0，放不大 —— 只能用 Web Audio 的 GainNode。
+     坑：createMediaElementSource 对跨源媒体会「污染」(tainted) → 直接变静音。
+     所以先把音频抓成 blob 再用 objectURL（同源），失败就退回普通播放，绝不让发音变哑。 */
+  let speakCtx = null, speakGain = null, speakSrcNode = null, speakGainReady = false;
+  const SPEAK_GAIN = () => { const g = Number(S.voiceGain); return (isFinite(g) && g > 0) ? g : 1.9; };
+  function setupSpeakGain() {
+    if (speakGainReady) return true;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      speakCtx = speakCtx || new AC();
+      speakGain = speakCtx.createGain();
+      speakGain.gain.value = SPEAK_GAIN();
+      speakGain.connect(speakCtx.destination);
+      speakSrcNode = speakCtx.createMediaElementSource(getSpeakAudio());
+      speakSrcNode.connect(speakGain);
+      speakGainReady = true;
+      return true;
+    } catch { speakGainReady = false; return false; }
+  }
   async function playSpeakSrc(src) {
     const el = getSpeakAudio();
     try { el.pause(); } catch { /* 没播过 */ }
+    // 优先：抓成 blob（同源）→ 走 GainNode 放大
+    if (setupSpeakGain()) {
+      try {
+        const blob = await getBlob(src);
+        const url = URL.createObjectURL(blob);
+        if (speakGain) speakGain.gain.value = SPEAK_GAIN();
+        if (speakCtx && speakCtx.state === 'suspended') { try { await speakCtx.resume(); } catch { /* 忽略 */ } }
+        const done = () => { try { URL.revokeObjectURL(url); } catch { /* 忽略 */ } el.removeEventListener('ended', done); };
+        el.addEventListener('ended', done);
+        el.src = url;
+        el.currentTime = 0;
+        await el.play();
+        return;
+      } catch { /* 落到下面普通播放 */ }
+    }
+    // 兜底：普通播放（音量跟随系统/元素，不再放大）
     el.src = src;
     el.currentTime = 0;
     await el.play();
@@ -287,10 +379,10 @@ import { icon } from './icons.js?v=20261016i';
     try { const r = await voicePack.status(VP_ID); vpOjt = (r && r.installed) ? r : null; } catch { vpOjt = null; }
     return { audio: vpAudio, ojt: vpOjt };
   }
-  async function speak(t) {
+  async function speak(t, silent) {
     const text = String(t == null ? '' : t).trim();
     if (!text) return;
-    if (!IS_NATIVE) { try { await speakOnline(text); } catch { toast('发音失败'); } return; }
+    if (!IS_NATIVE) { try { await speakOnline(text); } catch { if (!silent) toast('发音失败'); } return; }
     const packs = await activePacks();
     if (packs.audio) {
       try {
@@ -307,9 +399,9 @@ import { icon } from './icons.js?v=20261016i';
         if (r && r.path) { await playSpeakSrc(capFileSrc(r.path)); return; }
       } catch { /* 兜底也不行 */ }
     }
-    toast('发音失败');
+    if (!silent) toast('发音失败');
   }
-  if (typeof window !== 'undefined') { window.__tlSpeak = (t) => speak(t); window.__tlVpPrompt = () => voicePackPrompt(); }   // 真机/CDP 测试钩子
+  if (typeof window !== 'undefined') { window.__tlSpeak = (t) => speak(t, true); window.__tlVpPrompt = () => voicePackPrompt(); }   // 真机/CDP 测试钩子
   /** 首次打开：没装语音包就问一次「要不要装」，可「不再提醒」 */
   function voicePackPrompt() {
     if (!IS_NATIVE || !voicePack.available || S.vpNoAsk) return;
@@ -808,25 +900,46 @@ import { icon } from './icons.js?v=20261016i';
     let n = pos + dir;
     if (n < 0) n = lines.length - 1;
     if (n >= lines.length) n = 0;
-    // 循环开着时，上一句/下一句是「换到那句继续循环」，不能悄悄退出循环
-    playFrom(lines[n].i);
+    // 循环开着时，上一句/下一句是「换到那句继续循环」；没循环时就只是挪一句，不能偷偷切进单句
+    playFrom(lines[n].i, false);
   }
-  /** 点句子：从这句继续往下播（不循环）——只有双击/长按/循环键才开单句循环 */
-  function playFrom(i) {
+  /**
+   * 点句子 = 把单句循环切到这一句（README：「点句子从那句开始循环」/ 约束①：单句重复是硬需求）。
+   * 以前这里只在 mode==='loop' 时才循环，其它情况只是「从那句往下播」——
+   * 结果用户在「全曲」模式下点句子，看起来就是「点击播放单句失效了」。
+   * 现在无论当前什么模式，点句子一律切到单句循环（模式也跟着切过去，状态在控件上看得见）；
+   * 想整首连着放就别点句子，用播放键 / 「全曲」开关。
+   */
+  function playFrom(i, forceLoop = true) {
     if (!curLines[i]) return;
     const t = curLines[i].t;
-    if (mode === 'loop') {                       // 循环模式：换到这句继续循环
-      loopLine = i; activeLine = i;
-      if (t != null) jump(t);
-      if (audio.paused) audio.play().catch(() => {});
-      highlight(true); return;
+    // forceLoop=false 用于「上一句 / 下一句」：只挪位置，别偷偷把模式切进单句
+    const toLoop = forceLoop || mode === 'loop';
+    const wasAll = mode !== 'loop';
+    if (toLoop) {
+      if (wasAll && forceLoop) setMode('loop');    // 点句子才切模式；上下句不切
+      loopLine = i;
+    } else {
+      loopLine = null;
     }
     activeLine = i;
     if (t != null) jump(t);
-    highlight(true);
-    if (curTrack) playTrack(curTrack, { at: t });   // 整首模式：从这句继续往下播
-    toast('双击＝单句循环');
+    // 全曲模式挪一句时，音频可能还没挂上（jump 只存了 seekTime，没人消费）→ 交给 playTrack 带上 at
+    const needLoad = audio.getAttribute('data-tid') !== (curTrack && curTrack.id) || !audio.src;
+    if (!toLoop && needLoad) { if (curTrack) playTrack(curTrack, { at: t }); }
+    else if (audio.paused || (wasAll && forceLoop)) audio.play().catch(() => {});
+    highlight(false);
+    armTapScroll();                               // 滚动推迟：否则第一下就把歌词滚走，第二下落不到同一行
+    if (wasAll && forceLoop) toast('单句循环 · 点「全曲」恢复整首');
   }
+  // 单击后不马上滚动，等「双击窗口」过去再滚到当前句 —— 保证双击的第二下落在同一行同一处
+  let tapScrollT = null;
+  function armTapScroll() {
+    clearTimeout(tapScrollT);
+    tapScrollT = setTimeout(() => { tapScrollT = null; highlight(true); }, DBL_MS + 80);
+  }
+  // 双击判定窗：真机上手速普遍 300~500ms，原来 360ms 太紧（踩过：10 次里 8 次判不出来）
+  const DBL_MS = 620;
   let toastTimer = null;
   function toast(msg) {
     setState(msg);
@@ -855,24 +968,44 @@ import { icon } from './icons.js?v=20261016i';
 
   function wordRow(v) {
     const st = libStat(v);
-    return `<div class="item word" data-id="${v.id}">
+    const starred = isStar(v);
+    return `<div class="item word${starred ? ' starred' : ''}${isKnown(v) ? ' known' : ''}" data-id="${v.id}">
       <div class="col">
-        <div class="l1">${esc(v.word)}<span class="rd">${esc(v.reading)}</span></div>
+        <div class="l1">${esc(v.word)}<span class="rd">${esc(v.reading)}</span>${isKnown(v) ? '<span class="wtag">已掌握</span>' : ''}</div>
         <div class="l2">${esc(meaningOf(v) || '（还没释义）')}</div>
         <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · ${st ? st.tracks.size : 0} 首歌 / ${st ? st.n : 0} 次</div>
       </div>
       ${dotsHtml(v)}
-      <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握">${icon('check','in')}</button>
+      <button class="tick star ${starred ? 'on' : ''}" data-star="${v.id}" title="${starred ? '取消星标' : '星标'}" aria-label="星标">${icon(starred ? 'star-fill' : 'star','in')}</button>
+      <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握" aria-label="标为已掌握">${icon('check','in')}</button>
     </div>`;
   }
   function wireWords(root) {
     root.querySelectorAll('.word').forEach((el) => {
       const id = Number(el.dataset.id);
       el.onclick = (e) => {
-        if (e.target.closest('[data-known]')) return;
+        if (e.target.closest('[data-known]') || e.target.closest('[data-star]')) return;
+        // 定格「眼前这个列表」当翻页上下文：详情页里的上下词就按它走（含当时的筛选/排序/已展开多少）
+        const host = el.closest('.list');
+        const ids = host ? [...host.querySelectorAll('.word')].map((x) => Number(x.dataset.id)) : [];
+        if (ids.indexOf(id) >= 0) setWordNav(ids, location.hash || lastMainHash);
         go('#/word/' + id);
       };
     });
+    root.querySelectorAll('[data-star]').forEach((el) => (el.onclick = (e) => {
+      e.stopPropagation();
+      const v = VBYID.get(Number(el.dataset.star));
+      if (!v) return;
+      const on = !isStar(v);
+      toggleStar(v);
+      el.classList.toggle('on', on);
+      el.innerHTML = icon(isStar(v) ? 'star-fill' : 'star', 'in');
+      el.title = isStar(v) ? '取消星标' : '星标';
+      if (el.closest('.word')) el.closest('.word').classList.toggle('starred', isStar(v));
+      if (on) toast('已收进星标 · 复习时它会出现');
+      // 「星标」标签下这一行会离开列表，需要重渲染；其它标签下原地改就行
+      if ((S.dTag || 'undone') === 'star' && $('view-learn') && $('view-learn').contains(el)) renderLearn();
+    }));
     root.querySelectorAll('[data-known]').forEach((el) => (el.onclick = (e) => {
       e.stopPropagation();
       const v = VBYID.get(Number(el.dataset.known));
@@ -890,6 +1023,11 @@ import { icon } from './icons.js?v=20261016i';
     : r === 'n45' ? v.jl >= 4
     : r === 'n123' ? (!!v.jl && v.jl <= 3) : true;
   /** 曲库里的歌 → 词表（学词 / 复习 / 例句都只看曲库里有的歌） */
+  /** 顶栏「N 首 · M 词」：以前只在 boot 里算一次，导入后不刷新 → 抽成函数 */
+  function updateHeadStat() {
+    const hs = $('headstat');
+    if (hs && IDX) hs.textContent = `${IDX.tracks.length} 首 · ${LIBW.size} 词`;
+  }
   function indexLibrary() {
     LIBW.clear();
     for (const t of IDX.tracks) for (const l of t.lines || []) for (const sg of l.segs || []) {
@@ -898,6 +1036,7 @@ import { icon } from './icons.js?v=20261016i';
       if (!e) LIBW.set(sg.b, e = { n: 0, tracks: new Set() });
       e.n++; e.tracks.add(t.id);
     }
+    updateHeadStat();                     // 每次重建曲库索引都刷新顶栏（以前只在 boot 算一次，导入后不刷新）
   }
   const libStat = (v) => (v ? LIBW.get(v.word) : null);
   /** 这个词在曲库里的例句（正在听的那首排最前） */
@@ -921,7 +1060,12 @@ import { icon } from './icons.js?v=20261016i';
   }
   function deckList() {
     let list = VOCAB.filter((v) => LIBW.has(v.word) && rangeOk(v, S.dRange || 'all') && ((S.dPos || 'all') === 'all' || v.pos === S.dPos));
-    if (S.hideKnown !== false) list = list.filter((v) => !isKnown(v));
+    // 「标签」取代了原来的「● 隐藏已掌握」开关：默认就是「未掌握」（不含已掌握），另外三个标签反过来只看那一类
+    const tag = S.dTag || 'undone';
+    if (tag === 'known') list = list.filter(isKnown);
+    else if (tag === 'star') list = list.filter(isStar);
+    else if (tag === 'err') list = list.filter(inErrPool);
+    else list = list.filter((v) => !isKnown(v));
     const by = S.dSort || 'easy';
     if (by === 'freq') return [...list].sort((a, b) => b.count - a.count || a.diff - b.diff);
     if (by === 'az') return [...list].sort((a, b) => String(a.reading).localeCompare(String(b.reading), 'ja'));
@@ -937,15 +1081,16 @@ import { icon } from './icons.js?v=20261016i';
     const withAudio = IDX.tracks.filter((t) => t.audio || t.audioOss).length;
     $('view-home').innerHTML = `
       <div class="herohead">
-        <div class="ht">TH Lyrics</div>
+        <div class="ht">今日から、<span class="accent">東方</span>の<br>歌詞で言葉を学ぶ。</div>
+        <div class="hs">——三首歌里挑五个词；先听懂，再背下。</div>
         <div class="homesearch">
           <input id="h-q" placeholder="搜曲名、社团、原曲、词…" autocomplete="off">
           <button id="h-go">搜索</button>
         </div>
         <div class="hln">
-          <button id="h-songs">曲库 ${IDX.tracks.length} 首</button>
+          <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
           <button id="h-words">学词</button>
-          <button id="h-mine">生词本 ${knownN}</button>
+          <button id="h-mine">我的词 <span class="cnt">${knownN}</span></button>
         </div>
       </div>
       ${last ? `<div class="nowcard">
@@ -984,61 +1129,282 @@ import { icon } from './icons.js?v=20261016i';
   }
   let homeQt = null;
 
-  // ────────────── 复习（生词本的学习闭环：看词 → 回忆 → 看释义 → 标记） ──────────────
-  let revDeck = [], revI = 0, revShown = false, revStat = { ok: 0, again: 0 };
+  // ────────────── 复习：验证式（出题判定，不是自评） ──────────────
+  // 想法来自多邻国（练习即验证 / 答完立刻给正解 / 错题本轮回炉）和有道（到期才复习）。
+  // 呈现是我们自己的：一屏一题、整行卡片选项、底部阻断式反馈条。
+  // 题型里有一道「歌词挖空」——只有我们有这个资产（每个词都挂着真实歌词例句）。
+  const REVIEW_N = 12;                     // 一轮 12 题
+
+  // 复习方式：让用户自己决定出哪些题。
+  // 默认只开「读音向」三种 —— 中国人学日语最卡的是「汉字怎么读」和「同一个中文在日语里是另一个词」，
+  // 选义/看义选词对这两件事没用（而且是多邻国那套给英语母语者补词汇用的）。
+  const REV_MODES = [
+    ['pick', '选读音', '看词，从 4 个假名里挑对的'],
+    ['type', '读音填空', '看词，写出假名（也认罗马音）'],
+    ['ctx', '上下文填空', '歌词挖空，选缺的那个词'],
+    ['listen', '听音选词', '听发音，挑出这个词'],
+    ['meaning', '选释义', '看词选中文（入门 / 其它外语用）'],
+  ];
+  const REV_MODE_DEFAULT = { pick: true, type: true, ctx: true, listen: false, meaning: false };
+  const revModes = () => Object.assign({}, REV_MODE_DEFAULT, S.revModes || {});
+  const revModeOn = (k) => revModes()[k] !== false;
+  const REV_AVAIL = (k) => k !== 'listen' || typeof navigator === 'undefined' || navigator.onLine !== false;
+  let revDeck = [], revI = 0, revQ = null, revStat = { ok: 0, bad: 0, requeue: 0 };
+
   function startReview(n) {
-    const pool = VOCAB.filter((v) => !isKnown(v) && LIBW.has(v.word));
-    const pick = [];
-    const step = Math.max(1, Math.floor(pool.length / (n || 20)));
-    for (let i = 0; i < pool.length && pick.length < (n || 20); i += step) pick.push(pool[i]);
-    revDeck = pick;
-    revI = 0; revShown = false; revStat = { ok: 0, again: 0 };
+    const want = (Number(n) > 0) ? Math.floor(Number(n)) : REVIEW_N;
+    revDeck = dueWords().slice(0, want);
+    revI = 0; revQ = null; revStat = { ok: 0, bad: 0, requeue: 0 };
   }
+
+  /** 用户填的读音算不算对：认平假名/片假名/罗马音，比较时抹掉长音符与促音（初学者常漏） */
+  function readingOk(input, v) {
+    const clean = (x) => norm(x).replace(/[\s\u3000.・·]/g, '').replace(/[ーっ]/g, '');
+    const got = clean(input);
+    if (!got) return false;
+    const cands = [v.reading, v.romaji].filter(Boolean).map(clean);
+    return cands.some((c) => c && (c === got || c.replace(/[んn]$/, '') === got.replace(/[んn]$/, '')));
+  }
+
+  /** 读音干扰项：同首字的词（一字多音，最值得考）、长度接近、词性相近 */
+  function readingDistractors(v, n) {
+    n = n || 3;
+    const base = norm(v.reading || '');
+    const first = String(v.word || '').slice(0, 1);
+    const pool = VOCAB.filter((x) => x.id !== v.id && x.reading
+      && /^[\u3041-\u309f\u30a0-\u30ffー]+$/.test(x.reading) && norm(x.reading) !== base);
+    const score = (x) => {
+      const r = norm(x.reading || '');
+      let sc = 0;
+      if (first && String(x.word || '').slice(0, 1) === first) sc -= 2.5;      // 同首字：形近音不同
+      if (Math.abs(r.length - base.length) <= 1) sc -= 1;                       // 长度接近，更难蒙
+      if (x.pos === v.pos) sc -= .8;
+      sc += Math.abs((Number(x.jl) || 3) - (Number(v.jl) || 3)) * .4;
+      sc += Math.abs((Number(x.diff) || 50) - (Number(v.diff) || 50)) / 300;
+      return sc;
+    };
+    const head = pool.sort((a, b) => score(a) - score(b)).slice(0, 60);
+    const out = [], seen = new Set([base]);
+    while (out.length < n && head.length) {
+      const x = head.splice(Math.floor(Math.random() * head.length), 1)[0];
+      const r = norm(x.reading);
+      if (seen.has(r)) continue;
+      seen.add(r); out.push(x);
+    }
+    return out;
+  }
+
+  /** 干扰项：同词性 + 难度接近的优先，再从前 60 个里随机挑，避免每次都是同一批 */
+  function distractors(v, get, n) {
+    n = n || 3;
+    const target = get(v);
+    const pool = VOCAB.filter((x) => x.id !== v.id && get(x) && get(x) !== target);
+    const score = (x) => (x.pos === v.pos ? 0 : 2)
+      + Math.abs((Number(x.jl) || 3) - (Number(v.jl) || 3)) * 0.5
+      + Math.abs((Number(x.diff) || 50) - (Number(v.diff) || 50)) / 200;
+    const head = pool.sort((a, b) => score(a) - score(b)).slice(0, 60);
+    const out = [], seen = new Set([target]);
+    while (out.length < n && head.length) {
+      const x = head.splice(Math.floor(Math.random() * head.length), 1)[0];
+      const k = get(x);
+      if (seen.has(k)) continue;
+      seen.add(k); out.push(x);
+    }
+    return out;
+  }
+  const shuffle = (arr) => arr.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+
+  /** 出一道题。四种题型按词的可出题条件挑，用 revI 轮着来（同一轮里不老是同一种） */
+  function makeQuestion(v, i) {
+    const ex = examplesFor(v, 1)[0];
+    const hasReading = !!(v.reading && /^[\u3041-\u309f\u30a0-\u30ffー]+$/.test(v.reading));
+    // 可用题型 = 用户勾选的 ∩ 这个词真出得来的
+    let kinds = REV_MODES.map((m) => m[0]).filter((k) => revModeOn(k) && REV_AVAIL(k));
+    kinds = kinds.filter((k) => {
+      if (k === 'ctx') return !!ex;
+      if (k === 'pick' || k === 'type') return hasReading;
+      return true;
+    });
+    if (!kinds.length) kinds = ['pick'];
+    const kind = kinds[i % kinds.length];
+    const play = (silent) => speak(v.reading || v.word, !!silent);
+    const meaning = String(meaningOf(v) || '').trim();
+    const readNote = [v.reading, v.romaji].filter(Boolean).join(' · ');
+    const romajiNote = [v.romaji, meaning].filter(Boolean).join(' · ');      // 答案已经是读音时，补充信息就别再重复读音
+
+    // ── 读音向：看词选读音 ──
+    if (kind === 'pick') {
+      const wrong = readingDistractors(v, 3).map((x) => x.reading);
+      const opts = shuffle([{ t: v.reading, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+      return { v, i, kind, head: '这个词怎么读？', input: false, opts,
+        prompt: `<b class="rw1">${esc(v.word)}</b>${meaning ? `<i class="rw2">${esc(meaning)}</i>` : ''}`,
+        correct: v.reading, answer: romajiNote, done: false, picked: -1, play };
+    }
+    // ── 读音向：自己写出读音 ──
+    if (kind === 'type') {
+      return { v, i, kind, head: '写出它的读音', input: true, opts: null,
+        prompt: `<b class="rw1">${esc(v.word)}</b>${meaning ? `<i class="rw2">${esc(meaning)}</i>` : ''}`,
+        correct: v.reading, answer: romajiNote, done: false, picked: -1, play };
+    }
+    // ── 上下文向：歌词挖空选词（同一句中文可能对应好几个日语词，只有上下文能区分）──
+    if (kind === 'ctx') {
+      const wrong = distractors(v, (x) => String(x.word || '').trim(), 3).map((x) => x.word);
+      const opts = shuffle([{ t: v.word, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+      const line = String(ex.jp || '');
+      const at = line.indexOf(v.word);
+      const masked = at >= 0
+        ? esc(line.slice(0, at)) + '<b class="blank">＿＿</b>' + esc(line.slice(at + v.word.length))
+        : esc(line);
+      return { v, i, kind, head: '这句歌词里，缺的是哪个词？', input: false, opts,
+        prompt: `<b class="rw4">${masked}</b>${ex.zh ? `<i class="rw5">${esc(ex.zh)}</i>` : ''}`,
+        correct: v.word, answer: [readNote, meaning].filter(Boolean).join(' · '), done: false, picked: -1, play };
+    }
+    // ── 听音选词 ──
+    if (kind === 'listen') {
+      const wrong = distractors(v, (x) => String(x.word || '').trim(), 3).map((x) => x.word);
+      const opts = shuffle([{ t: v.word, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+      return { v, i, kind, head: '听发音，选出这个词', input: false, opts,
+        prompt: `<button class="rwplay" id="rev-play" aria-label="再听一次">${icon('volume', 'in')}</button>`,
+        correct: v.word, answer: readNote, done: false, picked: -1, play };
+    }
+    // ── 看词选释义（默认关，留给入门 / 以后接其它外语）──
+    const wrong = distractors(v, (x) => String(meaningOf(x) || '').trim(), 3).map((x) => meaningOf(x));
+    const opts = shuffle([{ t: meaning, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
+    return { v, i, kind: 'meaning', head: '这个词是什么意思？', input: false, opts,
+      prompt: `<b class="rw1">${esc(v.word)}</b>${v.reading ? `<i class="rw2">${esc(v.reading)}</i>` : ''}`,
+      correct: meaning, answer: readNote, done: false, picked: -1, play };
+  }
+
   function renderReview() {
+    const box = $('view-review');
     if (!LIBW.size) {
-      $('view-review').innerHTML = emptyBox('曲库是空的', '', [['e-rgo', '导入歌曲']]);
+      box.innerHTML = emptyBox('曲库是空的', '', [['e-rgo', '导入歌曲']]);
       $('e-rgo').onclick = () => { impState.open = true; go('#/songs'); };
       return;
     }
-    if (!revDeck.length) startReview(20);
-    const v = revDeck[revI];
-    if (!v) {
-      $('view-review').innerHTML = `<div class="revwrap">
-        <div class="sec-head"><div><div class="sec-title">复习完成</div><div class="sec-sub">这轮 ${revDeck.length} 个词 · 记住了 ${revStat.ok} · 还要再看 ${revStat.again}</div></div></div>
-        ${emptyBox('这一轮过完了', '', [])}
-        <div class="row" style="justify-content:center;gap:8px">
-          <button class="toolbtn" id="rev-again">再来一轮</button>
-          <button class="toolbtn" id="rev-mine">回生词本</button>
+    if (!revDeck.length) {
+      const pool = dueWords();
+      if (!pool.length) {
+        box.innerHTML = `<div class="revwrap">${emptyBox('まだ、星はない。', '点歌词里的 ★ 收词 · 复习时先出现', [['e-rlearn', '去学词']])}</div>`;
+        $('e-rlearn').onclick = () => go('#/learn');
+        return;
+      }
+      startReview(REVIEW_N);
+    }
+    // 一轮结束 → 结算
+    if (revI >= revDeck.length) {
+      const total = revStat.ok + revStat.bad;
+      box.innerHTML = `<div class="revwrap">
+        <div class="revdone">
+          <div class="rd-t">一轮结束</div>
+          <div class="rd-big">${revStat.ok}<span>/${total}</span></div>
+          <div class="rd-sub">答错 ${revStat.bad} 个 · 回炉 ${revStat.requeue} 个 · 还剩 ${Math.max(0, dueWords().length)} 个到期</div>
+        </div>
+        <div class="row" style="justify-content:center;gap:10px;margin-top:6px">
+          <button class="toolbtn" id="rev-again">${icon('rotate-ccw', 'in')}再来一轮</button>
+          <button class="toolbtn" id="rev-mine">回我的词</button>
         </div></div>`;
-      if ($('rev-again')) $('rev-again').onclick = () => { startReview(20); renderReview(); };
-      if ($('rev-mine')) $('rev-mine').onclick = () => go('#/mine');
+      $('rev-again').onclick = () => { startReview(REVIEW_N); renderReview(); };
+      $('rev-mine').onclick = () => go('#/mine');
       return;
     }
-    const ex = examplesFor(v, 1)[0];
-    $('view-review').innerHTML = `<div class="revwrap">
-      <div class="sec-head"><div><div class="sec-title">复习</div><div class="sec-sub">第 ${revI + 1} / ${revDeck.length} 个 · 记住 ${revStat.ok} · 还要再看 ${revStat.again}</div></div></div>
-      <div class="revbar"><i style="width:${Math.round(((revI) / revDeck.length) * 100)}%"></i></div>
-      <div class="revcard">
-        <div class="rw">${esc(v.word)}</div>
-        ${revShown ? `<div class="rr">${esc(v.reading || '')} ${esc(v.romaji || '')}</div>
-          <div class="rm">${esc(meaningOf(v) || '（没有释义）')}</div>
-          ${ex ? exRowHtml(ex) : ''}`
-        : '<div class="rr">？</div>'}
+    const v = revDeck[revI];
+    if (!revQ || revQ.i !== revI || revQ.v.id !== v.id) revQ = makeQuestion(v, revI);
+    const q = revQ;
+    const pct = Math.round((revI / revDeck.length) * 100);
+    const typed = q.input
+      ? `<div class="revin" id="revin">
+           <input class="revinp" id="rev-input" autocomplete="off" autocapitalize="off" autocorrect="off"
+             spellcheck="false" inputmode="text" enterkeyhint="done" placeholder="假名，或罗马音">
+           <button class="revinok" id="rev-submit">提交</button>
+         </div>`
+      : `<div class="revopts" id="revopts">
+           ${q.opts.map((o, k) => `<button class="revopt" data-i="${k}"><span class="k">${k + 1}</span><span class="t">${esc(o.t)}</span></button>`).join('')}
+         </div>`;
+    box.innerHTML = `<div class="revwrap">
+      <div class="revtop">
+        <button class="revx" id="rev-stop">${icon('chevron-left', 'in')}结束</button>
+        <span class="revcount">${revI + 1} / ${revDeck.length}</span>
       </div>
-      <div class="revacts">
-        ${revShown ? `<button id="rev-again2">还不熟</button><button class="k" id="rev-ok">记住了</button>`
-        : `<button class="k" id="rev-show">看释义</button>`}
+      <div class="revbar"><i style="width:${pct}%"></i></div>
+      <div class="revq">
+        <div class="revkind">${esc(q.head)}</div>
+        <div class="revprompt">${q.prompt}</div>
       </div>
-      <div class="row" style="justify-content:center;margin-top:12px;gap:8px">
-        <button class="toolbtn" id="rev-detail">词条详情</button>
-        <button class="toolbtn" id="rev-stop">结束</button>
-      </div></div>`;
-    bindPreviewRows($('view-review'));
-    if ($('rev-show')) $('rev-show').onclick = () => { revShown = true; renderReview(); };
-    if ($('rev-ok')) $('rev-ok').onclick = () => { toggleKnown(v); revStat.ok++; revI++; revShown = false; renderReview(); };
-    if ($('rev-again2')) $('rev-again2').onclick = () => { if (isKnown(v)) toggleKnown(v); revStat.again++; revDeck.push(v); revI++; revShown = false; renderReview(); };
-    if ($('rev-detail')) $('rev-detail').onclick = () => go('#/word/' + v.id);
-    if ($('rev-stop')) $('rev-stop').onclick = () => go('#/mine');
+      ${typed}
+      <div class="revfeed" id="revfeed" hidden></div>
+    </div>`;
+    if ($('rev-play')) $('rev-play').onclick = () => q.play(false);
+    if (q.kind === 'listen') setTimeout(() => { if (revQ === q) q.play(true); }, 260);
+    box.querySelectorAll('.revopt').forEach((el) => (el.onclick = () => answerReview(Number(el.dataset.i))));
+    if (q.input) {
+      const inp = $('rev-input');
+      if (inp) { inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitTyped(); } }; setTimeout(() => { try { inp.focus(); } catch {} }, 120); }
+      if ($('rev-submit')) $('rev-submit').onclick = () => submitTyped();
+    }
+    $('rev-stop').onclick = () => go('#/mine');
+  }
+
+  /** 交卷：统一走这里（选择题 / 填空题共用），负责落盘、上色、出反馈条 */
+  function finishQuestion(ok, pickedIdx) {
+    const q = revQ;
+    if (!q || q.done) return;
+    q.done = true; q.picked = pickedIdx;
+    revApply(q.v, ok);                                     // 落盘熟练度/到期；不动「已掌握」
+    if (ok) revStat.ok++;
+    else { revStat.bad++; revStat.requeue++; revDeck.push(q.v); }   // 错题回炉：排到本轮末尾
+    const box = $('view-review');
+    box.querySelectorAll('.revopt').forEach((el, k) => {
+      el.disabled = true;
+      if (q.opts[k].ok) el.classList.add('right');
+      else if (k === pickedIdx) el.classList.add('wrong');
+      else el.classList.add('dim');
+    });
+    const inp = $('rev-input'); if (inp) inp.disabled = true;
+    const sub = $('rev-submit'); if (sub) sub.disabled = true;
+    const feed = $('revfeed');
+    if (!feed) return;
+    feed.hidden = false;
+    feed.className = 'revfeed ' + (ok ? 'ok' : 'bad');
+    const tip = q.answer ? `<span class="fa">${esc(q.answer)}</span>` : '';
+    feed.innerHTML = `<span class="fi">${icon(ok ? 'circle-check' : 'close', 'in')}</span>`
+      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}</span>`
+      + `<button class="fnext" id="rev-next">继续</button>`;
+    $('rev-next').onclick = () => { revI++; revQ = null; renderReview(); };
+    try { $('rev-next').focus(); } catch { /* ignore */ }
+    // 读音题答完顺手读一遍，把形和音钉在一起（静默，网页版可能被拦）
+    setTimeout(() => { if (revQ === q) q.play(true); }, 160);
+  }
+
+  function answerReview(i) {
+    const q = revQ;
+    if (!q || q.done || q.input) return;
+    const opt = q.opts[i];
+    if (!opt) return;
+    finishQuestion(!!opt.ok, i);
+  }
+  function submitTyped() {
+    const q = revQ;
+    if (!q || q.done || !q.input) return;
+    const el = $('rev-input');
+    if (!el) return;
+    finishQuestion(readingOk(el.value, q.v), -1);
+  }
+
+  // 网页版兼容：键盘 1234 选项、回车/空格继续（桌面浏览器也能用）
+  if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', (e) => {
+      const rv = $('view-review');
+      if (!rv || rv.hidden) return;
+      if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      if (e.key >= '1' && e.key <= '4') {
+        const b = rv.querySelector(`.revopt[data-i="${Number(e.key) - 1}"]`);
+        if (b && !b.disabled) { b.click(); }
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        const n = $('rev-next');
+        if (n) { e.preventDefault(); n.click(); }
+      }
+    });
   }
 
   function renderLearn() {
@@ -1052,39 +1418,69 @@ import { icon } from './icons.js?v=20261016i';
     const list = deckList();
     const pct = libN ? Math.round((known / libN) * 100) : 0;
     $('view-learn').innerHTML = `
-      <div class="sec-head">
-        <div>
-          <div class="sec-title">今天学哪些词</div>
-          <div class="sec-sub">已掌握 ${known} / ${libN} 词 · 这一批还有 ${list.length} 个</div>
-        </div>
+      <div class="sec-head learn-head">
+        <div class="serif learn-title">今日から、<span class="accent">${list.length}</span> つの言葉。</div>
+        <div class="learn-sub">已掌握 ${known} / ${libN} 词 · 进度 ${pct}%</div>
       </div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="filtrow">
-        <select class="sel" id="d-range">
-          <option value="all">全部范围</option><option value="c1">标日初级上（1-24课）</option>
-          <option value="c2">标日初级下（25-48课）</option><option value="c3">标日中级</option>
-          <option value="out">标日未收录</option><option value="n45">JLPT N5-N4</option><option value="n123">JLPT N3-N1</option>
-        </select>
-        <select class="sel" id="d-pos">
-          <option value="all">全部词性</option><option value="名詞">名词</option><option value="動詞">动词</option>
-          <option value="形容詞">形容词</option><option value="副詞">副词</option>
-        </select>
-        <select class="sel" id="d-sort">
-          <option value="easy">从易到难</option><option value="freq">最常见</option><option value="az">五十音 ↑</option><option value="azd">五十音 ↓</option>
-        </select>
-        <button class="toolbtn ${S.hideKnown !== false ? 'on' : ''}" id="d-hideknown">隐藏已掌握</button>
+      <div class="bar learn-bar"><i style="width:${pct}%"></i></div>
+      ${dueWords().length
+        ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">今天 ${dueWords().length} 个</span><button class="go" id="d-duego">开始 ›</button></div>`
+        : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收词 · 答错的重练</span></div>`}
+      <div class="learn-filters">
+        <div class="learn-filter-row">
+          <span class="filter-label">范围</span>
+          <div class="chips" id="d-range">
+            <button class="chip" data-v="all">全部</button><button class="chip" data-v="c1">初级上</button>
+            <button class="chip" data-v="c2">初级下</button><button class="chip" data-v="c3">中级</button>
+            <button class="chip" data-v="out">未收录</button><button class="chip" data-v="n45">N5-N4</button>
+            <button class="chip" data-v="n123">N3-N1</button>
+          </div>
+        </div>
+        <div class="learn-filter-row">
+          <span class="filter-label">词性</span>
+          <div class="chips" id="d-pos">
+            <button class="chip" data-v="all">全部</button><button class="chip" data-v="名詞">名词</button>
+            <button class="chip" data-v="動詞">动词</button><button class="chip" data-v="形容詞">形容词</button>
+            <button class="chip" data-v="副詞">副词</button>
+          </div>
+        </div>
+        <div class="learn-filter-row">
+          <span class="filter-label">排序</span>
+          <div class="chips" id="d-sort">
+            <button class="chip" data-v="easy">从易到难</button><button class="chip" data-v="freq">最常见</button>
+            <button class="chip" data-v="az">五十音 ↑</button><button class="chip" data-v="azd">五十音 ↓</button>
+          </div>
+        </div>
+        <div class="learn-filter-row">
+          <span class="filter-label">标签</span>
+          <div class="chips" id="d-tag">
+            <button class="chip" data-v="undone">未掌握</button><button class="chip" data-v="known">已掌握</button>
+            <button class="chip" data-v="star">${icon('star','in')}星标</button><button class="chip" data-v="err">错词</button>
+          </div>
+        </div>
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
       ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里没有可学的词'}</div>` : ''}
       ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个</button></div>` : ''}
 `;
-    $('d-range').value = S.dRange || 'all';
-    $('d-pos').value = S.dPos || 'all';
-    $('d-sort').value = S.dSort || 'easy';
-    $('d-range').onchange = (e) => { S.dRange = e.target.value; save(); deckCount = 30; renderLearn(); };
-    $('d-pos').onchange = (e) => { S.dPos = e.target.value; save(); deckCount = 30; renderLearn(); };
-    $('d-sort').onchange = (e) => { S.dSort = e.target.value; save(); renderLearn(); };
-    $('d-hideknown').onclick = (e) => { S.hideKnown = S.hideKnown === false; save(); e.target.classList.toggle('on', S.hideKnown !== false); renderLearn(); };
+    [['d-range','dRange'], ['d-pos','dPos'], ['d-sort','dSort']].forEach(([id, key]) => {
+      const host = $(id); if (!host) return;
+      const cur = S[key] || host.querySelector('.chip')?.dataset.v;
+      host.querySelectorAll('.chip').forEach((el) => {
+        const on = el.dataset.v === cur;
+        el.classList.toggle('on', on);
+        el.onclick = () => { S[key] = el.dataset.v; save(); if (key === 'dRange' || key === 'dPos') deckCount = 30; renderLearn(); };
+      });
+    });
+    const tagHost = $('d-tag');
+    if (tagHost) {
+      const curTag = S.dTag || 'undone';
+      tagHost.querySelectorAll('.chip').forEach((el) => {
+        el.classList.toggle('on', el.dataset.v === curTag);
+        el.onclick = () => { S.dTag = el.dataset.v; save(); deckCount = 30; forgetScroll('#/learn'); renderLearn(); };
+      });
+    }
+    if ($('d-duego')) $('d-duego').onclick = () => { startReview(REVIEW_N); go('#/review'); };
     if ($('d-more')) $('d-more').onclick = () => { deckCount += 30; renderLearn(); };
     wireWords($('view-learn'));
   }
@@ -1201,7 +1597,7 @@ import { icon } from './icons.js?v=20261016i';
   let RDL = new Map(), RDL_MAX = 1;   // 读音兜底表（内置曲目里出现过的词 → 罗马音/读音/词性）
   const SEG = ('Segmenter' in Intl) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
   /** 分词结果版本：1 = 旧（假名读音当表面形）· 2 = 修好同音撞车之后（改分词逻辑就 +1，老记录会自动重算） */
-  const SEG_V = 2;
+  const SEG_V = 3;      // 3: 词表补到 6604（+158 高频遗漏词）后强制重切，否则缓存的 segs 认不出新词
   function buildDict() {
     DICT = new Map();
     const put = (k, v, form) => { if (k && !DICT.has(k)) DICT.set(k, { v, form }); };
@@ -1514,14 +1910,19 @@ import { icon } from './icons.js?v=20261016i';
     if (!need.length) return;
     segBackfilling = true;
     let done = 0;
-    for (const rec of need.slice(0, 40)) {
-      try {
-        const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
-        rec.segs = segs; rec.segV = SEG_V;
-        const t = TRACK.get(rec.id);
-        if (t) { const nt = impTrack(rec); t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds; }
-        done++;
-      } catch { break; }        // 接口不可用就下次再说
+    // 一轮补 40 首、补完再起下一轮（原来只跑一次 40 首就收工，207 首要启动 5 次才补完）
+    while (need.length) {
+      const batch = need.splice(0, 40);
+      for (const rec of batch) {
+        try {
+          const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
+          rec.segs = segs; rec.segV = SEG_V;
+          const t = TRACK.get(rec.id);
+          if (t) { const nt = impTrack(rec); t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds; }
+          done++;
+        } catch { segBackfilling = false; save(); indexLibrary(); return; }   // 接口不可用就下次再说
+      }
+      save(); indexLibrary();     // 每 40 首落一次盘，中途退出也不丢
     }
     segBackfilling = false;
     if (!done) return;
@@ -1584,8 +1985,8 @@ import { icon } from './icons.js?v=20261016i';
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
-    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, a);
-    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, b);
+    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, clearedAt: 0 }, a);
+    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, clearedAt: 0 }, b);
     const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
     out.known = {};
     for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
@@ -1613,6 +2014,18 @@ import { icon } from './icons.js?v=20261016i';
       const v = n0(y.u) > n0(x.u) ? y : x;
       if (v && v.meaning && (n0(v.u) > out.clearedAt || !out.clearedAt)) out.notes[k] = v;
     }
+    out.star = {};                                     // 星标：和 known 同构（正=标了，负=取消）
+    for (const k of new Set([...Object.keys(A.star), ...Object.keys(B.star)])) {
+      const x = n0(A.star[k]), y = n0(B.star[k]);
+      const v = Math.abs(y) > Math.abs(x) ? y : x;
+      if (v && Math.abs(v) > out.clearedAt) out.star[k] = v;
+    }
+    out.rev = {};                                      // 复习档案：取「最后作答时间」更新的一条
+    for (const k of new Set([...Object.keys(A.rev), ...Object.keys(B.rev)])) {
+      const x = A.rev[k] || {}, y = B.rev[k] || {};
+      const v = n0(y.t) > n0(x.t) ? y : x;
+      if (v && (n0(v.s) > 0 || n0(v.e) > 0)) out.rev[k] = v;
+    }
     out.roma = {};                                     // 罗马音纠正：取时间戳更新的一条
     for (const k of new Set([...Object.keys(A.roma), ...Object.keys(B.roma)])) {
       const x = A.roma[k] || {}, y = B.roma[k] || {};
@@ -1632,7 +2045,7 @@ import { icon } from './icons.js?v=20261016i';
     return out;
   }
   const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {},
-    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, words: o.words || {}, clearedAt: n0(o.clearedAt) });
+    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, words: o.words || {}, star: o.star || {}, rev: o.rev || {}, clearedAt: n0(o.clearedAt) });
 
   /** 合并后多出来的导入曲目，挂进内存里的曲库 */
   function registerImpTracks() {
@@ -1670,7 +2083,7 @@ import { icon } from './icons.js?v=20261016i';
         await ensureReadings().catch(() => {});
         applying = true;
         S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
-        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing; S.roma = mergedAcc.roma;
+        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing; S.roma = mergedAcc.roma; S.star = mergedAcc.star; S.rev = mergedAcc.rev;
         S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();
@@ -2157,21 +2570,33 @@ import { icon } from './icons.js?v=20261016i';
   }
 
   function renderMine() {
-    const knownList = VOCAB.filter(isKnown);
+    // 复习不再看「已掌握」——这里的主语换成 星标 ∪ 错词，已掌握降级成一行统计
+    const starred = VOCAB.filter(isStar);
+    const errs = VOCAB.filter(inErrPool);
     const noted = VOCAB.filter((v) => S.notes[v.id] && S.notes[v.id].meaning);
+    const knownList = VOCAB.filter(isKnown);
+    const chip = (v, sup) => `<span class="chip" data-w="${v.id}">${esc(v.word)}${sup ? `<i class="sup">${sup}</i>` : ''}</span>`;
     $('view-mine').innerHTML = `
       <div class="sec-head">
-        <div><div class="sec-title">生词本</div><div class="sec-sub">已掌握 ${knownList.length} 词 · 改过释义 ${noted.length} 词</div></div>
+        <div><div class="sec-title">我的词</div><div class="sec-sub">星标 ${starred.length} 词 · 错词 ${errs.length} 词 · 改过释义 ${noted.length} 词</div></div>
         <button class="toolbtn" id="m-review">开始复习</button>
       </div>
-      ${knownList.length ? `<div class="chips">${knownList.slice(0, 200).map((v) => `<span class="chip" data-w="${v.id}">${esc(v.word)}</span>`).join('')}</div>` : ''}
-      ${knownList.length ? '' : emptyBox('还没有标过词', '', [['e-mlearn', '去学词'], ['e-mreview', '复习']])}
+      ${(!starred.length && !errs.length) ? emptyBox('还没有星标词', '点歌词里的 ★ 收词 · 复习先出现', [['e-mlearn', '去学词'], ['e-mreview', '看复习']]) : ''}
+      ${starred.length ? `<div class="sec-sub" style="margin:4px 0 6px">星标</div><div class="chips" data-group="star">${starred.slice(0, 300).map((v) => chip(v)).join('')}</div>` : ''}
+      ${errs.length ? `<div class="sec-sub" style="margin:16px 0 6px">错词</div><div class="chips" data-group="err">${errs.slice(0, 300).map((v) => chip(v, errOf(v))).join('')}</div>` : ''}
+      ${noted.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">改过释义</div>${noted.slice(0, 100).map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('')}` : ''}
       <div class="hair"></div>
-      ${noted.length ? noted.map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('') : '<div class="meta">还没有改过释义</div>'}`;
-    $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.w)));
+      <div class="mine-foot">已掌握 ${knownList.length} 词 · <button class="tlink tlink-ghost" id="m-known-go">看一眼 ›</button></div>`;
+    $('view-mine').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => {
+      const host = el.closest('[data-group]');
+      const ids = host ? [...host.querySelectorAll('[data-w]')].map((x) => Number(x.dataset.w)) : [];
+      if (ids.indexOf(Number(el.dataset.w)) >= 0) setWordNav(ids, '#/mine');
+      go('#/word/' + el.dataset.w);
+    }));
     if ($('e-mlearn')) $('e-mlearn').onclick = () => go('#/learn');
     if ($('e-mreview')) $('e-mreview').onclick = () => go('#/review');
-    if ($('m-review')) $('m-review').onclick = () => { startReview(20); go('#/review'); };
+    if ($('m-known-go')) $('m-known-go').onclick = () => { S.dTag = 'known'; save(); go('#/learn'); };
+    if ($('m-review')) $('m-review').onclick = () => { startReview(REVIEW_N); go('#/review'); };
   }
 
   // ── 分享码：只带「歌单/专辑/单曲的来源」，对方导入时重新解析 ──
@@ -2278,6 +2703,10 @@ import { icon } from './icons.js?v=20261016i';
       ${IS_NATIVE ? `<div class="sect">发音</div>
       <div class="setrow"><div class="k">离线语音包</div><button class="toolbtn" id="tts-packs">语音包</button></div>
       <div class="setrow"><div class="k">试听</div><button class="toolbtn" id="tts-test">发音</button></div>` : ''}
+      <div class="sect">复习方式</div>
+      <div class="meta" style="margin:-4px 0 4px">复习按勾选的方式出题（至少留一种）</div>
+      ${REV_MODES.map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
+        <button class="toolbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
       <div class="sect">同步</div>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">立即同步</button>
@@ -2321,6 +2750,13 @@ import { icon } from './icons.js?v=20261016i';
     if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
     if (accPwDo) accPwDo.onclick = () => changePass();
     $('view-me').querySelectorAll('#me-theme button').forEach((el) => (el.onclick = () => { S.theme = el.dataset.v; save(); applyTheme(); renderMe(); }));
+    $('view-me').querySelectorAll('[data-revmode]').forEach((el) => (el.onclick = () => {
+      const k = el.dataset.revmode;
+      const m = revModes();
+      m[k] = !m[k];
+      if (!REV_MODES.some(([x]) => m[x])) { toast('至少留一种复习方式'); return; }
+      S.revModes = m; save(); renderMe();
+    }));
     if ($('me-tsort')) $('me-tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderMe(); };
     const disp = (key, id) => { const el = $(id); if (el) el.onclick = () => { S[key] = S[key] === false; save(); applyDisplay(); renderMe(); }; };
     disp('ruby', 'me-ruby'); disp('zh', 'me-zh'); disp('gloss', 'me-gloss');
@@ -2343,10 +2779,10 @@ import { icon } from './icons.js?v=20261016i';
     };
     $('m-import').onclick = () => {
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json';
-      inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
+      inp.onchange = () => { const f = inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { try { S = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, rate: 1 }, JSON.parse(String(fr.result))); save(); location.reload(); } catch { alert('读不了这个文件'); } }; fr.readAsText(f); };
       inp.click();
     };
-    if ($('m-clear')) $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清')) return; S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.clearedAt = Date.now(); save(); renderMe(); };
+    if ($('m-clear')) $('m-clear').onclick = () => { if (!confirm('清空进度？云端也会一起清')) return; S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.star = {}; S.rev = {}; S.clearedAt = Date.now(); save(); renderMe(); };
     const shStat = $('sh-stat');
     if ($('sh-gen')) $('sh-gen').onclick = async () => {
       const code = shareCode();
@@ -2389,14 +2825,19 @@ import { icon } from './icons.js?v=20261016i';
       let st = null;
       try { st = await voicePack.status(p.id); } catch { st = null; }
       const installed = !!(st && st.installed);
+      // 已装但版本落后 → 给「更新」入口（以前只判断装没装，1.0 永远看不到 1.1）
+      const oldVer = installed ? String(st.version || '') : '';
+      const canUpd = installed && oldVer && String(p.version) !== oldVer;
       rows.push(`<div class="item" data-pack="${esc(p.id)}">
         <div class="col"><div class="l1">${esc(p.name)}</div>
-          <div class="l2">${installed ? '已安装' : fmtSize(p.size)}</div>
+          <div class="l2">${installed ? (canUpd ? `已安装 ${esc(oldVer)} · 可更新 ${esc(p.version)}（${fmtSize(p.size)}）` : '已安装') : fmtSize(p.size)}</div>
           <div class="bar" id="vp-bar-${esc(p.id)}" hidden><i style="width:0"></i></div></div>
         <div class="row" style="flex:0 0 auto">
-          ${installed
-            ? `<button class="toolbtn" data-test="${esc(p.id)}">试听</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
-            : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载</button>`}
+          ${canUpd
+            ? `<button class="toolbtn on" data-dl="${esc(p.id)}">更新</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
+            : installed
+              ? `<button class="toolbtn" data-test="${esc(p.id)}">试听</button><button class="toolbtn" data-rm="${esc(p.id)}">删除</button>`
+              : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载</button>`}
         </div></div>`);
     }
     box.innerHTML = rows.join('');
@@ -2456,24 +2897,34 @@ import { icon } from './icons.js?v=20261016i';
   function showWord(id) {
     const v = VBYID.get(Number(id));
     if (!v) { go('#/learn'); return; }
-    const order = deckList();
-    const at = order.findIndex((x) => x.id === v.id);
-    const prev = at > 0 ? order[at - 1] : null, next = at >= 0 && at < order.length - 1 ? order[at + 1] : null;
+    // 翻页上下文在「进入详情」那一刻定格，之后不随筛选/标记变化。
+    // 以前是每次重渲染都拿 deckList() 现算 —— 一标「已掌握」，这个词被隐藏筛选剔掉，
+    // at 变 -1，上下两个按钮就凭空消失了（用户反馈的就是这个）。
+    const nav = wordNavFor(v.id);
+    const at = nav.ids.indexOf(v.id);
+    const prevId = at > 0 ? nav.ids[at - 1] : null;
+    const nextId = (at >= 0 && at < nav.ids.length - 1) ? nav.ids[at + 1] : null;
+    const prev = prevId != null ? VBYID.get(prevId) : null;
+    const next = nextId != null ? VBYID.get(nextId) : null;
     const forms = Object.entries(v.forms || {}).filter(([f]) => f !== v.word).slice(0, 8);
     const exs = examplesFor(v, 6);
+    const starred = isStar(v);
     $('view-word').innerHTML = `
       <div class="row" style="margin-bottom:14px">
         <button class="toolbtn" id="w-back">${icon('chevron-left','in')}返回</button>
-        ${prev ? `<button class="toolbtn" data-go-word="${prev.id}">${icon('chevron-left','in')}${esc(prev.word)}</button>` : ''}
-        ${next ? `<button class="toolbtn" data-go-word="${next.id}">${esc(next.word)}${icon('chevron-right','in')}</button>` : ''}
+        <button class="toolbtn" data-go-word="${prev ? prev.id : ''}"${prev ? '' : ' disabled'}>${icon('chevron-left','in')}${prev ? esc(prev.word) : '到头了'}</button>
+        <button class="toolbtn" data-go-word="${next ? next.id : ''}"${next ? '' : ' disabled'}>${next ? esc(next.word) : '到头了'}${icon('chevron-right','in')}</button>
       </div>
-      <div class="sec-title" style="font-size:30px">${esc(v.word)}</div>
+      <div class="whead">
+        <div class="sec-title" style="font-size:30px">${esc(v.word)}</div>
+        <button class="star big${starred ? ' on' : ''}" id="w-star" title="${starred ? '取消星标' : '星标'}" aria-label="星标">${icon(starred ? 'star-fill' : 'star','in')}</button>
+      </div>
       <div class="sec-sub" style="font-size:13px;color:var(--ink2)">${esc(v.reading)} · ${esc(v.romaji)} · ${POSNAME[posKind(v)]} · ${esc(levelName(v))}${v.brZh ? ' · 教材释义：' + esc(v.brZh) : ''}</div>
       <div class="bar" style="margin:14px 0 0"><i style="width:${level(v) * 20}%"></i></div>
       <div style="font-size:17px;margin-top:14px;color:#ffe9df" id="w-mean">${esc(meaningOf(v) || '（还没有释义）')}</div>
       <div class="row" style="margin-top:14px">
         <button class="btn-primary" id="w-play">${icon('volume','in')}发音</button>
-        <button class="toolbtn ${isKnown(v) ? 'on' : ''}" id="w-known">${isKnown(v) ? '已掌握' : '标为已掌握'}</button>
+        <button class="toolbtn${isKnown(v) ? ' on' : ''}" id="w-known">${isKnown(v) ? '已掌握' : '标为已掌握'}</button>
         <button class="toolbtn" id="w-edit">改释义</button>
       </div>
       <div class="row" id="w-editrow" style="display:none;margin-top:10px">
@@ -2484,10 +2935,28 @@ import { icon } from './icons.js?v=20261016i';
       <div class="hair"></div>
       <div class="sec-sub" style="margin-bottom:6px">它出现在这些句子里</div>
       <div class="list">${exs.length ? exs.map(exRowHtml).join('') : '<div class="meta">曲库里还没有这个词的例句</div>'}</div>`;
-    $('w-back').onclick = () => goBack('#/learn');
-    $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => go('#/word/' + el.dataset.goWord)));
+    $('w-back').onclick = () => leaveWord();                       // 回「来源页」，不是 history.back()（那是上一个词）
+    $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => {
+      if (el.disabled || !el.dataset.goWord) return;
+      gotoWord(el.dataset.goWord);                                 // 翻页用 replaceState：详情页只占一条历史
+    }));
     $('w-play').onclick = () => speak(v.reading || v.word);
-    $('w-known').onclick = () => { toggleKnown(v); showWord(v.id); };
+    $('w-star').onclick = () => {
+      const on = !isStar(v);
+      toggleStar(v);
+      const b = $('w-star');
+      b.classList.toggle('on', on);
+      b.innerHTML = icon(isStar(v) ? 'star-fill' : 'star', 'in');
+      b.title = isStar(v) ? '取消星标' : '星标';
+      if (on) toast('已收进星标 · 复习时它会出现');
+    };
+    // 原地改，不重渲染 —— 重渲染就是上面那个 bug 的来源
+    $('w-known').onclick = () => {
+      toggleKnown(v);
+      const b = $('w-known');
+      b.classList.toggle('on', isKnown(v));
+      b.textContent = isKnown(v) ? '已掌握' : '标为已掌握';
+    };
     $('w-edit').onclick = () => { const r = $('w-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; $('w-editinput').focus(); };
     const saveMean = () => { S.notes[v.id] = Object.assign({}, S.notes[v.id], { meaning: $('w-editinput').value.trim(), u: Date.now() }); save(); showWord(v.id); };
     $('w-save').onclick = saveMean;
@@ -2656,17 +3125,14 @@ import { icon } from './icons.js?v=20261016i';
         const blk = e.target.closest('.lblock[data-i]');
         const li = blk ? Number(blk.dataset.i) : null;
         const cur = curLineIdx();
-        // 词只认「当前这一句」：点别的句里的词 = 先切到那一句，不弹词条（用户要求：
-        // 想查别的句的词，先把那句切过来）
-        if (li != null && cur >= 0 && li !== Number(cur)) {
-          playFrom(li);
+        // 只有「当前句」里的词能点开词条。
+        // 点别的句、或者还没有当前句（没播 / 没时间轴）→ 一律跳转播放那一句，不弹词条（用户要求）。
+        if (li != null && (cur < 0 || li !== Number(cur))) {
+          playFrom(li, false);                 // 切句 + 播放；forceLoop=false 不动模式
           toast('已切到这一句 · 再点词看释义');
-          return;
+          return;                              // ← 关键：直接结束，不开抽屉
         }
-        // 还没有「当前句」（歌没在放 / 音源没准备好）：这一下先把这一句定成当前句，再开词条。
-        // 不然一暂停就退回「随便点哪句的词都弹」——用户要的是「词只对当前句可选」。
-        if (li != null && cur < 0) { activeLine = li; highlight(false); }
-        // 同一句里点别的词 = 直接切过去看那个词（查词顺手）；要关就点抽屉外、下拉、或 ✕
+        // 当前句的词 → 开词条；showPop 里会暂停播放（续播交给收起抽屉）
         const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
         showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '', li,
           ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
@@ -2676,20 +3142,26 @@ import { icon } from './icons.js?v=20261016i';
       if (!b) return;
       const i = Number(b.dataset.i);
       const now = Date.now();
-      if (now - lastTap < 360 && lastTapIdx === i) { lastTap = 0; setLoop(i); toast('单句循环'); return; }   // 双击 → 切到单句循环
+      if (now - lastTap < DBL_MS && lastTapIdx === i) {          // 双击 → 切到单句循环
+        lastTap = 0; clearTimeout(tapScrollT); tapScrollT = null;
+        setLoop(i); toast('单句循环'); return;
+      }
       lastTap = now; lastTapIdx = i;
       playFrom(i);
     });
-    host.addEventListener('dblclick', (e) => {           // 桌面端双击
+    host.addEventListener('dblclick', (e) => {           // 原生双击（安卓 WebView 会直接给这个）
       const b = e.target.closest('.lblock[data-i]');
-      if (b && !e.target.closest('.w')) setLoop(Number(b.dataset.i));
+      if (b && !e.target.closest('.w')) {
+        clearTimeout(tapScrollT); tapScrollT = null;
+        setLoop(Number(b.dataset.i)); toast('单句循环');
+      }
     });
     host.addEventListener('contextmenu', (e) => { const b = e.target.closest('.lblock[data-i]'); if (b) { e.preventDefault(); setLoop(Number(b.dataset.i)); } });
     host.addEventListener('touchstart', (e) => {
       const b = e.target.closest('.lblock[data-i]');
       if (!b || e.target.closest('.w')) return;
       clearTimeout(pressTimer);
-      pressTimer = setTimeout(() => setLoop(Number(b.dataset.i)), 520);      // 长按 = 单句循环
+      pressTimer = setTimeout(() => { setLoop(Number(b.dataset.i)); toast('单句循环'); }, 420);   // 长按 = 单句循环
     }, { passive: true });
     host.addEventListener('touchend', () => clearTimeout(pressTimer));
     host.addEventListener('touchmove', () => clearTimeout(pressTimer));
@@ -2714,20 +3186,22 @@ import { icon } from './icons.js?v=20261016i';
     S.lastTrack = t.id; save();
     const zhN = t.lines.filter((l) => l.zh).length;
     $('view-track').innerHTML = `
-      <div class="row" style="margin-bottom:12px"><button class="toolbtn" id="b-back">${icon('chevron-left','in')}返回</button></div>
-      <div class="item" style="border:0;padding:0 0 12px;cursor:default">
-        ${t.coverFile ? `<img class="cover big" src="data/${t.coverFile}" alt="">`
-          : (t.coverUrl ? `<img class="cover big" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover big"></div>')}
-        <div class="col">
-          <div class="l1" style="font-size:17px">${esc(t.title)}</div>
-          <div class="l2">${esc(t.artist)} · ${esc(t.album)}</div>
-          <div class="l3">${t.imp ? `来自歌单：${esc(t.plName || '导入')}` : `原曲：${esc(t.base)}`} · ${t.lineCount} 行${zhN ? ` · 中文 ${zhN}` : ''}</div>
+      <div class="track-head">
+        <div class="track-back"><button id="b-back" class="tlink tlink-ghost">‹ ${icon('chevron-left','in')}返回</button></div>
+        <div class="track-meta">
+          ${t.coverFile ? `<img class="cover xl" src="data/${t.coverFile}" alt="">`
+            : (t.coverUrl ? `<img class="cover xl" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover xl"></div>')}
+          <div class="col">
+            <div class="track-title serif">${esc(t.title)}</div>
+            <div class="track-artist">${esc(t.artist)}${t.album ? ' · ' + esc(t.album) : ''}</div>
+            <div class="track-base">${t.imp ? `来自歌单：${esc(t.plName || '导入')}` : `原曲：${esc(t.base || '—')}`} · ${t.lineCount} 行${zhN ? ' · 中文 ' + zhN : ''}</div>
+          </div>
         </div>
-      </div>
-      <div class="row" style="margin:2px 0 10px">
-        <button class="btn-primary" id="t-sing">${icon('play','in')}进入跟唱</button>
-        <button class="toolbtn ${isFav(t.id) ? 'on' : ''}" id="t-fav">${isFav(t.id) ? icon('heart-fill','in') + '已收藏' : icon('heart','in') + '收藏'}</button>
-        <button class="toolbtn ${isSing(t.id) ? 'on' : ''}" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
+        <div class="track-actions">
+          <button class="tlink" id="t-sing">▶ 进入跟唱</button>
+          <button class="tlink-ghost tlink" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
+          <button class="tlink-ghost tlink" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
+        </div>
       </div>
       <div id="t-vocab-pane">
         <div class="chips" id="twchips">
@@ -2748,7 +3222,7 @@ import { icon } from './icons.js?v=20261016i';
     $('t-mark').onclick = () => { toggleMark('sing', t.id); showTrack(t.id); };
     renderTrackWords();
     $('twchips').querySelectorAll('.chip').forEach((el) => (el.onclick = () => { twFilter = el.dataset.f; $('twchips').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === el)); renderTrackWords(); }));
-    $('b-back').onclick = () => goBack('#/songs');
+    $('b-back').onclick = () => leaveDetailPage('#/songs');
     $('p-title').textContent = t.title; $('p-artist').textContent = t.artist + ' · ' + t.album;
     const pc = $('p-cover');                             // 全屏页头部也给一张封面，别只有一行字
     if (pc) {
@@ -2840,55 +3314,81 @@ import { icon } from './icons.js?v=20261016i';
     popFallback = fallback || null;
     popSeg = seg || null;
     popPos = (seg && seg.li != null && seg.ti != null && curTrack) ? { tid: curTrack.id, li: seg.li, ti: seg.ti } : null;
-    const on = (id) => { const el = $(id); if (el) el.style.display = ''; };
+    $('pop').classList.remove('expanded');                 // 每次打开都回到一阶段
+    closeRomaEditor();                                     // 编辑器别残留
+    const row = $('p-editrow'); if (row) row.hidden = true;
+
     if (!w) {
-      popWord = null;                                   // 必须清掉：否则补释义会写到上一个查过的词上
+      popWord = null;                                      // 必须清掉：否则补释义会写到上一个查过的词上
       const rd = (seg && seg.r) ? norm(seg.r) : '';
       const mine = userWord(seg, fallback);
       $('p-word').textContent = fallback || '';
       $('p-reading').textContent = rd ? '（' + rd + '）' : '';
       $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || (seg && seg.y) || '';
       $('p-meaning').textContent = (mine && mine.m) || '暂无释义';
-      $('p-ex').innerHTML = '';
       $('p-meta').textContent = [POSNAME[seg && seg.k], mine ? '自补释义' : ''].filter(Boolean).join(' · ');
       $('p-known').style.display = 'none';
-      $('p-detail').style.display = 'none'; $('p-lines').style.display = 'none';
-      $('p-edit').style.display = '';                       // 允许补一条释义（存本机 + 跟账号同步）
-      $('p-edit').textContent = (mine && mine.m) ? '改释义' : '补一条释义';
-      if ($('p-morebox')) $('p-morebox').hidden = false;     // 「补一条释义」在更多里，别藏起来
-      if ($('p-more')) $('p-more').style.display = 'none';
+      if ($('p-star')) $('p-star').style.display = 'none';          // 自补的词没有 id，挂不上星标
+      const sp = $('p-speak'); if (sp) sp.style.display = 'none';   // 没收录的词没有标准读音可发
+      if ($('p-edit')) $('p-edit').textContent = (mine && mine.m) ? '改释义' : '补一条释义';
+      $('p-exlist').innerHTML = '<div class="mt">这个词是自补的，暂时没有例句</div>';
       bindPreviewRows($('pop'));
-      $('pop').classList.add('on'); return;
+      $('pop').classList.add('on');
+      return;
     }
+
     popWord = w;
-    ['p-known', 'p-detail', 'p-lines', 'p-edit'].forEach(on);
-    if ($('p-morebox')) $('p-morebox').hidden = true;
+    $('p-known').style.display = '';
+    const sp = $('p-speak'); if (sp) sp.style.display = '';
     $('p-word').textContent = w.word;
     $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
     $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || w.romaji || '';
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
-    const ex = examplesFor(w, 1)[0];
-    $('p-ex').innerHTML = ex ? exRowHtml(ex) : '';
+    $('p-known').classList.toggle('on', !!isKnown(w));
+    $('p-known').title = isKnown(w) ? '取消已掌握' : '标为已掌握';
+    if ($('p-star')) {
+      $('p-star').style.display = '';
+      $('p-star').classList.toggle('on', isStar(w));
+      $('p-star').title = isStar(w) ? '取消星标' : '星标';
+      $('p-star').innerHTML = icon(isStar(w) ? 'star-fill' : 'star', 'in');
+    }
+    if ($('p-edit')) $('p-edit').textContent = '改释义';
     const st = libStat(w);
     $('p-meta').textContent = [POSNAME[posKind(w)], levelName(w), st ? `${st.tracks.size} 首歌 / ${st.n} 次` : ''].filter(Boolean).join(' · ');
-    $('p-known').textContent = isKnown(w) ? '取消已掌握' : '标为已掌握';
-    if ($('p-edit')) $('p-edit').textContent = '改释义';
-    if ($('p-more')) $('p-more').style.display = '';
-    $('p-editrow').style.display = 'none';
+    renderPopExamples();                                   // 「出现的句子」直接铺出来，不再藏在按钮后面
     bindPreviewRows($('pop'));
     $('pop').classList.add('on');
+  }
+  /** 例句区块：正在听这首里的 + 其它曲目里的 */
+  function renderPopExamples() {
+    const box = $('p-exlist'); if (!box) return;
+    const head = (text) => `<div class="mt">${text}</div>`;
+    const here = (popWord && curTrack)
+      ? curTrack.lines.map((l, i) => ({ l, i })).filter((x) => (x.l.segs || []).some((s) => s.w && s.b === popWord.word)).slice(0, 3)
+      : [];
+    const others = popWord ? examplesFor(popWord, 5).filter((x) => !x.now) : [];
+    box.innerHTML =
+      (here.length ? head('正在听的这首里') + `<div class="list">${here.map((x) => exRowHtml({ jp: x.l.text, zh: x.l.zh, track: '', tid: curTrack.id, li: x.i, now: true })).join('')}</div>` : '')
+      + (others.length ? head('其它曲目里') + `<div class="list">${others.map(exRowHtml).join('')}</div>` : '')
+      + ((!here.length && !others.length) ? '<div class="mt">曲库里还没有这个词的例句</div>' : '');
   }
   /** 关弹层：顺手收起罗马音编辑器；抽屉弹出时暂停的播放，在这里续上 */
   const hidePop = (keepPaused) => {
     const skip = keepPaused === true;               // ⚠️ 会被当 onclick 用，参数可能是 MouseEvent，必须判 === true
     pvStop(false);
-    const b = $('p-exlist'); if (b) { b.innerHTML = ''; b.dataset.on = '0'; }
+    const b = $('p-exlist'); if (b) b.innerHTML = '';
     closeRomaEditor();
-    $('pop').classList.remove('on');
+    $('pop').classList.remove('on', 'expanded');
     // 抽屉弹出时暂停的播放，收起时续上；整首已经播完就不用再起播了
     if (!skip && popWasPlaying && !audio.ended && curTrack) playTrack(curTrack);
     popWasPlaying = false;
   };
+  // 真机/CDP 与自动化测试钩子：直接按词打开词条抽屉（省得依赖音频真的在播）
+  if (typeof window !== 'undefined') window.__tlPop = (x) => {
+    const v = (x && typeof x === 'object') ? x : VBYID.get(Number(x));
+    if (v) showPop(v, null, null);
+  };
+
   function closeRomaEditor() {
     const box = $('p-romabox'); if (box) box.hidden = true;
     romaCtx = null;
@@ -2904,18 +3404,71 @@ import { icon } from './icons.js?v=20261016i';
   function show(which) {
     try { pvStop(); } catch {}
     const avd = $('avdrop'); if (avd) avd.hidden = true;
-    // 首页已经自带次级入口了，全局 tab 行在首页收起来（别让两排入口抢注意力）
     if ($('tabs')) $('tabs').hidden = (which === 'view-home');
-    // 音频配置不再挂在每个页面底部：只在生词本（设置）和单曲页出现
     const slot = $('srcslot');
-    if (slot) slot.hidden = !(which === 'view-me' || which === 'view-track');   // ⚠️ 别挪进 view：render* 会用 innerHTML 把它冲掉
+    if (slot) slot.hidden = !(which === 'view-me' || which === 'view-track');
     VIEWS.forEach((v) => { const el = $(v); if (el) el.hidden = v !== which; });
     const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine', 'view-me': 'tab-me', 'view-admin': 'tab-me' };
     ['tab-learn', 'tab-songs', 'tab-mine', 'tab-me'].forEach((t) => { const el = $(t); if (el) el.classList.toggle('on', map[which] === t); });
     window.scrollTo(0, 0);
   }
-  const go = (h) => { if (String(h || '') !== location.hash) armAllowLeave(); location.hash = h; };        // 自己点的导航不算误触
+  const go = (h) => {
+    if (String(h || '') !== location.hash) { armAllowLeave(); rememberScroll(location.hash); }
+    // 从列表页第一次进详情：记一笔，返回时才知道「历史里那条就是来源页」
+    if (/^#\/(word|track)\//.test(String(h)) && !/^#\/(word|track)\//.test(location.hash || '')) detailPushed = true;
+    location.hash = h;
+  };                                        // 自己点的导航不算误触
   const goBack = (fallback) => { armAllowLeave(); if (history.length > 1) history.back(); else go(fallback); };
+
+  // ── 详情页的翻页上下文（进入时定格）──
+  // 以前 showWord() 每次都拿 deckList() 现算上下词：一标「已掌握」，当前词被隐藏筛选剔掉，
+  // at 变 -1 → 两个按钮凭空消失。现在改成「进详情那一刻拍一张快照」，之后不再重算。
+  let wordNav = null, detailPushed = false;
+  function wordNavFor(id) {
+    if (wordNav && wordNav.ids.indexOf(Number(id)) >= 0) return wordNav;   // 已定格且含当前词 → 沿用
+    const list = deckList();
+    wordNav = { ids: list.map((x) => x.id), from: lastMainHash || '#/learn', scroll: 0 };
+    return wordNav;
+  }
+  /** 有的来源页不是 deckList（搜索结果 / 我的词分组），由调用方显式定格 */
+  const setWordNav = (ids, from) => { wordNav = { ids: (ids || []).map(Number), from: from || lastMainHash || '#/learn', scroll: 0 }; };
+
+  /** 详情页内翻词：replaceState —— 详情页在历史里永远只占一条，翻 10 个词也不会堆 10 条 */
+  const gotoWord = (id) => {
+    const h = '#/word/' + id;
+    if (String(location.hash) === h) return;
+    try { history.replaceState(null, '', h); } catch { /* 极端情况下退回改 hash */ location.hash = h; return; }
+    show('view-word'); showWord(id);                                       // replaceState 不触发 hashchange，手动渲染
+  };
+
+  /** 详情页返回：回「进来时的那个页面」，而不是 history.back()（那会退回上一个词） */
+  function leaveDetailPage(fallback) {
+    const from = (wordNav && wordNav.from) || lastMainHash || fallback || '#/home';
+    wordNav = null;
+    // 从列表点进来的：历史里那一条就是来源页（翻页没堆历史），back 一下最干净
+    if (detailPushed) { detailPushed = false; armAllowLeave(); history.back(); return; }
+    go(from);
+  }
+  const leaveWord = () => leaveDetailPage('#/learn');
+
+  // ── 滚动记忆：从列表进详情、再返回时回到原来的位置 ──
+  // 注意：详情/搜索/复习这些页面不记（它们每次进来都该从头开始）
+  const scrollMem = new Map();
+  const NO_SCROLL_MEM = /^#\/(word|track|search|review|admin|voicepack)/;
+  function rememberScroll(h) {
+    const k = h || location.hash || '#/home';
+    if (NO_SCROLL_MEM.test(k)) return;
+    try { scrollMem.set(k, window.scrollY || 0); } catch { /* 隐私模式下可能读不到 */ }
+  }
+  function restoreScroll(h) {
+    const k = h || location.hash || '#/home';
+    if (!scrollMem.has(k)) return;
+    const y = scrollMem.get(k);
+    const put = () => { try { window.scrollTo(0, y); } catch { /* 忽略 */ } };
+    requestAnimationFrame(put);
+    setTimeout(put, 90);
+  }
+  const forgetScroll = (h) => { scrollMem.delete(h || location.hash); };
 
   // ── 返回：能回上一页就直接回；只有回不到上一页（会退出 App）才问一句 ──
   // 路由是 hash：#/track/... → 主 tab 时直接回；全屏播放器开着时返回手势只收播放器。
@@ -2936,11 +3489,8 @@ import { icon } from './icons.js?v=20261016i';
     });
   }
 
-  /** 详情页返回：优先按历史退回列表，没历史就回最近的主 tab */
-  function leaveDetail() {
-    const fallback = lastMainHash || '#/home';
-    if (history.length > 1) goBack(fallback); else go(fallback);
-  }
+  /** 详情页返回：回进来时那个页面（wordNav.from / lastMainHash） */
+  function leaveDetail() { leaveDetailPage(lastMainHash || '#/home'); }
 
   // 原生 BACK 键/侧滑返回：MainActivity 把事件交给这里，网页决定怎么退（不然原生壳直接 finish 到桌面）
   window.__tlOnBackPressed = () => {
@@ -3009,7 +3559,13 @@ import { icon } from './icons.js?v=20261016i';
     document.addEventListener('touchcancel', end, { passive: true });
   })();
 
+  let prevHash = '';
   function route() {
+    const curHash = location.hash || '#/home';
+    if (prevHash && prevHash !== curHash) rememberScroll(prevHash);   // 记住「刚离开的那一页」的滚动位置
+    prevHash = curHash;
+    if (!/^#\/word\//.test(curHash)) wordNav = null;                  // 离开详情：丢掉定格，下次进入重新快照
+    setTimeout(() => restoreScroll(curHash), 0);                       // 渲染是同步的，下一轮再恢复滚动
     const raw = decodeURIComponent(String(location.hash || '').replace(/^#\/?/, ''));
     const [path, at] = raw.split('@');
     const parts = path.split('/');
@@ -3020,7 +3576,7 @@ import { icon } from './icons.js?v=20261016i';
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
     if (v === 'search') { show('view-search'); $('searchwrap').classList.add('on'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
     if (v === 'home') { show('view-home'); return renderHome(); }
-    if (v === 'review') { show('view-review'); return renderReview(); }
+    if (v === 'review') { show('view-review'); if (revDeck.length && revI >= revDeck.length) startReview(REVIEW_N); return renderReview(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
     if (v === 'mine') { show('view-mine'); return renderMine(); }
     if (v === 'me') { show('view-me'); return renderMe(); }
@@ -3065,7 +3621,7 @@ import { icon } from './icons.js?v=20261016i';
       const t = impTrack(rec); data.tracks.push(t); TRACK.set(t.id, t);
     }
     indexLibrary();
-    const hs = $('headstat'); if (hs) hs.textContent = `${IDX.tracks.length} 首 · ${LIBW.size} 词`;
+    updateHeadStat();
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     if ($('brand')) $('brand').onclick = () => go('#/home');
@@ -3119,14 +3675,31 @@ import { icon } from './icons.js?v=20261016i';
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
-    if ($('p-speak')) $('p-speak').innerHTML = icon('volume', 'in') + '发音';
+    if ($('p-speak')) $('p-speak').innerHTML = icon('volume');   // 圆图标里只放图标（以前把「发音」两个字也塞进来 → 喇叭下面挂字）
     $('p-speak').onclick = () => speak((popWord && (popWord.reading || popWord.word)) || (popSeg && popSeg.r) || popFallback);
     $('p-close2').onclick = hidePop;
-    $('p-detail').onclick = () => { if (popWord) { const id = popWord.id; hidePop(); go('#/word/' + id); } };
+    // 底部「上拉看更多」：点一下展开到 75%；展开态再点标题栏区域可收回
+    // 点释义就地改；点罗马音就地改 —— 取代原来那排「改释义 / 罗马音」链接
+    const mg = $('p-meaning');
+    if (mg) mg.onclick = () => { const e = $('p-edit'); if (e) e.onclick(); };
+    const rj = $('p-romaji');
+    if (rj) rj.onclick = () => { const e = $('p-roma'); if (e) e.onclick(); };
+
+    const expandBtn = $('p-expand');
+    if (expandBtn) expandBtn.onclick = () => {
+      const sh = $('pop'); if (!sh) return;
+      sh.classList.add('expanded');
+      const b = $('p-body'); if (b) b.scrollTop = 0;
+    };
+    // 把手点一下 = 收起回一阶段（再点一下不会关抽屉，关闭走「更多」里的关闭或下拉）
+    const grab = document.querySelector('#pop .grab');
+    if (grab) grab.onclick = () => $('pop').classList.remove('expanded');
     $('p-edit').onclick = () => {
       if (!popWord) return;
-      const r = $('p-editrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none';
-      $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus();
+      const r = $('p-editrow');
+      const opening = r.hidden;
+      r.hidden = !opening;
+      if (opening) { $('p-editinput').value = meaningOf(popWord); $('p-editinput').focus(); }
     };
     $('p-editinput').onkeydown = (e) => {
       if (e.key !== 'Enter') return;
@@ -3141,7 +3714,16 @@ import { icon } from './icons.js?v=20261016i';
       }
     };
     $('p-known').onclick = () => { if (!popWord) return; toggleKnown(popWord); showPop(popWord); if (curTrack) renderLyrics($('plyric'), curTrack); };
-    $('p-more').onclick = () => { const b = $('p-morebox'); if (b) b.hidden = !b.hidden; };
+    if ($('p-star')) $('p-star').onclick = () => {
+      if (!popWord) return;
+      const on = !isStar(popWord);
+      toggleStar(popWord);
+      const b = $('p-star');
+      b.classList.toggle('on', on);
+      b.innerHTML = icon(isStar(popWord) ? 'star-fill' : 'star', 'in');
+      b.title = isStar(popWord) ? '取消星标' : '星标';
+      if (on) toast('已收进星标 · 复习时它会出现');
+    };
     // ── 罗马音纠正：打开时暂停播放，保存/关闭后继续 ──
     const romaTarget = () => {
       if (!popPos) return null;
@@ -3176,20 +3758,6 @@ import { icon } from './icons.js?v=20261016i';
     $('p-romasave').onclick = () => saveRoma(false);
     $('p-romareset').onclick = () => saveRoma(true);
     $('p-romainput').onkeydown = (e) => { if (e.key === 'Enter') saveRoma(false); };
-    $('p-lines').onclick = () => {
-      if (!popWord) return;
-      const box = $('p-exlist');
-      if (!box) return;
-      if (box.dataset.on === '1') { box.innerHTML = ''; box.dataset.on = '0'; return; }
-      const here = curTrack ? curTrack.lines.map((l, i) => ({ l, i })).filter((x) => (x.l.segs || []).some((s) => s.w && s.b === popWord.word)).slice(0, 3) : [];
-      const others = examplesFor(popWord, 5).filter((x) => !x.now);
-      box.dataset.on = '1';
-      box.innerHTML =
-        (here.length ? `<div class="mt">正在听的这首里</div><div class="list">${here.map((x) => exRowHtml({ jp: x.l.text, zh: x.l.zh, track: '', tid: curTrack.id, li: x.i, now: true })).join('')}</div>` : '')
-        + (others.length ? `<div class="mt">其它曲目里</div><div class="list">${others.map(exRowHtml).join('')}</div>` : '')
-        + ((!here.length && !others.length) ? '<div class="mt">曲库里还没有这个词的例句</div>' : '');
-      bindPreviewRows(box);
-    };
     document.addEventListener('click', (e) => {
       const p = $('pop');
       if (!p || !p.classList.contains('on')) return;     // 抽屉没开就别 hidePop：会把例句试听一起停掉
@@ -3216,29 +3784,44 @@ import { icon } from './icons.js?v=20261016i';
       e.preventDefault();
     }, true);
 
-    // 底部弹层下拉关闭（内容滚到顶才生效，不然会把正常滚动当成关闭手势）
-    (function sheetDrag() {
-      const sheet = $('pop');
-      if (!sheet) return;
-      let y0 = null, dy = 0;
-      const pt = (e) => (e.touches && e.touches[0]) || e;
-      const start = (e) => { if (sheet.scrollTop > 0) return; y0 = pt(e).clientY; dy = 0; sheet.style.transition = 'none'; };
+    // 底部抽屉手势：只在「把手」和「上拉看更多」上跟手，且只跟向下 ——
+    // 之前挂在整块 .sheet 上，会在内部滚动词条时抢手势 → 卡顿/乱跳，向上拖还能把抽屉整个拎起来。
+    (function sheetPull() {
+      const sh = $('pop'); if (!sh) return;
+      const body = $('p-body');
+      const zones = [sh.querySelector('.grab'), $('p-expand')].filter(Boolean);
+      let y0 = null, dy = 0, raf = 0;
+      const paint = () => {
+        raf = 0;
+        // 只向下跟手；向上不给位移（靠松手后的 snap 展开）
+        sh.style.transform = dy > 0 ? `translateY(${dy}px)` : '';
+      };
+      const start = (e) => { y0 = e.touches[0].clientY; dy = 0; sh.style.transition = 'none'; };
       const move = (e) => {
         if (y0 == null) return;
-        dy = pt(e).clientY - y0;
-        if (dy > 0) { sheet.style.transform = `translateY(${dy}px)`; if (e.cancelable) e.preventDefault(); }
+        dy = e.touches[0].clientY - y0;
+        if (!raf) raf = requestAnimationFrame(paint);          // rAF 节流，别每个 touchmove 都写样式
       };
       const end = () => {
         if (y0 == null) return;
-        sheet.style.transition = ''; sheet.style.transform = '';
-        const closed = dy > 70;
+        cancelAnimationFrame(raf); raf = 0;
+        const d = dy;
+        sh.style.transition = ''; sh.style.transform = '';
         y0 = null; dy = 0;
-        if (closed) hidePop();
+        if (d > 80) {
+          if (sh.classList.contains('expanded')) sh.classList.remove('expanded');  // 先收回一阶段
+          else hidePop();                                                          // 再拉就关
+        } else if (d < -40) {
+          sh.classList.add('expanded');
+          if (body) body.scrollTop = 0;
+        }
       };
-      sheet.addEventListener('touchstart', start, { passive: true });
-      sheet.addEventListener('touchmove', move, { passive: false });
-      sheet.addEventListener('touchend', end);
-      sheet.addEventListener('touchcancel', end);
+      zones.forEach((el) => {
+        el.addEventListener('touchstart', start, { passive: true });
+        el.addEventListener('touchmove', move, { passive: true });
+        el.addEventListener('touchend', end);
+        el.addEventListener('touchcancel', end);
+      });
     })();
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT') return;

@@ -595,14 +595,61 @@ App 里页面 origin 是 **`https://localhost`**（iOS 是 `capacitor://localhos
 而网页端完全正常，很容易漏。`ops/fc/index.js` 默认值与 `ops/deploy-fc.py` 的环境变量都要有。
 改后端后别忘了 `python3 ops/deploy-fc.py`。
 
+⚠️ **打 APK 必须先挪走 `docs/dl/`**：Capacitor 把整个 `docs/` 同步进 `assets/public`，
+而 `docs/dl/` 里放着上一版 APK —— 不挪就是 APK 套 APK，体积 10MB → 26 → 43 → 61MB 一路涨。
+`docs/_screenshots/` 同理（白塞 2MB 预览图）。
+用 `scripts/build-apk.sh`（内部自动挪出/还原），别直接 `gradlew assembleDebug`。
+产物默认 `docs/dl/thlyrics-beta.apk`，正常约 10MB。
+
+#### 四点五、点句子 = 单句循环（别再改回去）
+
+- 硬需求原文：「**但是要有单句重复**」「**点句子从那句开始循环**」「单句循环切换…要丝滑」。
+- `playFrom(i, forceLoop=true)` 是唯一的入口：
+  - 点句子（非词区域）→ **无条件切到单句循环**（`setMode('loop')` + `loopLine=i` + seek + 播）。
+    不能只在 `mode==='loop'` 时才循环 —— 用户在「全曲」模式点句子会以为「点击播放单句失效了」（踩过）。
+  - 「上一句 / 下一句」传 `forceLoop=false`：只挪位置，**不能偷偷把模式切进单句**。
+  - 点「别的句里的词」传 `forceLoop=false`：先把那句切过来，但不动模式（约束：点词不能冒泡到切换循环行）。
+- 单击后**不要立刻滚动**（`armTapScroll` 把 `highlight(true)` 推迟到双击窗之后）：
+  否则第一下就把歌词滚走，双击的第二下落到别的行 / 别的词上，双击永远判不出来。
+- 双击判定窗 `DBL_MS = 620`（原来 360 太紧，真机手速 300~500ms）。
+- ⚠️ **测双击别用 `Input.dispatchTouchEvent` ×2**：Chrome 对合成触摸的双击不合成 click（一个事件都没有）。
+  用 `Input.synthesizeTapGesture {tapCount:2}`，但它两次点击的间隔会在 170~710ms 之间飘，
+  所以它只能验「链路通不通」，**不能当作双击时机的回归依据**。
+
+#### 四点六、测真机时**绝对不要**点这些控件
+
+`p-scope`（全曲/单句）、主题开关、各种筛选 chip —— 它们都走 `save()` → **写 localStorage + 云同步**。
+点一下就把用户的真实设置改了（踩过：把用户的播放模式从「全曲」改成「单句」，用户以为功能坏了）。
+要测这些状态，用 CDP 直接改 DOM class，或测完立刻用 App 内的 UI 改回观测到的原值。
+
 #### 五、真机验证怎么做（可复用）
 
-- 手机 USB 连 Windows 即可：WSL 里直接调 `adb.exe`（`/mnt/c/Users/zfq/AppData/Local/Android/Sdk/platform-tools/adb.exe`）。
+- **装 APK 用 `pm install`，别用 `adb install`**：华为会弹「风险提示」→ 跳进应用市场的广告页，
+  `adb install` 一直挂着直到超时（踩过）。正确姿势：
+  `adb push x.apk /data/local/tmp/_i.apk && adb shell pm install -r /data/local/tmp/_i.apk`。
+  `scripts/phone.sh install` 已经这么做了。
+- 手机 USB 连 Windows 即可。WSL 里自己 `which adb` 是**找不到**的（PATH 里没有、WSL 也没装），
+  必须直接调 Windows 侧那份：
+  `ADB=/mnt/c/Users/zfq/AppData/Local/Android/Sdk/platform-tools/adb.exe`
+  （机型 `NOH-AN00` / 序列号 `PQY0220C03006777`）。已封装成 `scripts/phone.sh`：
+  `shot|ui|tap|swipe|key|install|start|stop|cdp`。
+- ⚠️ **华为 HiSuite 会两头捣乱**：① 抢前台（`adb install` 报 `INSTALL_FAILED_ABORTED: User rejected permissions`
+  就是它挡的，`input keyevent KEYCODE_HOME` 关掉就行）；② 它在前台时 **`screencap` 出 0 字节空文件**
+  （设备上 `/sdcard/x.png` 就是 0 字节），回桌面后再截就正常。遇空图先去 HiSuite。
+- **adb 的文件路径**：Windows 的 `adb.exe` 不认 WSL 路径。pull/push 的目的地必须写
+  Windows 形式（`C:\Users\zfq\AppData\Local\Temp\thlyrics\x.png`），再从
+  `/mnt/c/...` 拷回 WSL。
 - **CDP 直连 WebView**：Playwright 的 `connectOverCDP` 连不上（WebView 只有页面级端点，
   浏览器级会 1006 断开）。用 `.e2e/android/cdp.mjs`（Node 自带 WebSocket 直连页面）。
-  取 socket：`adb shell cat /proc/net/unix | grep webview_devtools_remote` → `adb forward tcp:9222 localabstract:<socket>`。
-- 骚扰点：安装/截图需要**手机解锁亮屏**（锁屏时 adb install 会一直挂着）；
-  华为 USB 连接会自动弹 HiSuite 抢前台，注意把 App 拉回来。
+  取 socket：`adb shell cat /proc/net/unix | grep -o 'webview_devtools_remote_[0-9]*'`
+  —— **名字带进程 PID**，App 重启后 PID 会变，必须重取重 forward，别缓存。
+  `adb forward tcp:9222 localabstract:<socket>`。
+  （本机 WSL 是 mirrored 网络，`127.0.0.1:9222` 能直连；不是 mirrored 时要走宿主 IP。）
+- **真机 UI 回归**：`.e2e/android/audit2.mjs` + `layout-check.js` —— 遍历 5 个主路由，
+  查「横向溢出 / 单行元素被换行」，输出 0 问题才算过。改任何 CSS 后都该跑一遍：
+  桌面 412px 看不出来的坑（顶栏三行文字全被挤成两行）都是这类脚本抓出来的。
+- **看截图**：无图形界面时用 `scripts/see.py <png> [列数] [--crop y0 y1]` 把图渲染成
+  自适应对比度的字符画，能直接看出布局。定位元素用 CDP `getBoundingClientRect` 交叉验证。
 - 临时账号用完要清：`/tmp/oss.py`（V1 签名小工具）删 `sync/users/<uid>/*` 并从
   `sync/users/_index.json` 移除。清理后索引里只应剩 `zfq` 和 `seki`。
 
