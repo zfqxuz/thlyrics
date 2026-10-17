@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zp';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zp';
-import { icon } from './icons.js?v=20261017zp';
+import { V } from './version.js?v=20261017zq';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zq';
+import { icon } from './icons.js?v=20261017zq';
 
 (() => {
   'use strict';
@@ -708,11 +708,12 @@ import { icon } from './icons.js?v=20261017zp';
   async function playTrack(track, opts = {}) {
     if (!track) return;
     if (audio.getAttribute('data-tid') !== track.id || !audio.src) {
-      prepToken++;   // 让在飞的 prepAudio 作废，避免它随后 attach → load() 把刚起的播放重置
+      const my = ++prepToken;   // 让在飞的 prepAudio / 上一次 playTrack 作废（否则会晚一步把 src 改回去）
       audio.pause();
       setLoad(true, '正在准备音频…');
       try {
         const url = await urlFor(track);
+        if (my !== prepToken) return;              // 已经被后来的调用顶掉了（比如切原曲/伴奏）
         if (!url) { setLoad(false); setState(track.audioOss ? '音频地址不可用' : '没有音频'); return; }
         stationNid = (S.audio[track.id] && S.audio[track.id].nid) || (track.audio && track.audio.nid) || null;
         audio.setAttribute('data-tid', track.id);
