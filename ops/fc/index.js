@@ -21,6 +21,7 @@ const crypto = require('node:crypto');
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 
 const ENV = process.env;
 const OSS_HOST = ENV.OSS_HOST || 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com';
@@ -377,7 +378,7 @@ async function vocalCut(buf) {
 function fcInvokeAsync(payload) {
   return new Promise((resolve, reject) => {
     const host = 'fcv3.cn-hangzhou.aliyuncs.com';
-    const path = `/2023-03-30/functions/${encodeURIComponent(ENV.FC_FUNCTION || 'thlyrics-auth')}/invocations`;
+    const path = `/2023-03-30/functions/${encodeURIComponent(ENV.SEP_FUNCTION || 'thlyrics-sep')}/invocations`;
     const body = Buffer.from(JSON.stringify(payload), 'utf8');
     const hashed = crypto.createHash('sha256').update(body).digest('hex');
     const date = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -693,6 +694,16 @@ exports.handler = async (event) => {
   }
   if (method === 'OPTIONS') return reply(req, 204, {});
   const want = q.token ? { auth: q.token } : {};
+  // 同一个代码包部署成两个函数：thlyrics-auth（账号/同步/解析）和 thlyrics-sep（伴奏，重活）
+  const action0 = q.action ? '/' + q.action.replace(/^\/+/, '') : path.replace(/^\/api/, '');
+  const ROLE = ENV.ROLE || 'auth';
+  if (ROLE === 'sep') {
+    if (!['/sep', '/sep/status', '/sep/quota', '/sep/run', '/sep/bench', '/health'].includes(action0)) {
+      return reply(req, 404, { error: '没有这个接口' });
+    }
+  } else if (action0 === '/sep/run') {
+    return reply(req, 404, { error: '没有这个接口' });
+  }
 
   try {
     // 页面会从 OSS 的静态 JSON 里读这个地址，允许 ?action=xxx 这种便于排查
@@ -809,6 +820,33 @@ exports.handler = async (event) => {
       if (!acct || hashPass(pass, acct.salt) !== acct.hash) return reply(req, 401, { error: '用户名或密码不对' });
       const adm = !!acct.admin || ADMINS.indexOf(String(acct.nameLower || '').toLowerCase()) >= 0;
       return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
+    }
+
+    // 临时：ONNX 分离器在 FC 上的速度标定（只有内部 token 能用）
+    if (action === '/sep/bench') {
+      const tok = String((req.headers && (req.headers['x-sep-token'] || req.headers['X-Sep-Token'])) || '');
+      if (tok !== sepRunToken()) return reply(req, 403, { error: 'forbidden' });
+      const t0 = Date.now();
+      let ort = null;
+      try { ort = require('./vendor/onnxruntime-node'); } catch (e) { return reply(req, 500, { error: 'ORT 加载失败：' + String(e.message || e) }); }
+      const mp = '/tmp/kara2.onnx';
+      if (!fs.existsSync(mp) || fs.statSync(mp).size < 1e6) {
+        const r = await ossRequest('GET', 'sep/models/kara2.onnx', null, null, true);
+        if (r.status !== 200) return reply(req, 500, { error: '模型下载失败 ' + r.status });
+        fs.writeFileSync(mp, r.body);
+      }
+      const t1 = Date.now();
+      const th = Math.max(1, Math.min(16, Number(q.threads) || 1));
+      const sess = await ort.InferenceSession.create(mp, { executionProviders: ['cpu'], intraOpNumThreads: th, interOpNumThreads: 1 });
+      const t2 = Date.now();
+      const n = 4 * 2048 * 256;
+      const data = new Float32Array(n);
+      for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+      const feeds = { input: new ort.Tensor('float32', data, [1, 4, 2048, 256]) };
+      const times = [];
+      for (let i = 0; i < 2; i++) { const s0 = Date.now(); await sess.run(feeds); times.push(Date.now() - s0); }
+      return reply(req, 200, { ok: true, cpus: os.cpus().length, memGB: +(os.totalmem() / 1e9).toFixed(2), threads: th,
+        dlMs: t1 - t0, loadMs: t2 - t1, runMs: times, totalMs: Date.now() - t0 });
     }
 
     // 内部：异步调用的落点（不对外，靠 x-sep-token 认）

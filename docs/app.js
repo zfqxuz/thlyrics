@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zb';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck } from './platform/index.js?v=20261017zb';
-import { icon } from './icons.js?v=20261017zb';
+import { V } from './version.js?v=20261017zc';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zc';
+import { icon } from './icons.js?v=20261017zc';
 
 (() => {
   'use strict';
@@ -3374,13 +3374,13 @@ import { icon } from './icons.js?v=20261017zb';
     const tid = t.id;
     sepBusy = true; renderSep(); toast('伴奏生成中…');
     try {
-      const r = await apiCall('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
+      const r = await sepCall('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
       let url = r && r.url;
       if (!url && r && r.taskId) {
         // 异步任务：每 2.5 秒问一次，最长 10 分钟
         for (let i = 0; i < 240 && !url; i++) {
           await sepSleep(2500);
-          const st2 = await apiCall('/sep/status?taskId=' + encodeURIComponent(r.taskId));
+          const st2 = await sepCall('/sep/status?taskId=' + encodeURIComponent(r.taskId));
           if (st2.status === 'done') url = st2.url;
           else if (st2.status === 'error') throw new Error(st2.error || '生成失败');
         }

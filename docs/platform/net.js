@@ -3,10 +3,12 @@
  * 分开的三个来源：自己的后端（函数计算）、第三方中继（gdstudio）、站内静态数据。
  * 原生壳里不需要 CORS，行为一致，所以也不需要分实现。
  */
-import { V } from '../version.js?v=20261017zb';
+import { V } from '../version.js?v=20261017zc';
 
 export const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 / 解析 / 分词
-export const GD = 'https://music-api.gdstudio.xyz/api.php';                             // 第三方中继（仅网易云）
+export const GD = 'https://music-api.gdstudio.xyz/api.php';
+// 伴奏分离单独一个函数（重活：4GB/2 核，不占用账号接口的规格）
+export const SEP_BASE = 'https://thlyrics-sep-bcjvzfkgnp.cn-hangzhou.fcapp.run/api';                             // 第三方中继（仅网易云）
 
 /** 给请求套一个超时（ms <= 0 表示不设超时） */
 async function withTimeout(run, ms) {
@@ -62,15 +64,18 @@ export function apiJson(path, { method = 'GET', body, timeout = 20000 } = {}) {
 }
 
 /** 账号 API：带 token；同步一次可能很久，所以默认不设超时（与旧行为一致） */
-export async function apiCall(path, { method = 'GET', body, token } = {}) {
+async function callBase(base, path, { method = 'GET', body, token } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = 'Bearer ' + token;
-  const r = await fetch(API_BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const r = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   let j = null;
   try { j = await r.json(); } catch { /* 空响应 */ }
   if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
   return j || {};
 }
+export const apiCall = (path, opts) => callBase(API_BASE, path, opts);
+/** 伴奏分离函数（同样的 token 体系，只是换了域名） */
+export const sepCall = (path, opts) => callBase(SEP_BASE, path, opts);
 
 /** 第三方中继：偶尔抽风（限流 / 少 CORS 头），失败退避重试 */
 export async function gdJson(q, tries = 3) {

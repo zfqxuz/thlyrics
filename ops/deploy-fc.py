@@ -26,7 +26,7 @@ def secret():
         open(p, 'w').write(secrets.token_hex(32)); os.chmod(p, 0o600)
     return open(p).read().strip()
 
-def build_zip():
+def build_zip(with_ort=False):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
         d = os.path.join(HERE, 'fc')
@@ -51,6 +51,29 @@ def build_zip():
                 for f in files:
                     p = os.path.join(root, f)
                     z.write(p, 'vendor/node_modules/' + dep + '/' + os.path.relpath(p, base))
+        # ONNX 分离器运行时（只留 linux-x64，38MB；模型放 OSS 冷启动拉）
+        ort = os.path.join(nm, 'onnxruntime-node')
+        if with_ort and os.path.isdir(ort):
+            for f in os.listdir(ort):
+                p = os.path.join(ort, f)
+                if os.path.isfile(p):
+                    z.write(p, 'vendor/onnxruntime-node/' + f)
+            for sub in ['lib', 'dist', 'script']:
+                for root, _d, files in os.walk(os.path.join(ort, sub)):
+                    for f in files:
+                        p = os.path.join(root, f)
+                        z.write(p, 'vendor/onnxruntime-node/' + os.path.relpath(p, ort))
+            com = os.path.join(nm, 'onnxruntime-common')
+            if os.path.isdir(com):
+                for root, _d, files in os.walk(com):
+                    for f in files:
+                        p = os.path.join(root, f)
+                        z.write(p, 'vendor/node_modules/onnxruntime-common/' + os.path.relpath(p, com))
+            base = os.path.join(ort, 'bin/napi-v3/linux/x64')
+            for f in os.listdir(base):
+                p = os.path.join(base, f)
+                if os.path.isfile(p):
+                    z.write(p, 'vendor/onnxruntime-node/bin/napi-v3/linux/x64/' + f)
         # 伴奏分离：mp3 解码（wasm）+ mp3 编码（lamejs），加起来不到 1MB
         for dep in ['mpg123-decoder', '@wasm-audio-decoders/common', '@eshaz/web-worker', '@breezystack/lamejs', 'simple-yenc']:
             base = os.path.join(nm, dep)
@@ -71,9 +94,11 @@ def main():
         'OSS_HOST': 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com',
         'TOKEN_SECRET': secret(),
         'ALLOW_ORIGINS': 'https://zfqxuz.github.io,https://localhost,capacitor://localhost,http://127.0.0.1:8848,http://localhost:8848',
+        'ROLE': 'auth',
+        'SEP_FUNCTION': 'thlyrics-sep',
     }
     body = {
-        'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 300, 'memorySize': 1024,
+        'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 300, 'memorySize': 1024, 'cpu': 1, 'diskSize': 512,
         'code': {'zipFile': build_zip()}, 'environmentVariables': env,
     }
     r = acs3.call('PUT', HOST, f'/2023-03-30/functions/{FUNC}', body=body)
