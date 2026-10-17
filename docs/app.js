@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zk';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zk';
-import { icon } from './icons.js?v=20261017zk';
+import { V } from './version.js?v=20261017zl';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zl';
+import { icon } from './icons.js?v=20261017zl';
 
 (() => {
   'use strict';
@@ -3459,6 +3459,7 @@ import { icon } from './icons.js?v=20261017zk';
   /** 一首歌开始播时：如果开着伴奏模式但还没有伴奏，就顺手生成 */
   function sepAutoFor(t) {
     if (!sepPref() || !t || sepHas(t) || sepTried.has(t.id) || sepBusyId) return;
+    if (sepLeft === 0 && !sepUnlimited) { S.sepPref = false; save(); applySepBtn(); return; }   // 额度用完：别再反复要
     sepTried.add(t.id);
     ensureSepFor(t);
   }
