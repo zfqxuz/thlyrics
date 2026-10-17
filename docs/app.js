@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zg';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zg';
-import { icon } from './icons.js?v=20261017zg';
+import { V } from './version.js?v=20261017zh';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zh';
+import { icon } from './icons.js?v=20261017zh';
 
 (() => {
   'use strict';
@@ -61,6 +61,8 @@ import { icon } from './icons.js?v=20261017zg';
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   let saveN = 0;
   const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); queueSync(); };
+  /** 只落本机、不排云同步（高频写入用，比如播放位置） */
+  const saveLocal = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); };
   // 真机排错用的小钩子（不改状态，只读）：浏览器控制台里 __th() 看当前关键状态
   if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, lsBytes: (kvGet(LS_KEY) || '').length });
 
@@ -778,7 +780,7 @@ import { icon } from './icons.js?v=20261017zg';
       posSavedAt = now;
       S.pos = S.pos || {};
       S.pos[curTrack.id] = Math.round(audio.currentTime);
-      save();
+      saveLocal();                                   // 播放位置是本机的，别推云端（以前每 3 秒推一次全量状态）
     });
   }
 
@@ -1970,6 +1972,8 @@ import { icon } from './icons.js?v=20261017zg';
   // 清掉浏览器数据、换设备，打开页面自动拉回来；合并是逐条按时间戳取胜，
   // 所以两台设备各改各的也不会互相抹掉。
   const SYNC_DEBOUNCE = 1800;
+  const SYNC_MIN_GAP = 30000;        // 自动同步最短间隔：别让高频操作把整份状态反复推上去
+  let lastSyncAt = 0, lastSyncJson = '';
   const DEV_KEY = 'thlyrics.dev.v1';
   var syncCfg = null, syncTimer = null, syncBusy = false, syncQueued = false, syncErr = '', applying = false;
   const devId = (() => { let d = kvGet(DEV_KEY); if (!d) { d = Math.random().toString(36).slice(2, 10); kvSet(DEV_KEY, d); } return d || 'x'; })();
@@ -2078,7 +2082,8 @@ import { icon } from './icons.js?v=20261017zg';
   function queueSync() {
     if (applying || S.autoSync === false || !ACC || !ACC.token) return;
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { syncNow({ auto: true }); }, SYNC_DEBOUNCE);
+    const gap = Math.max(0, SYNC_MIN_GAP - (Date.now() - lastSyncAt));
+    syncTimer = setTimeout(() => { syncNow({ auto: true }); }, Math.max(SYNC_DEBOUNCE, gap));
   }
 
   /** 读云端 → 逐条合并 → 有变化就写回；云端多的也会并回本机 */
@@ -2087,7 +2092,12 @@ import { icon } from './icons.js?v=20261017zg';
     syncBusy = true;
     try {
       if (!ACC || !ACC.token) { syncBusy = false; return false; }   // 没登录就不动云
-      const res = await apiCall('/data', { method: 'PUT', body: { data: userState(S) } });   // 一次 PUT：服务端合并后返回全量
+      const payload = userState(S);
+      const payloadJson = JSON.stringify(payload);
+      if (payloadJson === lastSyncJson && !opts.force) { syncBusy = false; return true; }   // 内容没变：不发
+      lastSyncAt = Date.now();
+      const res = await apiCall('/data', { method: 'PUT', body: { data: payload } });   // 一次 PUT：服务端合并后返回全量
+      lastSyncJson = payloadJson;
       const mergedAcc = mergeStates(userState(S), res.data || {});
       const gained = Object.keys(mergedAcc.imp).length - Object.keys(userState(S).imp).length;
       if (JSON.stringify(mergedAcc) !== JSON.stringify(userState(S))) {
@@ -2098,6 +2108,7 @@ import { icon } from './icons.js?v=20261017zg';
         S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();
+        lastSyncJson = JSON.stringify(userState(S));   // 服务端合并后的状态才是下一次的比较基准
       }
       applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; S.syncHash = ''; save(); applying = false;
       syncErr = '';
@@ -2290,7 +2301,7 @@ import { icon } from './icons.js?v=20261017zg';
     if (syncBusy) { toast('同步中'); return; }
     const impB = Object.keys(S.imp || {}).length, kB = knownCount();
     setLoad(true, '从云端拉取…');
-    const ok = await syncNow({ manual: true });
+    const ok = await syncNow({ manual: true, force: true });   // 拉取必须真发一次，不能因为「内容没变」就跳过
     setLoad(false);
     if (!ok) { toast('拉取失败：' + syncErr); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); return; }
     const d1 = Object.keys(S.imp || {}).length - impB, d2 = knownCount() - kB;

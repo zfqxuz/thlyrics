@@ -24,7 +24,9 @@ const path = require('node:path');
 const os = require('node:os');
 
 const ENV = process.env;
+// 函数→OSS 走内网域名（不计公网流量、也不慢）；发给客户端的签名 URL 必须用公网域名
 const OSS_HOST = ENV.OSS_HOST || 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com';
+const OSS_PUBLIC_HOST = ENV.OSS_PUBLIC_HOST || 'thlyrics-audio.oss-cn-hangzhou.aliyuncs.com';
 const OSS_BUCKET = ENV.OSS_BUCKET || 'thlyrics-audio';
 const PREFIX = 'sync/users/';
 const TOKEN_DAYS = 180;
@@ -303,7 +305,7 @@ function ossSign(key, expiresIn = SEP_TTL_DAYS * 86400) {
   const sts = ['GET', '', '', String(exp), `/${OSS_BUCKET}/${key}`].join('\n');
   const sig = crypto.createHmac('sha1', ENV.OSS_SK).update(sts).digest('base64');
   const q = `OSSAccessKeyId=${encodeURIComponent(ENV.OSS_AK)}&Expires=${exp}&Signature=${encodeURIComponent(sig)}`;
-  return `https://${OSS_HOST}/` + key.split('/').map(encodeURIComponent).join('/') + '?' + q;
+  return `https://${OSS_PUBLIC_HOST}/` + key.split('/').map(encodeURIComponent).join('/') + '?' + q;
 }
 
 async function ossHead(key) {
