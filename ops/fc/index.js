@@ -1152,6 +1152,12 @@ exports.handler = async (event) => {
       return reply(req, 200, { ok: true, token: tokenFor(me.sub, acct.name), user: { uid: me.sub, name: acct.name } });
     }
 
+    // 只回一个「云端有没有变」的小哨兵：客户端启动时先问它，没变就不必传整份状态
+    if (action === '/data/meta') {
+      const cur = (await ossGetJson(dataKey(me.sub))) || { v: 1, at: null, data: null };
+      return reply(req, 200, { ok: true, at: cur.at || null, bytes: cur.data ? JSON.stringify(cur.data).length : 0 });
+    }
+
     if (action === '/data') {
       const cur = (await ossGetJson(dataKey(me.sub))) || { v: 1, at: null, data: null };
       if (method === 'GET') {

@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zh';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zh';
-import { icon } from './icons.js?v=20261017zh';
+import { V } from './version.js?v=20261017zi';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zi';
+import { icon } from './icons.js?v=20261017zi';
 
 (() => {
   'use strict';
@@ -1687,12 +1687,40 @@ import { icon } from './icons.js?v=20261017zh';
     flush();
     return out;
   }
-  /** 服务端分词（kuromoji）：一次一首歌的所有行 */
-  async function segmentLines(lines) {
-    const j = await apiJson('/segment', { method: 'POST', body: { lines }, timeout: 60000 });
-    if (!j.segs) throw new Error('分词失败');
-    return j.segs;
+  // ── 本地分词（kuromoji.js + IPADIC，随 App 一起发，不联网）──
+  // 以前是 POST /api/segment 走服务器：那样每次冷启动服务器都要拉 18MB 词典。
+  // 现在词典在包的 vendor/kuromoji/ 里，只有 App/内容包发版才会变。
+  const toHira = (s) => String(s || '').replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  let kuro = null, kuroP = null;
+  function ensureKuromoji() {
+    if (kuro) return Promise.resolve(kuro);
+    if (kuroP) return kuroP;
+    kuroP = new Promise((resolve, reject) => {
+      const build = () => {
+        if (!window.kuromoji) { reject(new Error('kuromoji 没加载上')); return; }
+        window.kuromoji.builder({ dicPath: 'vendor/kuromoji/dict/' }).build((err, tk) => {
+          if (err) reject(err); else { kuro = tk; resolve(tk); }
+        });
+      };
+      if (window.kuromoji) { build(); return; }
+      const s = document.createElement('script');
+      s.src = 'vendor/kuromoji/kuromoji.js?v=' + V;
+      s.onload = build;
+      s.onerror = () => reject(new Error('kuromoji 加载失败'));
+      document.head.appendChild(s);
+    });
+    kuroP.catch(() => { kuroP = null; });     // 失败了下一次还能重试
+    return kuroP;
   }
+  /** 本地分词：输出和服务端 /api/segment 完全一致（[表面形, 辞书形, 读音, 词性, 词性细分]） */
+  async function segmentLines(lines) {
+    const tk = await ensureKuromoji();
+    return lines.map((text) => tk.tokenize(String(text == null ? '' : text))
+      .map((t) => [t.surface_form, t.basic_form && t.basic_form !== '*' ? t.basic_form : t.surface_form,
+        t.reading && t.reading !== '*' ? toHira(t.reading) : '', t.pos, t.pos_detail_1])
+      .filter((t) => String(t[0]).trim() !== ''));
+  }
+  if (typeof window !== 'undefined') window.__tlSeg = (lines) => segmentLines(lines);   // 测试钩子
   /** 服务端 token → 紧凑存储 [表面形, 读音, 词性码, 词表命中词]（读音能被前端还原成罗马音） */
   function segsCompact(tokens) {
     const out = [];
@@ -2094,7 +2122,14 @@ import { icon } from './icons.js?v=20261017zh';
       if (!ACC || !ACC.token) { syncBusy = false; return false; }   // 没登录就不动云
       const payload = userState(S);
       const payloadJson = JSON.stringify(payload);
-      if (payloadJson === lastSyncJson && !opts.force) { syncBusy = false; return true; }   // 内容没变：不发
+      const sig = hashStr(payloadJson) + ':' + payloadJson.length;
+      if (!opts.force) {
+        if (payloadJson === lastSyncJson) { syncBusy = false; return true; }        // 内存里没变：不发
+        if (sig === S.syncHash) {                                                   // 本地自上次同步没变 → 只问一个哨兵
+          const meta = await apiCall('/data/meta').catch(() => null);
+          if (meta && meta.at && meta.at === S.syncAt) { syncBusy = false; return true; }
+        }
+      }
       lastSyncAt = Date.now();
       const res = await apiCall('/data', { method: 'PUT', body: { data: payload } });   // 一次 PUT：服务端合并后返回全量
       lastSyncJson = payloadJson;
@@ -2110,7 +2145,7 @@ import { icon } from './icons.js?v=20261017zh';
         registerImpTracks();
         lastSyncJson = JSON.stringify(userState(S));   // 服务端合并后的状态才是下一次的比较基准
       }
-      applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; S.syncHash = ''; save(); applying = false;
+      applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; S.syncHash = sig; save(); applying = false;
       syncErr = '';
       if (opts.auto && gained > 0) toast(`已从账号取回 ${gained} 首导入的歌`);
       return true;
