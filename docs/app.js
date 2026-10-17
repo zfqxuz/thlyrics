@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018f';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018f';
-import { icon } from './icons.js?v=20261018f';
+import { V } from './version.js?v=20261018g';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018g';
+import { icon } from './icons.js?v=20261018g';
 
 (() => {
   'use strict';
@@ -3449,8 +3449,8 @@ import { icon } from './icons.js?v=20261018f';
         // 点别的句、或者还没有当前句（没播 / 没时间轴）→ 一律跳转播放那一句，不弹词条（用户要求）。
         if (li != null && (cur < 0 || li !== Number(cur))) {
           playFrom(li, false);                 // 切句 + 播放；forceLoop=false 不动模式
-          wEl.classList.add('hint');
-          setTimeout(() => wEl.classList.remove('hint'), 900);
+          wEl.classList.add('w-flash');
+          setTimeout(() => wEl.classList.remove('w-flash'), 900);
           toast('已切到这一句 · 再点词看释义');
           return;                              // ← 关键：直接结束，不开抽屉
         }
