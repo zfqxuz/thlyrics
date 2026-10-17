@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017u';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017u';
-import { icon } from './icons.js?v=20261017u';
+import { V } from './version.js?v=20261017x';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack } from './platform/index.js?v=20261017x';
+import { icon } from './icons.js?v=20261017x';
 
 (() => {
   'use strict';
@@ -1026,6 +1026,11 @@ import { icon } from './icons.js?v=20261017u';
     : r === 'n45' ? v.jl >= 4
     : r === 'n123' ? (!!v.jl && v.jl <= 3) : true;
   /** 曲库里的歌 → 词表（学词 / 复习 / 例句都只看曲库里有的歌） */
+  /** 顶栏「N 首 · M 词」：以前只在 boot 里算一次，导入后不刷新 → 抽成函数 */
+  function updateHeadStat() {
+    const hs = $('headstat');
+    if (hs && IDX) hs.textContent = `${IDX.tracks.length} 首 · ${LIBW.size} 词`;
+  }
   function indexLibrary() {
     LIBW.clear();
     for (const t of IDX.tracks) for (const l of t.lines || []) for (const sg of l.segs || []) {
@@ -1034,6 +1039,7 @@ import { icon } from './icons.js?v=20261017u';
       if (!e) LIBW.set(sg.b, e = { n: 0, tracks: new Set() });
       e.n++; e.tracks.add(t.id);
     }
+    updateHeadStat();                     // 每次重建曲库索引都刷新顶栏（以前只在 boot 算一次，导入后不刷新）
   }
   const libStat = (v) => (v ? LIBW.get(v.word) : null);
   /** 这个词在曲库里的例句（正在听的那首排最前） */
@@ -1594,7 +1600,7 @@ import { icon } from './icons.js?v=20261017u';
   let RDL = new Map(), RDL_MAX = 1;   // 读音兜底表（内置曲目里出现过的词 → 罗马音/读音/词性）
   const SEG = ('Segmenter' in Intl) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
   /** 分词结果版本：1 = 旧（假名读音当表面形）· 2 = 修好同音撞车之后（改分词逻辑就 +1，老记录会自动重算） */
-  const SEG_V = 2;
+  const SEG_V = 3;      // 3: 词表补到 6604（+158 高频遗漏词）后强制重切，否则缓存的 segs 认不出新词
   function buildDict() {
     DICT = new Map();
     const put = (k, v, form) => { if (k && !DICT.has(k)) DICT.set(k, { v, form }); };
@@ -1907,14 +1913,19 @@ import { icon } from './icons.js?v=20261017u';
     if (!need.length) return;
     segBackfilling = true;
     let done = 0;
-    for (const rec of need.slice(0, 40)) {
-      try {
-        const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
-        rec.segs = segs; rec.segV = SEG_V;
-        const t = TRACK.get(rec.id);
-        if (t) { const nt = impTrack(rec); t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds; }
-        done++;
-      } catch { break; }        // 接口不可用就下次再说
+    // 一轮补 40 首、补完再起下一轮（原来只跑一次 40 首就收工，207 首要启动 5 次才补完）
+    while (need.length) {
+      const batch = need.splice(0, 40);
+      for (const rec of batch) {
+        try {
+          const segs = (await segmentLines(rec.lines.map((l) => l.text))).map(segsCompact);
+          rec.segs = segs; rec.segV = SEG_V;
+          const t = TRACK.get(rec.id);
+          if (t) { const nt = impTrack(rec); t.lines = nt.lines; t.lineCount = nt.lineCount; t.vocabIds = nt.vocabIds; }
+          done++;
+        } catch { segBackfilling = false; save(); indexLibrary(); return; }   // 接口不可用就下次再说
+      }
+      save(); indexLibrary();     // 每 40 首落一次盘，中途退出也不丢
     }
     segBackfilling = false;
     if (!done) return;
@@ -3613,7 +3624,7 @@ import { icon } from './icons.js?v=20261017u';
       const t = impTrack(rec); data.tracks.push(t); TRACK.set(t.id, t);
     }
     indexLibrary();
-    const hs = $('headstat'); if (hs) hs.textContent = `${IDX.tracks.length} 首 · ${LIBW.size} 词`;
+    updateHeadStat();
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     if ($('brand')) $('brand').onclick = () => go('#/home');

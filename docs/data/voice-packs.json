@@ -3,11 +3,11 @@
     {
       "id": "kokoro-ja",
       "name": "日语词音（阿里云）",
-      "version": "2.0",
+      "version": "2.1",
       "kind": "audio",
-      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-2.0.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107581605&Signature=4PSr3YFnjPT85D9Mf%2FwFEglldQ8%3D",
-      "size": 29084153,
-      "sha256": "7eb947b8a2e3043b7ecb12f9ab62c6a4686258afd4589d7e240e538a7afbf416",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-2.1.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107588701&Signature=LWgIgi9ToGFATZBCL%2BZRMaVZSt0%3D",
+      "size": 29430387,
+      "sha256": "276ef19cb9dcbe8663e7375a583737808b13addb02756b74ba9540c2e7d2e84a",
       "source": "https://help.aliyun.com/zh/isi/",
       "license": "阿里云智能语音交互（NLS）· voice=tomoka"
     },
