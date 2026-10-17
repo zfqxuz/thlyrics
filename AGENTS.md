@@ -1230,3 +1230,41 @@ paused=false、currentTime 6s 内推进 5.96s、duration 221s、readyState=4、�
   （约 1MB），FC 里用 **动态 import()**（index.js 本身仍是 CJS）。
 - 想提速度：`vocalCut` 单线程跑 lamejs 编码，占大头（本地 6~17s，FC 上 ~30s）；
   加内存/CPU 对单线程帮助有限，真要快就换 wasm 编码器或原生 ffmpeg。
+
+### 2026-10-17 深夜：流量事故复盘 + 分词搬到客户端 + 同步不再整份推
+
+#### 一、事故：一天烧掉 12GB 公网流量
+
+账单接口查出来（2026-10-17）：
+
+| 项目 | 用量 | 原因 |
+|---|---|---|
+| 函数计算出方向流量 | **8.34 GB** | 播放时 `timeupdate` 每 3 秒 `save()` → 云同步 → **整份状态（2.7MB）PUT 上去、再 2.7MB 返回来** |
+| OSS 外网流出 | **3.85 GB** | 函数冷启动从**公网域名**拉 50MB 伴奏模型 / 18MB kuromoji 词典 |
+
+三天合计约 22GB，把 CDT 免费额度吃掉了。**教训：凡是「高频动作 × 大 payload」的组合，先算流量再写代码。**
+
+#### 二、修法（已上线）
+
+1. **播放位置只写本机**：`saveLocal()`，不排云同步。
+2. **自动同步节流**：最短 30s；`payloadJson` 没变直接不发。
+3. **启动哨兵**：`GET /api/data/meta` 只回 `{at,bytes}`；本地 `S.syncHash` 与云端 `at` 都没变 → **一个字节的状态都不传**。
+   - 实测：打开 App = `/api/me` + `/api/data/meta` 两个小请求；点一次星标 = 1 次 PUT；播放 16 秒 = 0 次请求。
+4. **函数→OSS 全走内网域名** `thlyrics-audio.oss-cn-hangzhou-internal.aliyuncs.com`
+   （`OSS_HOST` 内网、`OSS_PUBLIC_HOST` 公网；签名 URL 必须用公网那个，别混）。
+
+#### 三、分词搬到客户端（用户要求：词典只能随版本更新）
+
+- `docs/vendor/kuromoji/`：`kuromoji.js`（308KB）+ IPADIC 词典（18MB）+ 许可证。
+- `ensureKuromoji()` 懒加载一次，`segmentLines()` 直接在本地跑，输出格式和原 `/api/segment` 一致
+  （`[表面形, 辞书形, 读音平假名, 词性, 词性细分]`）。
+- **客户端不再请求任何云端词库/分词接口**。`/api/segment` 服务端还留着但没人调（留着当兼容）。
+- 代价：`docs/` 增加 18MB → 内容包 1.3MB → **16.1MB**，APK 也会同步变大。
+  **词典要更新 = 发版**；内容包更新也会带上这 18MB（Capgo 是全量 zip，除非以后换 delta）。
+- 分层/文案门禁已跳过 `docs/vendor/`（第三方代码不查）。
+
+#### 四、伴奏：模型选错，先退回声道相消
+
+`kara2.onnx` 是 **UVR-MDX-NET KARA2（主唱 / 和声分离）**，输入本来就该是人声轨。
+拿整首混音喂它，输出和人声几乎一样（实测波形相关度 **0.988**，等于没去）。
+`SEP_ENGINE=side-cancel` 已切回；要上 AI 分轨得换「整曲 → 人声/伴奏」的模型（Open-Unmix / MDX Inst 这类）。

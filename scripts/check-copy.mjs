@@ -28,7 +28,7 @@ const BANNED = [
 const ALLOW = fs.existsSync(ALLOW_FILE)
   ? fs.readFileSync(ALLOW_FILE, 'utf8').split('\n').map((x) => x.trim()).filter((x) => x && !x.startsWith('#'))
   : [];
-const SKIP = ['docs/data/', 'docs/icons.js', 'docs/LICENSE-lucide.txt'];
+const SKIP = ['docs/data/', 'docs/vendor/', 'docs/icons.js', 'docs/LICENSE-lucide.txt'];   // 第三方库不查文案
 const violations = [];
 const seen = new Set();
 
