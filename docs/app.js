@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018r';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018r';
-import { icon } from './icons.js?v=20261018r';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018r';
+import { V } from './version.js?v=20261018t';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018t';
+import { icon } from './icons.js?v=20261018t';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018t';
 
 (() => {
   'use strict';
@@ -390,14 +390,16 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     return speakAudio;
   };
   const speakCache = new Map();
-  async function speakOnline(text) {
-    let url = speakCache.get(text);
+  async function speakOnline(text, lang) {
+    const tag = lang || 'ja';
+    const cacheKey = tag + '|' + text;
+    let url = speakCache.get(cacheKey);
     if (!url) {
-      const j = await fcJson('/tts?text=' + encodeURIComponent(text.slice(0, 60)));
+      const j = await fcJson('/tts?lang=' + encodeURIComponent(tag) + '&text=' + encodeURIComponent(text.slice(0, 60)));
       if (!j || !j.url) throw new Error('没有音频');
       url = j.url;
       if (speakCache.size >= 200) speakCache.delete(speakCache.keys().next().value);
-      speakCache.set(text, url);
+      speakCache.set(cacheKey, url);
     }
     await playSpeakSrc(url);
   }
@@ -466,10 +468,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       try {
         const r = await tts.speak(text, { lang: lg });
         if (r && r.ok && r.matched) return;
-        if (r && r.ok && r.matched === false && !silent) toast(`没有 ${lg} 的语音，去「语音包」看看`);
-        return;
       } catch { /* 落到在线合成 */ }
-      if (!IS_NATIVE) { try { await speakOnline(text); } catch { if (!silent) toast('发音失败'); } }
+      try { await speakOnline(text, lg); return; } catch { /* 在线也不行就报错 */ }
+      if (!silent) toast('发音失败');
       return;
     }
     if (!IS_NATIVE) { try { await speakOnline(text); } catch { if (!silent) toast('发音失败'); } return; }
@@ -3542,6 +3543,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     let have = [];
     try { have = await tts.langs(); } catch { have = []; }
     const web = !IS_NATIVE;
+    // 日语另有一套 App 内离线包（kokoro/openjtalk），装了就算“已安装”
+    try { const st = await voicePack.status(VP_AUDIO); if (st && st.installed && have.indexOf('ja') < 0) have = have.concat(['ja']); } catch { /* 忽略 */ }
     const rows = LEARN_LANGS.map((L) => {
       const base = L.tts.split('-')[0].toLowerCase();
       const ok = have.indexOf(base) >= 0;

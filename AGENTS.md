@@ -1374,3 +1374,16 @@ paused=false、currentTime 6s 内推进 5.96s、duration 221s、readyState=4、�
 - 英语已跑通：导入英语歌 → 语言打标 → 词形命中 → 学词/词卡/复习；非日语不显示读音题。
 - 注意：ECDICT 源文件 `data/ecdict/ecdict.csv` 不进仓库；输出包和 MIT 许可证进 `docs/data/en/`。
 - 尚未完成：9 个 UI locale 的全量文案、法语/俄语/西语/葡语/韩语/德语词库、完整 pair gloss 覆盖矩阵、ja-JP/en-US 之外语音包。
+
+### 2026-10-18：多语言内容包（法/德/西/葡/俄/韩）+ 界面国际化 + 按语言发音
+
+- 内容包：`docs/data/<lang>/{lexicon,lists,pairs,manifest}.json`，法 10,674 / 德 19,399 / 西 12,782 / 葡 8,482 / 俄 10,831 / 韩 9,604 条；
+  释义来自中文维基词典（CC BY-SA），词频分档来自 FrequencyWords（MIT），韩语另有 NIKL / TOPIK 官方等级
+- `data/function-words/<lang>.json`：高频虚词人工核对表（der/und/de/para 这种词典常缺的词）
+- `scripts/lang-forms.mjs`：构建期生成活用形/复数/格变化；运行时 `lookupWord()` 再做去变音 + 词干回退
+- 前端：`SCOPE_OPTIONS` 改由内容包 manifest 驱动；`wordsCompactLine()` 按语言分词；`VBYL/VBYF` 按语言建索引
+- 界面国际化：`docs/locales/<locale>.json`（9 语言，213 条核心文案），`i18n.js` 提供 `t()/translateNode()`，
+  MutationObserver 在非中文时自动替换文案，未翻译的回退中文
+- 发音：`platform/tts.js` 按语言选嗓音；FC `/tts` 支持 `lang` 参数（百度/有道多语言），非日语词优先系统嗓子、失败走在线合成
+- 语音包页按语言列出状态与安装入口；`TtsPlugin` 之前在 `MainActivity` 里没注册（已补）
+- 文档：`docs/CONTENT-PACKS.md`（来源、许可、覆盖率、已知缺口）

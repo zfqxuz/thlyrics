@@ -827,15 +827,20 @@ async function sepQuota(uid) {
   return { key, cur };
 }
 
-/** 在线日语 TTS（只给网页版用）：百度日语优先、有道兜底 */
-async function japaneseTts(text) {
+/** 在线 TTS（只给网页版用）：百度优先、有道兜底；按语言选提供商的语言码 */
+const TTS_LANG = {
+  ja: ['jp', 'jap'], en: ['en', 'en'], zh: ['zh', 'zh'], fr: ['fr', 'fr'], de: ['de', 'de'],
+  es: ['es', 'es'], pt: ['pt', 'pt'], ru: ['ru', 'ru'], ko: ['kor', 'ko'],
+};
+async function onlineTts(text, lang) {
   const t = String(text || '').trim().slice(0, 60);
   if (!t) throw new Error('没有要读的内容');
+  const code = TTS_LANG[String(lang || 'ja').toLowerCase().split('-')[0]] || TTS_LANG.ja;
   const enc = encodeURIComponent(t);
   const ua = 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36';
   const tries = [
-    { url: `https://fanyi.baidu.com/gettts?lan=jp&text=${enc}&spd=3&source=web`, headers: { 'User-Agent': ua, Referer: 'https://fanyi.baidu.com/' } },
-    { url: `https://dict.youdao.com/dictvoice?audio=${enc}&le=jap`, headers: { 'User-Agent': ua, Referer: 'https://dict.youdao.com/' } },
+    { url: `https://fanyi.baidu.com/gettts?lan=${code[0]}&text=${enc}&spd=3&source=web`, headers: { 'User-Agent': ua, Referer: 'https://fanyi.baidu.com/' } },
+    { url: `https://dict.youdao.com/dictvoice?audio=${enc}&le=${code[1]}`, headers: { 'User-Agent': ua, Referer: 'https://dict.youdao.com/' } },
   ];
   let last = null;
   for (const t0 of tries) {
@@ -1134,7 +1139,7 @@ exports.handler = async (event) => {
       const text = String(q.text || q.q || '').slice(0, 60);
       if (!text.trim()) return reply(req, 400, { error: '缺 text' });
       try {
-        const r = await japaneseTts(text);
+        const r = await onlineTts(text, q.lang || 'ja');
         return reply(req, 200, { ok: true, mime: r.mime, url: 'data:' + r.mime + ';base64,' + r.buffer.toString('base64') });
       } catch (e) {
         return reply(req, 502, { error: '发音服务暂时不可用：' + String((e && e.message) || e) });

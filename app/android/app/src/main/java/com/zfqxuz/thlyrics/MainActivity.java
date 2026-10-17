@@ -35,6 +35,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(LocalAudioPlugin.class);
         registerPlugin(VoicePackPlugin.class);
         registerPlugin(BackPlugin.class);
+        registerPlugin(TtsPlugin.class);
         super.onCreate(savedInstanceState);
         debugHooks();
     }
