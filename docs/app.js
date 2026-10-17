@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zo';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zo';
-import { icon } from './icons.js?v=20261017zo';
+import { V } from './version.js?v=20261017zp';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zp';
+import { icon } from './icons.js?v=20261017zp';
 
 (() => {
   'use strict';
@@ -3371,7 +3371,8 @@ import { icon } from './icons.js?v=20261017zo';
   }
   // ────────────── 伴奏（播放器里一个开关；没有就后台生成，生成完自动切过去） ──────────────
   let sepBusyId = '', sepLeft = null, sepUnlimited = false, sepTried = new Set();
-  const sepHas = (t) => !!(t && (S.sep || {})[t.id] && (S.sep || {})[t.id].url);
+  // v2 = 现在这套（UMX 人声分离）；老的无 v 记录（声道相消 / kara2）一律当作没有，点了会重做
+  const sepHas = (t) => { const sp = t && (S.sep || {})[t.id]; return !!(sp && sp.url && sp.v === 2); };
   const sepPref = () => !!S.sepPref;
 
   function applySepBtn() {
@@ -3429,7 +3430,7 @@ import { icon } from './icons.js?v=20261017zo';
         if (!url) throw new Error('生成超时');
       }
       if (!url) throw new Error('没有地址');
-      S.sep[t.id] = { url, at: Date.now(), engine: (r && r.engine) || '' };
+      S.sep[t.id] = { url, at: Date.now(), engine: (r && r.engine) || '', v: 2 };
       save();
       // 还在同一首、且仍然开着伴奏 → 无缝切过去
       if (sepPref() && curTrack && curTrack.id === t.id) reloadAudioHere();

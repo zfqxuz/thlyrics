@@ -437,12 +437,13 @@ async function sepRun(taskId) {
     const sha = crypto.createHash('sha256').update(dl.body).digest('hex');
     let engine = 'side-cancel', size = 0, reused = false, ms = null;
     const keyOf = (e) => `sep/out/${e}/${sha}.mp3`;
-    if (SEP_ENGINE === 'mdx' && await ossHead(keyOf('mdx-kara2'))) { engine = 'mdx-kara2'; reused = true; }
+    const wantEngine = SEP_ENGINE === 'umx' ? 'umx-hq' : SEP_ENGINE === 'mdx' ? 'mdx-kara2' : 'side-cancel';
+    if (wantEngine !== 'side-cancel' && await ossHead(keyOf(wantEngine))) { engine = wantEngine; reused = true; }
     else {
       let r = null;
-      if (SEP_ENGINE === 'mdx') {
-        try { r = await vocalCutMdx(dl.body); engine = 'mdx-kara2'; }
-        catch (e) { loggerWarn('mdx 失败，退回声道相消：' + ((e && e.message) || e)); r = null; }
+      if (SEP_ENGINE === 'umx' || SEP_ENGINE === 'mdx') {
+        try { r = SEP_ENGINE === 'umx' ? await vocalCutUmx(dl.body) : await vocalCutMdx(dl.body); engine = SEP_ENGINE === 'umx' ? 'umx-hq' : 'mdx-kara2'; }
+        catch (e) { loggerWarn('AI 分轨失败，退回声道相消：' + ((e && e.message) || e)); r = null; }
       }
       if (!r) { engine = 'side-cancel'; r = await vocalCut(dl.body); }
       ms = r.ms || null;
@@ -648,6 +649,167 @@ async function vocalCutMdx(buf) {
   }
   const fb = enc.flush(); if (fb.length) parts.push(Buffer.from(fb));
   return { mp3: Buffer.concat(parts), sr, dur: n / sr, ms: { decode: t1 - t0, sep: t2 - t1, enc: Date.now() - t2, chunks } };
+}
+
+// ── AI 分轨 v2：Open-Unmix UMX-HQ vocals（幅度掩码） ──
+// 契约（模型方 README）：输入 magnitude [1,2,2049,frames]（44.1k 立体声，
+// n_fft 4096 / hop 1024 / periodic Hann / 居中反射补边）；输出是人声幅度。
+// 掩码 = clip(输出/输入幅度,0,1)，伴奏 = 复数谱 ×(1-掩码) → iSTFT。
+const UMX = { n: 4096, hop: 1024, bins: 2049 };
+let UMX_SESS = null, UMX_ERR = null, FFT4K = null;
+
+function initFft4k() {
+  if (FFT4K) return FFT4K;
+  const N = UMX.n;
+  const REV = new Uint16Array(N);
+  for (let i = 0; i < N; i++) { let x = i, r = 0; for (let b = 0; b < 12; b++) { r = (r << 1) | (x & 1); x >>= 1; } REV[i] = r; }
+  const COS = new Float64Array(N / 2), SIN = new Float64Array(N / 2);
+  for (let i = 0; i < N / 2; i++) { COS[i] = Math.cos(-2 * Math.PI * i / N); SIN[i] = Math.sin(-2 * Math.PI * i / N); }
+  const win = new Float64Array(N);
+  for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  FFT4K = { N, REV, COS, SIN, win, zr: new Float64Array(N), zi: new Float64Array(N) };
+  return FFT4K;
+}
+
+function fft4k(t, re, im, inverse) {
+  const { N, REV, COS, SIN } = t;
+  for (let i = 0; i < N; i++) { const j = REV[i]; if (j > i) { let x = re[i]; re[i] = re[j]; re[j] = x; x = im[i]; im[i] = im[j]; im[j] = x; } }
+  const sgn = inverse ? -1 : 1;
+  for (let len = 2; len <= N; len <<= 1) {
+    const half = len >> 1, step = N / len;
+    for (let i = 0; i < N; i += len) {
+      for (let j = 0; j < half; j++) {
+        const q = j * step, c = COS[q], s = sgn * SIN[q];
+        const a = i + j, b = a + half;
+        const xr = re[b] * c - im[b] * s, xi = re[b] * s + im[b] * c;
+        re[b] = re[a] - xr; im[b] = im[a] - xi;
+        re[a] += xr; im[a] += xi;
+      }
+    }
+  }
+}
+
+async function umxSession() {
+  if (UMX_SESS || UMX_ERR) return UMX_SESS;
+  try {
+    const ort = loadOrt();
+    if (!ort) throw ORT_ERR || new Error('ORT 不可用');
+    const mp = '/tmp/unmix-vocals.onnx';
+    if (!fs.existsSync(mp) || fs.statSync(mp).size < 1e6) {
+      const r = await ossRequest('GET', 'sep/models/unmix-vocals.onnx', null, null, true);
+      if (r.status !== 200) throw new Error('模型下载失败 ' + r.status);
+      fs.writeFileSync(mp, r.body);
+    }
+    UMX_SESS = await ort.InferenceSession.create(mp, { executionProviders: ['cpu'], intraOpNumThreads: 2, interOpNumThreads: 1 });
+  } catch (e) { UMX_ERR = e; UMX_SESS = null; }
+  return UMX_SESS;
+}
+
+/** 一帧 → L/R 的 rfft 半边（0..2048），用一次 FFT 同时算两个声道 */
+function umxFrame(t, L, R, start, outL, outR) {
+  const { N, win, zr, zi } = t;
+  for (let i = 0; i < N; i++) { zr[i] = refl(L, start + i) * win[i]; zi[i] = refl(R, start + i) * win[i]; }
+  fft4k(t, zr, zi);
+  const half = N / 2;
+  for (let k = 0; k <= half; k++) {
+    const j = (N - k) % N;
+    const a = zr[k], b = zi[k], c = zr[j], d = zi[j];
+    outL[2 * k] = 0.5 * (a + c); outL[2 * k + 1] = 0.5 * (b - d);
+    outR[2 * k] = 0.5 * (b + d); outR[2 * k + 1] = 0.5 * (c - a);
+  }
+}
+
+/** AI 分轨（幅度掩码）：返回伴奏 mp3 */
+async function vocalCutUmx(buf) {
+  const sess = await umxSession();
+  if (!sess) throw new Error('模型不可用：' + String((UMX_ERR && UMX_ERR.message) || ''));
+  const { MPEGDecoder, lamejs } = await loadSepMods();
+  const ort = loadOrt();
+  const t0 = Date.now();
+  const dec = new MPEGDecoder();
+  await dec.ready;
+  const r = await dec.decode(buf);
+  dec.free();
+  if (!r || !r.samplesDecoded) throw new Error('音频解不开');
+  if (r.channelData.length < 2) throw new Error('单声道音轨分不了');
+  const sr = r.sampleRate || 44100, n = r.samplesDecoded;
+  if (sr !== 44100) throw new Error('采样率不是 44.1k');     // 模型是按 44.1k 训的
+  const L = r.channelData[0], R = r.channelData[1];
+  const { n: N, hop, bins } = UMX;
+  const pad = N / 2;
+  const t = initFft4k();
+  const frames = 1 + Math.floor(n / hop);
+  if (frames > 40000) throw new Error('歌太长（>15 分钟）');
+  const t1 = Date.now();
+
+  // ① 幅度谱 → 模型输入（通道优先布局 [2, bins, frames]）
+  const mag = new Float32Array(2 * bins * frames);
+  const half = new Float64Array(2 * bins), halfR = new Float64Array(2 * bins);
+  for (let f = 0; f < frames; f++) {
+    umxFrame(t, L, R, f * hop - pad, half, halfR);
+    for (let k = 0; k < bins; k++) {
+      const a = half[2 * k], b = half[2 * k + 1], c = halfR[2 * k], d = halfR[2 * k + 1];
+      mag[(0 * bins + k) * frames + f] = Math.sqrt(a * a + b * b);
+      mag[(1 * bins + k) * frames + f] = Math.sqrt(c * c + d * d);
+    }
+  }
+  const t2 = Date.now();
+  const feeds = {};
+  feeds[sess.inputNames[0]] = new ort.Tensor('float32', mag, [1, 2, bins, frames]);
+  const outObj = await sess.run(feeds);
+  const vm = outObj[sess.outputNames[0]].data;
+  const t3 = Date.now();
+
+  // ② 掩码 → 伴奏复数谱 → iSTFT 叠加
+  const total = n + N;
+  const oL = new Float32Array(total), oR = new Float32Array(total), wsum = new Float32Array(total);
+  const segL = new Float64Array(N), segR = new Float64Array(N);
+  for (let f = 0; f < frames; f++) {
+    umxFrame(t, L, R, f * hop - pad, half, halfR);
+    for (let k = 0; k < bins; k++) {
+      const ml = Math.min(1, Math.max(0, vm[(0 * bins + k) * frames + f] / Math.max(1e-8, mag[(0 * bins + k) * frames + f])));
+      const mr = Math.min(1, Math.max(0, vm[(1 * bins + k) * frames + f] / Math.max(1e-8, mag[(1 * bins + k) * frames + f])));
+      half[2 * k] *= (1 - ml); half[2 * k + 1] *= (1 - ml);
+      halfR[2 * k] *= (1 - mr); halfR[2 * k + 1] *= (1 - mr);
+    }
+    // 打包逆变换：Z[k] = L[k] + iR[k]
+    const zr = t.zr, zi = t.zi;
+    zr.fill(0); zi.fill(0);
+    zr[0] = half[0]; zi[0] = halfR[0];
+    for (let k = 1; k < bins; k++) {
+      const lre = half[2 * k], lim = half[2 * k + 1], rre = halfR[2 * k], rim = halfR[2 * k + 1];
+      zr[k] = lre - rim; zi[k] = lim + rre;
+      const j = N - k;
+      zr[j] = lre + rim; zi[j] = rre - lim;
+    }
+    fft4k(t, zr, zi, true);
+    const base = f * hop - pad;
+    for (let i = 0; i < N; i++) {
+      const p = base + i;
+      if (p < 0 || p >= total) continue;
+      const w = t.win[i];
+      oL[p] += (zr[i] / N) * w; oR[p] += (zi[i] / N) * w; wsum[p] += w * w;
+    }
+  }
+  const t4 = Date.now();
+  for (let i = 0; i < total; i++) { const w = wsum[i]; if (w > 1e-6) { oL[i] /= w; oR[i] /= w; } }
+  let peak = 0;
+  for (let i = 0; i < n; i++) { const a = Math.abs(oL[i]), b = Math.abs(oR[i]); if (a > peak) peak = a; if (b > peak) peak = b; }
+  const g = peak > 0.98 ? 0.98 / peak : 1;
+  const iL = new Int16Array(n), iR = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = oL[i] * g * 32767, b = oR[i] * g * 32767;
+    iL[i] = a > 32767 ? 32767 : a < -32768 ? -32768 : a | 0;
+    iR[i] = b > 32767 ? 32767 : b < -32768 ? -32768 : b | 0;
+  }
+  const enc = new lamejs.Mp3Encoder(2, sr, 192);
+  const parts = [];
+  for (let i = 0; i < n; i += 1152) {
+    const b = enc.encodeBuffer(iL.subarray(i, i + 1152), iR.subarray(i, i + 1152));
+    if (b.length) parts.push(Buffer.from(b));
+  }
+  const fb = enc.flush(); if (fb.length) parts.push(Buffer.from(fb));
+  return { mp3: Buffer.concat(parts), sr, dur: n / sr, ms: { decode: t1 - t0, stft: t2 - t1, infer: t3 - t2, istft: t4 - t3, enc: Date.now() - t4, frames } };
 }
 
 /** 每人每天 3 首（按天记，跨天自动重置） */
@@ -1067,7 +1229,7 @@ exports.handler = async (event) => {
       const trackId = String(body.trackId || '').trim().slice(0, 80);
       if (!id || !trackId) return reply(req, 400, { error: '缺 id / trackId' });
       if (!/^[A-Za-z0-9_-]+$/.test(id)) return reply(req, 400, { error: 'id 不对' });
-      const cacheKey = 'sep/cache/' + (SEP_ENGINE === 'mdx' ? 'mdx-kara2' : 'side-cancel') + '/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json';
+      const cacheKey = 'sep/cache/' + (SEP_ENGINE === 'umx' ? 'umx-hq' : SEP_ENGINE === 'mdx' ? 'mdx-kara2' : 'side-cancel') + '/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json';
       const hit = await ossGetJson(cacheKey).catch(() => null);
       if (hit && hit.url) return reply(req, 200, { ok: true, cached: true, url: hit.url, size: hit.size || 0, engine: hit.engine });
       const act = await ossGetJson(sepActiveKey(me.sub)).catch(() => null);

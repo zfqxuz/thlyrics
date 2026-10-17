@@ -28,7 +28,7 @@ def env():
         'TOKEN_SECRET': fc.secret(),
         'ALLOW_ORIGINS': 'https://zfqxuz.github.io,https://localhost,capacitor://localhost,http://127.0.0.1:8848,http://localhost:8848',
         'ROLE': 'sep',
-        'SEP_ENGINE': 'side-cancel',   # AI 分轨（kara2）模型选错，先停用，退回声道相消
+        'SEP_ENGINE': 'umx',   # Open-Unmix UMX-HQ：整曲 -> 人声/伴奏
     }
 
 
