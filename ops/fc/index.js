@@ -152,8 +152,8 @@ const INDEX_KEY = `${PREFIX}_index.json`;
 // ─────────── 记录合并（和时间戳规则同前端：谁改得晚听谁的） ───────────
 const n0 = (v) => (Number(v) || 0);
 function mergeStates(a, b) {
-  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, a || {});
-  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, clearedAt: 0 }, b || {});
+  const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, clearedAt: 0 }, a || {});
+  const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, clearedAt: 0 }, b || {});
   const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
   out.known = {};
   for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
@@ -186,6 +186,30 @@ function mergeStates(a, b) {
     const x = A.words[k] || {}, y = B.words[k] || {};
     const v = n0(y.u) > n0(x.u) ? y : x;
     if (v && v.m && (n0(v.u) > out.clearedAt || !out.clearedAt)) out.words[k] = v;
+  }
+  out.star = {};                                   // 星标（和 known 同构：正=标了，负=取消）
+  for (const k of new Set([...Object.keys(A.star), ...Object.keys(B.star)])) {
+    const x = n0(A.star[k]), y = n0(B.star[k]);
+    const v = Math.abs(y) > Math.abs(x) ? y : x;
+    if (v && Math.abs(v) > out.clearedAt) out.star[k] = v;
+  }
+  out.rev = {};                                    // 复习档案（按最后作答时间 t 取胜）
+  for (const k of new Set([...Object.keys(A.rev), ...Object.keys(B.rev)])) {
+    const x = A.rev[k] || {}, y = B.rev[k] || {};
+    const v = n0(y.t) > n0(x.t) ? y : x;
+    if (v && (n0(v.s) > 0 || n0(v.e) > 0)) out.rev[k] = v;
+  }
+  out.sep = {};                                    // 伴奏地址（按 at 取新）
+  for (const k of new Set([...Object.keys(A.sep), ...Object.keys(B.sep)])) {
+    const x = A.sep[k] || {}, y = B.sep[k] || {};
+    const v = n0(y.at) > n0(x.at) ? y : x;
+    if (v && v.url) out.sep[k] = v;
+  }
+  out.sepOn = {};                                  // 是否用伴奏播放（有符号时间戳）
+  for (const k of new Set([...Object.keys(A.sepOn), ...Object.keys(B.sepOn)])) {
+    const x = n0(A.sepOn[k]), y = n0(B.sepOn[k]);
+    const v = Math.abs(y) > Math.abs(x) ? y : x;
+    if (v) out.sepOn[k] = v;
   }
   out.audio = Object.assign({}, B.audio, A.audio);
   out.del = Object.assign({}, B.del);
@@ -261,6 +285,178 @@ function httpGetBuf(url, headers, timeout) {
     req.on('timeout', () => req.destroy(new Error('上游超时')));
     req.end();
   });
+}
+
+// ─────────── 伴奏生成（去人声 · 声道相消） ───────────
+// 说明：这是「快速伴奏」——把居中人声用 L/R 相消抵掉，再把 150Hz 以下的低频加回去保住底鼓/贝斯。
+// 不是 AI 分轨（Demucs 那类要容器镜像，本机没有 docker 打不了包），质量档次写在返回里。
+// 同一来源只解析一次：L1 来源缓存（平台+id）→ L2 内容缓存（音频 sha256）→ 都没有才真算。
+const SEP_DAILY = 3;                       // 每人每天最多 3 首
+const SEP_TTL_DAYS = 3650;
+let SEP_MODS = null;
+
+function ossSign(key, expiresIn = SEP_TTL_DAYS * 86400) {
+  const exp = Math.floor(Date.now() / 1000) + expiresIn;
+  const sts = ['GET', '', '', String(exp), `/${OSS_BUCKET}/${key}`].join('\n');
+  const sig = crypto.createHmac('sha1', ENV.OSS_SK).update(sts).digest('base64');
+  const q = `OSSAccessKeyId=${encodeURIComponent(ENV.OSS_AK)}&Expires=${exp}&Signature=${encodeURIComponent(sig)}`;
+  return `https://${OSS_HOST}/` + key.split('/').map(encodeURIComponent).join('/') + '?' + q;
+}
+
+async function ossHead(key) {
+  const r = await ossRequest('HEAD', key);
+  return r.status === 200;
+}
+
+async function loadSepMods() {
+  if (!SEP_MODS) {
+    const [{ MPEGDecoder }, lame] = await Promise.all([import('mpg123-decoder'), import('@breezystack/lamejs')]);
+    SEP_MODS = { MPEGDecoder, lamejs: lame.default || lame };
+  }
+  return SEP_MODS;
+}
+
+/** 声道相消 + 低频回补 → MP3（192kbps） */
+async function vocalCut(buf) {
+  const { MPEGDecoder, lamejs } = await loadSepMods();
+  const t0 = Date.now();
+  const dec = new MPEGDecoder();
+  await dec.ready;
+  const r = await dec.decode(buf);
+  dec.free();
+  if (!r || !r.samplesDecoded) throw new Error('音频解不开');
+  if (r.channelData.length < 2) throw new Error('单声道音轨去不了人声');
+  const sr = r.sampleRate || 44100;
+  const n = r.samplesDecoded;
+  const L = r.channelData[0], R = r.channelData[1];
+  const t1 = Date.now();
+  // 四阶低通（两级 RBJ biquad，140Hz）：只把「底鼓/贝斯」这一层加回中置，
+  // 一阶太缓（1kHz 才 -16dB，人声会漏回来），两级 -24dB/oct 才够干净。
+  const mkLP = () => {
+    const w0 = 2 * Math.PI * 140 / sr, cw = Math.cos(w0), al = Math.sin(w0) / (2 * 0.7071);
+    const a0 = 1 + al;
+    return { b0: (1 - cw) / 2 / a0, b1: (1 - cw) / a0, b2: (1 - cw) / 2 / a0, a1: -2 * cw / a0, a2: (1 - al) / a0, x1: 0, x2: 0, y1: 0, y2: 0 };
+  };
+  const lp1 = mkLP(), lp2 = mkLP();
+  const lpStep = (f, x) => {
+    const y = f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+    f.x2 = f.x1; f.x1 = x; f.y2 = f.y1; f.y1 = y;
+    return y;
+  };
+  let peak = 0;
+  const fL = new Float32Array(n), fR = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const mid = (L[i] + R[i]) * 0.5, side = (L[i] - R[i]) * 0.5;
+    const low = lpStep(lp2, lpStep(lp1, mid));
+    const yl = side + low, yr = -side + low;
+    fL[i] = yl; fR[i] = yr;
+    const am = (yl < 0 ? -yl : yl) > (yr < 0 ? -yr : yr) ? (yl < 0 ? -yl : yl) : (yr < 0 ? -yr : yr);
+    if (am > peak) peak = am;
+  }
+  const g = peak > 0.95 ? 0.95 / peak : 1;
+  const iL = new Int16Array(n), iR = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = fL[i] * g * 32767, y = fR[i] * g * 32767;
+    iL[i] = x > 32767 ? 32767 : x < -32768 ? -32768 : x | 0;
+    iR[i] = y > 32767 ? 32767 : y < -32768 ? -32768 : y | 0;
+  }
+  const t2 = Date.now();
+  const enc = new lamejs.Mp3Encoder(2, sr, 192);
+  const out = [];
+  const STEP = 1152;
+  for (let i = 0; i < n; i += STEP) {
+    const b = enc.encodeBuffer(iL.subarray(i, i + STEP), iR.subarray(i, i + STEP));
+    if (b.length) out.push(Buffer.from(b));
+  }
+  const fb = enc.flush();
+  if (fb.length) out.push(Buffer.from(fb));
+  return { mp3: Buffer.concat(out), sr, dur: n / sr, ms: { decode: t1 - t0, proc: t2 - t1, enc: Date.now() - t2 } };
+}
+
+/** 异步调自己（FC 3.0 OpenAPI，V3 签名）：提交后立刻返回，活儿在后台跑 */
+function fcInvokeAsync(payload) {
+  return new Promise((resolve, reject) => {
+    const host = 'fcv3.cn-hangzhou.aliyuncs.com';
+    const path = `/2023-03-30/functions/${encodeURIComponent(ENV.FC_FUNCTION || 'thlyrics-auth')}/invocations`;
+    const body = Buffer.from(JSON.stringify(payload), 'utf8');
+    const hashed = crypto.createHash('sha256').update(body).digest('hex');
+    const date = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const nonce = crypto.randomUUID();
+    const H = {
+      host, 'x-acs-version': '2023-03-30', 'x-acs-date': date, 'x-acs-signature-nonce': nonce,
+      'x-acs-content-sha256': hashed, 'x-fc-invocation-type': 'Async', 'content-type': 'application/json',
+    };
+    const signed = Object.keys(H).sort().join(';');
+    const canonHeaders = Object.keys(H).sort().map((k) => `${k}:${String(H[k]).trim()}\n`).join('');
+    const canon = ['POST', path, '', canonHeaders, signed, hashed].join('\n');
+    const sts = 'ACS3-HMAC-SHA256\n' + crypto.createHash('sha256').update(canon).digest('hex');
+    const sig = crypto.createHmac('sha256', ENV.OSS_SK).update(sts).digest('hex');
+    const req = https.request({
+      host, path, method: 'POST', timeout: 15000,
+      headers: Object.assign({}, H, {
+        'content-length': body.length,
+        Authorization: `ACS3-HMAC-SHA256 Credential=${ENV.OSS_AK},SignedHeaders=${signed},Signature=${sig}`,
+      }),
+    }, (res) => {
+      const b = [];
+      res.on('data', (d) => b.push(d));
+      res.on('end', () => {
+        const txt = Buffer.concat(b).toString('utf8');
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve({ status: res.statusCode, body: txt });
+        else reject(new Error('FC invoke ' + res.statusCode + ' ' + txt.slice(0, 200)));
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('FC invoke timeout')));
+    req.write(body); req.end();
+  });
+}
+
+const sepTaskKey = (id) => `sep/tasks/${id}.json`;
+const sepActiveKey = (uid) => `sep/active/${uid}.json`;
+const sepRunToken = () => crypto.createHmac('sha256', ENV.TOKEN_SECRET).update('sep-run-v1').digest('hex').slice(0, 32);
+
+/** 真正干活：下载 → 相消 → 上传 → 写任务 */
+async function sepRun(taskId) {
+  const tk = await ossGetJson(sepTaskKey(taskId));
+  if (!tk) return;
+  const t0 = Date.now();
+  const upd = async (patch) => { Object.assign(tk, patch); await ossPutJson(sepTaskKey(taskId), tk); };
+  await upd({ status: 'running', startedAt: Date.now() });
+  try {
+    const src = tk.src, id = tk.id;
+    const a = src === 'tencent' ? await qqAudio(id) : await netAudio(id, 320);
+    if (!a || !a.url) throw new Error('这首歌没有可播地址');
+    const dl = await httpGetBuf(a.url, { 'User-Agent': NET_UA, Referer: 'https://music.163.com/' }, 60000);
+    if (dl.status !== 200 || !dl.body || !dl.body.length) throw new Error('音频下载失败');
+    const sha = crypto.createHash('sha256').update(dl.body).digest('hex');
+    const outKey = `sep/out/${sha}.mp3`;
+    let size = 0, reused = false;
+    if (await ossHead(outKey)) { reused = true; }
+    else {
+      const r = await vocalCut(dl.body);
+      const put = await ossRequest('PUT', outKey, r.mp3, 'audio/mpeg');
+      if (put.status !== 200) throw new Error('上传失败 ' + put.status);
+      size = r.mp3.length;
+    }
+    const url = ossSign(outKey);
+    const rec = { src, id, url, size, engine: 'side-cancel', at: Date.now() };
+    await ossPutJson('sep/cache/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json', rec);
+    await upd({ status: 'done', url, size, engine: 'side-cancel', cached: reused, ms: Date.now() - t0, u: Date.now() });
+  } catch (e) {
+    await upd({ status: 'error', error: String((e && e.message) || e), ms: Date.now() - t0, u: Date.now() });
+  } finally {
+    try { const act = await ossGetJson(sepActiveKey(tk.uid)); if (act && act.taskId === taskId) await ossPutJson(sepActiveKey(tk.uid), { taskId: '', at: Date.now() }); } catch { /* 忽略 */ }
+  }
+}
+
+/** 每人每天 3 首（按天记，跨天自动重置） */
+async function sepQuota(uid) {
+  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);   // 按北京时间算天
+  const key = `sep/quota/${uid}.json`;
+  const cur = (await ossGetJson(key)) || { day: today, n: 0 };
+  if (cur.day !== today) { cur.day = today; cur.n = 0; }
+  return { key, cur };
 }
 
 /** 在线日语 TTS（只给网页版用）：百度日语优先、有道兜底 */
@@ -615,9 +811,69 @@ exports.handler = async (event) => {
       return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
     }
 
+    // 内部：异步调用的落点（不对外，靠 x-sep-token 认）
+    if (action === '/sep/run' && method === 'POST') {
+      const tok = String((req.headers && (req.headers['x-sep-token'] || req.headers['X-Sep-Token'])) || '');
+      if (tok !== sepRunToken()) return reply(req, 403, { error: 'forbidden' });
+      await sepRun(String(body.taskId || ''));
+      return reply(req, 200, { ok: true });
+    }
+
     // 余下的都要登录
     const me = userOf(req);
     if (!me) return reply(req, 401, { error: '请先登录' });
+
+    // ── 伴奏生成（去人声）：同一来源不重复解析；提交后异步跑，客户端轮询 ──
+    if (action === '/sep' && method === 'POST') {
+      const src = String(body.src || 'netease');
+      const id = String(body.id || '').trim().slice(0, 40);
+      const trackId = String(body.trackId || '').trim().slice(0, 80);
+      if (!id || !trackId) return reply(req, 400, { error: '缺 id / trackId' });
+      if (!/^[A-Za-z0-9_-]+$/.test(id)) return reply(req, 400, { error: 'id 不对' });
+      const cacheKey = 'sep/cache/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json';
+      const hit = await ossGetJson(cacheKey).catch(() => null);
+      if (hit && hit.url) return reply(req, 200, { ok: true, cached: true, url: hit.url, size: hit.size || 0, engine: hit.engine });
+      const act = await ossGetJson(sepActiveKey(me.sub)).catch(() => null);
+      if (act && act.taskId) {
+        const cur = await ossGetJson(sepTaskKey(act.taskId)).catch(() => null);
+        if (cur && (cur.status === 'queued' || cur.status === 'running') && Date.now() - n0(cur.at) < 15 * 60000) {
+          return reply(req, 200, { ok: true, taskId: act.taskId, status: cur.status, reused: true });
+        }
+      }
+      const qt = await sepQuota(me.sub);
+      if (qt.cur.n >= SEP_DAILY) return reply(req, 429, { error: `今天已经做了 ${SEP_DAILY} 首，明天再来` });
+      const taskId = crypto.randomBytes(9).toString('hex');
+      const tk = { taskId, uid: me.sub, trackId, src, id, status: 'queued', at: Date.now() };
+      await ossPutJson(sepTaskKey(taskId), tk);
+      qt.cur.n += 1;
+      await ossPutJson(qt.key, qt.cur);
+      await ossPutJson(sepActiveKey(me.sub), { taskId, at: Date.now() });
+      try {
+        await fcInvokeAsync({
+          rawPath: '/api/sep/run', requestContext: { http: { method: 'POST' } },
+          headers: { 'x-sep-token': sepRunToken(), 'x-sep-task': taskId },
+          body: JSON.stringify({ taskId }),
+        });
+      } catch (e) {
+        await ossPutJson(sepTaskKey(taskId), Object.assign(tk, { status: 'error', error: '任务启动失败' }));
+        return reply(req, 500, { error: '任务启动失败：' + String((e && e.message) || e) });
+      }
+      return reply(req, 200, { ok: true, taskId, status: 'queued', left: SEP_DAILY - qt.cur.n });
+    }
+
+    if (action === '/sep/status') {
+      const taskId = String(q.taskId || '').replace(/[^a-f0-9]/g, '');
+      if (!taskId) return reply(req, 400, { error: '缺 taskId' });
+      const tk = await ossGetJson(sepTaskKey(taskId));
+      if (!tk || tk.uid !== me.sub) return reply(req, 404, { error: '任务不存在' });
+      return reply(req, 200, { ok: true, status: tk.status, url: tk.url || '', size: tk.size || 0, error: tk.error || '', engine: tk.engine || '', ms: tk.ms || 0 });
+    }
+
+    // 查今天还剩几次（前端显示用）
+    if (action === '/sep/quota') {
+      const qt = await sepQuota(me.sub);
+      return reply(req, 200, { ok: true, left: Math.max(0, SEP_DAILY - qt.cur.n), total: SEP_DAILY });
+    }
 
     if (action === '/me') {
       const acct0 = await ossGetJson(acctKey(me.sub));
@@ -645,7 +901,7 @@ exports.handler = async (event) => {
       const a = await requireAdmin(req);
       if (a.err) return a.err;
       const key = String(body.key || '');
-      if (!/^(sync|audio|kuromoji)\//.test(key)) return reply(req, 400, { error: '只允许删 sync/ / audio/ / kuromoji/ 下的对象' });
+      if (!/^(sync|audio|kuromoji|sep|bundles)\//.test(key)) return reply(req, 400, { error: '只允许删 sync/ / audio/ / kuromoji/ 下的对象' });
       const done = await ossDelete(key);
       return reply(req, done ? 200 : 500, { ok: done, key });
     }
@@ -683,3 +939,5 @@ exports.handler = async (event) => {
     return reply(req, 500, { error: String((e && e.message) || e) });
   }
 };
+
+exports.__test = { vocalCut, ossSign, sepQuota };

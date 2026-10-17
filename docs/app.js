@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017za';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck } from './platform/index.js?v=20261017za';
-import { icon } from './icons.js?v=20261017za';
+import { V } from './version.js?v=20261017zb';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck } from './platform/index.js?v=20261017zb';
+import { icon } from './icons.js?v=20261017zb';
 
 (() => {
   'use strict';
@@ -48,14 +48,14 @@ import { icon } from './icons.js?v=20261017za';
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {},
+  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {},
     revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false },
     rate: 1, ruby: true, gloss: false, zh: true,
     mode: 'all', del: {}, autoSync: true, theme: 'dark', tSort: 'new' };
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
-  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
+  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.sep = S.sep || {}; S.sepOn = S.sepOn || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (!S.tSort) S.tSort = 'new';
     }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
@@ -581,6 +581,8 @@ import { icon } from './icons.js?v=20261017za';
     return null;
   }
   async function urlFor(track) {
+    const sp = (S.sep || {})[track.id];                             // 伴奏：生成了并且开关打开就走它
+    if (sp && sp.url && Number((S.sepOn || {})[track.id]) > 0) return sp.url;
     if (track.audioOss) return track.audioOss;                       // 自建对象存储固定直链：不需要解析
     const st = S.audio[track.id] || track.audio;
     if (!st) return null;
@@ -1988,8 +1990,8 @@ import { icon } from './icons.js?v=20261017za';
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
-    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, clearedAt: 0 }, a);
-    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, clearedAt: 0 }, b);
+    const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, clearedAt: 0 }, a);
+    const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, clearedAt: 0 }, b);
     const out = { clearedAt: Math.max(n0(A.clearedAt), n0(B.clearedAt)) };
     out.known = {};
     for (const k of new Set([...Object.keys(A.known), ...Object.keys(B.known)])) {
@@ -2035,6 +2037,18 @@ import { icon } from './icons.js?v=20261017za';
       const v = n0(y.u) > n0(x.u) ? y : x;
       if (v && v.y) out.roma[k] = v;
     }
+    out.sep = {};                                       // 伴奏地址：按生成时间取新
+    for (const k of new Set([...Object.keys(A.sep), ...Object.keys(B.sep)])) {
+      const x = A.sep[k] || {}, y = B.sep[k] || {};
+      const v = n0(y.at) > n0(x.at) ? y : x;
+      if (v && v.url) out.sep[k] = v;
+    }
+    out.sepOn = {};                                     // 是否用伴奏播（有符号时间戳）
+    for (const k of new Set([...Object.keys(A.sepOn), ...Object.keys(B.sepOn)])) {
+      const x = n0(A.sepOn[k]), y = n0(B.sepOn[k]);
+      const v = Math.abs(y) > Math.abs(x) ? y : x;
+      if (v) out.sepOn[k] = v;
+    }
     out.audio = Object.assign({}, B.audio, A.audio);             // 手册绑定的音频地址：本机优先
     out.del = Object.assign({}, B.del);
     for (const [k, v] of Object.entries(A.del)) out.del[k] = Math.max(n0(out.del[k]), n0(v));
@@ -2048,7 +2062,7 @@ import { icon } from './icons.js?v=20261017za';
     return out;
   }
   const userState = (o) => ({ known: o.known || {}, notes: o.notes || {}, audio: o.audio || {}, imp: o.imp || {}, del: o.del || {},
-    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, words: o.words || {}, star: o.star || {}, rev: o.rev || {}, clearedAt: n0(o.clearedAt) });
+    fav: o.fav || {}, sing: o.sing || {}, roma: o.roma || {}, words: o.words || {}, star: o.star || {}, rev: o.rev || {}, sep: o.sep || {}, sepOn: o.sepOn || {}, clearedAt: n0(o.clearedAt) });
 
   /** 合并后多出来的导入曲目，挂进内存里的曲库 */
   function registerImpTracks() {
@@ -2086,7 +2100,7 @@ import { icon } from './icons.js?v=20261017za';
         await ensureReadings().catch(() => {});
         applying = true;
         S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
-        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing; S.roma = mergedAcc.roma; S.star = mergedAcc.star; S.rev = mergedAcc.rev;
+        S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing; S.roma = mergedAcc.roma; S.star = mergedAcc.star; S.rev = mergedAcc.rev; S.sep = mergedAcc.sep; S.sepOn = mergedAcc.sepOn;
         S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();
@@ -3267,6 +3281,7 @@ import { icon } from './icons.js?v=20261017za';
     setNow(t.title + ' — ' + t.artist);
     $('minibar').classList.add('on');
     $('srcinfo').textContent = describeSource(t);
+    renderSep();
     $('nidinput').value = (S.audio[t.id] && S.audio[t.id].nid) || (t.audio && t.audio.nid) || '';
     if ($('p-nosrc')) $('p-nosrc').hidden = !!(t.audioOss || t.audio || S.audio[t.id]);
     if (!same) { activeLine = -1; loopLine = null; }
@@ -3318,6 +3333,79 @@ import { icon } from './icons.js?v=20261017za';
     if (s && s.nid) return `音频：${s.type === 'tencent' ? 'QQ音乐' : '网易云'}${s.trial ? ' · 试听片段（约 30 秒）' : ''}`;
     return '没有音频';
   }
+  // ────────────── 伴奏（服务端去人声） ──────────────
+  let sepBusy = false;
+  function renderSep() {
+    const row = $('seprow'); if (!row) return;
+    const t = curTrack;
+    if (!t) { row.hidden = true; return; }
+    row.hidden = false;
+    const sp = (S.sep || {})[t.id];
+    const on = Number((S.sepOn || {})[t.id]) > 0;
+    const info = $('sepinforow'), mk = $('sep-make'), tg = $('sep-toggle');
+    if (sp && sp.url) {
+      if (info) info.textContent = on ? '伴奏播放中' : '伴奏已生成';
+      if (mk) mk.textContent = '重做';
+      if (tg) { tg.hidden = false; tg.textContent = on ? '用原曲' : '用伴奏'; tg.classList.toggle('on', on); }
+    } else {
+      if (info) info.textContent = '';
+      if (mk) mk.textContent = sepBusy ? '生成中…' : '生成伴奏';
+      if (tg) tg.hidden = true;
+    }
+    if (mk) mk.disabled = sepBusy;
+  }
+  /** 换音源（原曲 ⇄ 伴奏）后从当前位置接着放，不从头开始 */
+  function reloadAudioHere() {
+    const t = curTrack; if (!t) return;
+    const at = audio.currentTime || 0;
+    const was = !audio.paused;
+    audio.pause();
+    audio.removeAttribute('data-tid');
+    audio.removeAttribute('src');
+    try { audio.load(); } catch { /* 忽略 */ }
+    playTrack(t, at > 1 ? { at } : {}).then(() => { if (!was) audio.pause(); sepRenderSoon(); });
+  }
+  const sepRenderSoon = () => setTimeout(renderSep, 300);
+  const sepSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function sepMake() {
+    const t = curTrack; if (!t || sepBusy) return;
+    const st = S.audio[t.id] || t.audio;
+    if (!st || !st.nid) { toast('先绑定音频'); return; }
+    const tid = t.id;
+    sepBusy = true; renderSep(); toast('伴奏生成中…');
+    try {
+      const r = await apiCall('/sep', { method: 'POST', body: { trackId: tid, src: st.type === 'tencent' ? 'tencent' : 'netease', id: st.nid } });
+      let url = r && r.url;
+      if (!url && r && r.taskId) {
+        // 异步任务：每 2.5 秒问一次，最长 10 分钟
+        for (let i = 0; i < 240 && !url; i++) {
+          await sepSleep(2500);
+          const st2 = await apiCall('/sep/status?taskId=' + encodeURIComponent(r.taskId));
+          if (st2.status === 'done') url = st2.url;
+          else if (st2.status === 'error') throw new Error(st2.error || '生成失败');
+        }
+        if (!url) throw new Error('生成超时');
+      }
+      if (!url) throw new Error('没有地址');
+      S.sep[tid] = { url, at: Date.now(), engine: (r && r.engine) || 'side-cancel' };
+      S.sepOn[tid] = Date.now();
+      save();
+      toast('伴奏好了');
+      if (curTrack && curTrack.id === tid) reloadAudioHere();
+    } catch (e) {
+      toast(String((e && e.message) || e));
+    } finally {
+      sepBusy = false; renderSep();
+    }
+  }
+  function sepToggle() {
+    const t = curTrack; if (!t) return;
+    const on = Number((S.sepOn || {})[t.id]) > 0;
+    S.sepOn[t.id] = on ? -Date.now() : Date.now();
+    save(); renderSep(); reloadAudioHere();
+  }
+  if (typeof window !== 'undefined') window.__tlSep = () => ({ busy: sepBusy, sep: (S.sep || {})[curTrack && curTrack.id] || null, on: Number((S.sepOn || {})[curTrack && curTrack.id]) > 0 });
+
   function applyDisplay() {
     document.body.classList.toggle('gloss', S.gloss !== false);
     document.body.classList.toggle('ruby', S.ruby !== false);
@@ -3904,6 +3992,8 @@ import { icon } from './icons.js?v=20261017za';
       if (audio.paused) { if (audio.error || audio.readyState === 0) playTrack(curTrack); else audio.play().catch(() => {}); }
       else audio.pause();
     }
+    if ($('sep-make')) $('sep-make').onclick = () => sepMake();
+    if ($('sep-toggle')) $('sep-toggle').onclick = () => sepToggle();
     if (!location.hash) history.replaceState(null, '', '#/home');   // 用 replaceState：别触发 hashchange（否则闸门后面的页面会被渲染出来）
     navFrom = location.hash || '#/home';
     window.addEventListener('hashchange', onNavGuard);                 // 先挂守卫：误触退出要拦下来问一句

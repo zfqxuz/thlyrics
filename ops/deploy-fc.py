@@ -51,6 +51,15 @@ def build_zip():
                 for f in files:
                     p = os.path.join(root, f)
                     z.write(p, 'vendor/node_modules/' + dep + '/' + os.path.relpath(p, base))
+        # 伴奏分离：mp3 解码（wasm）+ mp3 编码（lamejs），加起来不到 1MB
+        for dep in ['mpg123-decoder', '@wasm-audio-decoders/common', '@eshaz/web-worker', '@breezystack/lamejs', 'simple-yenc']:
+            base = os.path.join(nm, dep)
+            if not os.path.isdir(base):
+                continue
+            for root, _dirs, files in os.walk(base):
+                for f in files:
+                    p = os.path.join(root, f)
+                    z.write(p, 'node_modules/' + dep + '/' + os.path.relpath(p, base))
     return base64.b64encode(buf.getvalue()).decode()
 
 def main():
@@ -64,7 +73,7 @@ def main():
         'ALLOW_ORIGINS': 'https://zfqxuz.github.io,https://localhost,capacitor://localhost,http://127.0.0.1:8848,http://localhost:8848',
     }
     body = {
-        'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 60, 'memorySize': 1024,
+        'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 300, 'memorySize': 1024,
         'code': {'zipFile': build_zip()}, 'environmentVariables': env,
     }
     r = acs3.call('PUT', HOST, f'/2023-03-30/functions/{FUNC}', body=body)

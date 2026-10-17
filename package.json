@@ -17,6 +17,8 @@
     "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
-    "kuromoji": "^0.1.2"
+    "@breezystack/lamejs": "^1.2.7",
+    "kuromoji": "^0.1.2",
+    "mpg123-decoder": "^1.0.3"
   }
 }
