@@ -25,6 +25,9 @@ let bad = 0;
 const check = (n, ok, extra = '') => { if (!ok) bad++; console.log(`${ok ? '✓' : '✗'} ${n}${extra ? ' — ' + extra : ''}`); };
 
 await page.goto(BASE + '?acc=' + Date.now(), { waitUntil: 'load' });
+await page.waitForSelector('#view-home', { timeout: 30000 });
+await page.locator('#btn-av').click();
+await page.locator('#av-login').click();
 await page.waitForSelector('#g-reg', { timeout: 30000 });
 await page.setInputFiles('#g-av', { name: 'a.png', mimeType: 'image/png',
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII=', 'base64') });
@@ -32,6 +35,8 @@ await page.waitForTimeout(800);
 await page.locator('#g-name').fill(NAME);
 await page.locator('#g-pass').fill(PASS);
 await page.locator('#g-reg').click();
+await page.waitForTimeout(1200);
+if (await page.locator('#rc-ok').count()) { await page.locator('#rc-ok').check(); await page.locator('#rc-done').click(); }
 await page.waitForTimeout(7000);
 const reg = await page.evaluate(() => ({ gate: document.getElementById('gate').hidden, av: !!document.querySelector('#btn-av img'), name: (JSON.parse(localStorage.getItem('thlyrics.account.v1') || '{}').name) || '' }));
 check('线上注册（带头像）并放行', reg.gate && reg.name === NAME, `${reg.name} · 头像 ${reg.av ? '有' : '无'}`);
@@ -70,6 +75,9 @@ await page.waitForTimeout(3000);
 // 换设备：清掉浏览器数据 + 重新登录
 await page.evaluate(() => localStorage.clear());
 await page.goto(BASE + '?acc=' + Date.now() + '5#/me', { waitUntil: 'load' });
+await page.waitForSelector('#view-me', { timeout: 30000 });
+await page.locator('#btn-av').click();
+await page.locator('#av-login').click();
 await page.waitForSelector('#g-login', { timeout: 30000 });
 await page.locator('#g-name').fill(NAME);
 await page.locator('#g-pass').fill(PASS);

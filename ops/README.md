@@ -16,8 +16,9 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/health` | 存活探测 |
-| POST | `/api/register` | `{name, pass, data?}` → `{token, user}`；用户名唯一，密码 ≥6 位 |
-| POST | `/api/login` | `{name, pass}` → `{token, user}` |
+| POST | `/api/register` | `{name, pass, data?}` → `{token, recovery, user}`；用户名唯一，密码 ≥6 位；恢复码只返回一次 |
+| POST | `/api/login` | `{name, pass}` → `{token, user}`；老账号首次登录会补发一次恢复码 |
+| POST | `/api/recover` | `{name, code, new}` → `{token, recovery, user}`；恢复码一次性，重置后换新 |
 | GET | `/api/me` | 需要 `Authorization: Bearer <token>` |
 | POST | `/api/avatar` | `{avatar}`（data URL，≤80KB，128×128 jpeg）；头像存在 account.json 里 |
 | POST | `/api/password` | `{old, new}`，改完返回新 token |
@@ -73,4 +74,5 @@ python3 ops/deploy-fc.py        # 把 ops/fc/ 打包上传，并设置环境变�
 
 - RDS PostgreSQL Serverless：cn-hangzhou 查下来没有可卖规格（`DescribeAvailableZones` 为空），
   所以先用 OSS 当存储（每个账号两个小 JSON）。真要 SQL，等有规格时换 `dataKey/ossGetJson` 这一层即可。
-- 邮件找回密码、账号注销、多设备会话列表：没做。
+- 邮件找回密码：没做；改用注册/登录时下发的一次性恢复码。
+- 账号注销、多设备会话列表：没做。
