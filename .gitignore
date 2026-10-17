@@ -22,3 +22,15 @@ node_modules/
 .shots-phone/
 .e2e/android/*.mjs
 __pycache__/
+
+# 本机设计调研的临时截图/抓取
+.research-ios/
+
+# ECDICT source dump（构建英语词库用，许可证在 docs/data/en/）
+data/ecdict/
+
+# 本机构建产物
+docs/dl/thlyrics-ios.apk
+
+# 语料词频表 / 词典原始导出（构建内容包用，许可证见 docs/data/<lang>/）
+data/freq/

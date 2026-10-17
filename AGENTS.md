@@ -1343,3 +1343,34 @@ paused=false、currentTime 6s 内推进 5.96s、duration 221s、readyState=4、�
   - 切歌不继承上一首的伴奏开关；生成中再点一次可取消切换；
   - 旧版本的 `sepPref` 在 `loadLS()` 里删除，不再读取。
 - 真机验证：原始「Night of Bloom」的怪声来自生成后的伴奏，不是原曲；修复后不再自动生成。
+
+### 2026-10-18：第二套界面皮肤（iOS / Liquid Glass）+ 外观切换入口
+
+- 调研 14 个公开站点（Apple HIG、Mobbin、v0、Bolt、Cursor、Framer、21st、Aceternity、Magic UI、shadcn/ui、Subframe、Onlook、Godly、Awwwards），记录见 `spec/UI-ios-research.md`。
+- 第二套皮肤**只加视觉层**：`docs/index.html` 末尾 `body.ui-ios` / `body.ui-ios.warm` 两组 token 与组件覆盖；
+  不改业务 DOM，不引入第三方图片/字体；图标继续用 Lucide。
+- 切换入口：`renderMe()`「外观 → 界面风格 · 经典 / iOS」；状态 `S.ui`（`classic` / `ios`）随本机存储和云同步走。
+- `applyUI()` 只切 `body.ui-ios`；`applyTheme()` 与 `applyUI()` 一起同步 `<meta name="theme-color">`。
+- iOS 皮肤要点：SF/PingFang 字体栈、底部毛玻璃 tab bar（原 `#tabs` + Lucide 图标）、
+  inset grouped 卡片、iOS segmented control、51×31 开关、glass sheet/mini player/播放器控制区。
+- 经典皮肤无图标变化（`.segs .tic{display:none}`），原有 E2E 选择器不受影响。
+- 修复入口：头像下拉增加「我的」；iOS 皮肤在首页也保留底部 tab bar（经典首页仍保持无 Tab 的扉页感）。
+- 真机验证：装新 APK 后若仍显示旧 `app.js?v=`，先看 Capgo OTA 的 `current()`；内容包会优先于 APK builtin。
+  本次用 `CapacitorUpdater.reset()` 回到 builtin 后才看到 `20261018i`，随后确认头像菜单「我的」、`#me-ui`、iOS 首页底部 tab 都正常。
+- 验证：`npm run check` 通过；Playwright 400×850 / 375×844 / 320×800 检查切换、刷新保持、无横向溢出。
+  注意：当前 E2E 的 `gate` 组仍假设「启动即强制登录」，与 2026-10-18 游客模式冲突，本次未改测试脚本。
+
+### 2026-10-18：多语言基础层 + 英语/日语词库包（第一版）
+
+- 新增 `docs/i18n.js`：UI locale、可学习语言、歌曲语言检测（ja/zh/ko/ru + 拉丁语系停用词启发式）。
+- `S` 新增 `userLocale`（默认 auto）、`learnLang`（默认 ja）、`songLangView`（默认 learn）、`scope`。
+- 曲库新增语言标签和语言筛选：默认只显示包含当前 `learnLang` 的歌，可切「全部语言」。
+- 学词页新增学习语言切换；学习语言 == 用户区域语言时默认隐藏。
+- 日语新增范围梯度：标日初级上/下、中级上/下、N5–N1（用现有 `br.bk` / `jl`）。
+- 新增 `scripts/build-lang-packs.mjs`：
+  - ECDICT（MIT）→ `docs/data/en/lexicon.json`（14,936 词，带 中考/高考/CET-4/CET-6/考研/IELTS/TOEFL/GRE 标签）；
+  - 现有日语词库 → `docs/data/ja/lists/*` + `docs/data/ja/pairs/ja-zh.json`；
+  - 输出 `docs/data/content-report.json`。
+- 英语已跑通：导入英语歌 → 语言打标 → 词形命中 → 学词/词卡/复习；非日语不显示读音题。
+- 注意：ECDICT 源文件 `data/ecdict/ecdict.csv` 不进仓库；输出包和 MIT 许可证进 `docs/data/en/`。
+- 尚未完成：9 个 UI locale 的全量文案、法语/俄语/西语/葡语/韩语/德语词库、完整 pair gloss 覆盖矩阵、ja-JP/en-US 之外语音包。

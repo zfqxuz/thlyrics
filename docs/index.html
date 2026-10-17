@@ -1129,6 +1129,572 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 .revinok:disabled{opacity:.5;cursor:default}
 /* 反馈条里的「读音 · 罗马音」补充信息 */
 .revfeed .fa{display:block;font-size:12px;color:var(--ink-3);margin-top:3px;font-family:var(--serif)}
+
+/* ══════════════════════════════════════════════════════════
+   UI 2 · iOS / Liquid Glass（v2）
+   干净、轻、透明：背景是环境光，内容直接落在背景上；
+   只有浮层（tab bar / 迷你条 / sheet / 弹窗 / 播放器控制区）用玻璃。
+   不做大色块、不做大按钮、不做整页卡片。
+   ══════════════════════════════════════════════════════════ */
+.segs .tic{display:none}
+.segs button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+
+/* —— 深色令牌 —— */
+body.ui-ios{
+  --serif:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans GB","Helvetica Neue",sans-serif;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","PingFang SC","Hiragino Sans GB","Helvetica Neue",sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+  --bg:#08080a; --bg-2:#0c0c10;
+  --surface:rgba(28,28,32,.48); --surface-2:rgba(44,44,48,.52);
+  --glass:rgba(22,22,26,.52); --glass-strong:rgba(20,20,24,.74);
+  --glass-line:rgba(255,255,255,.13); --glass-highlight:rgba(255,255,255,.16);
+  --line:rgba(255,255,255,.10); --hairline:rgba(255,255,255,.075);
+  --ink:#f5f5f7; --ink-2:rgba(235,235,245,.62); --ink-3:rgba(235,235,245,.36); --ink-mute:rgba(235,235,245,.22);
+  --paper:#fff;
+  --accent:#0a84ff; --accent-2:#409cff;
+  --accent-soft:rgba(10,132,255,.13); --accent-ink:#6db6ff; --accent-ink-2:#409cff;
+  --moss:#30d158; --star:#ffd60a;
+  --star-soft:rgba(255,214,10,.12); --moss-soft:rgba(48,209,88,.11);
+  --ok:#30d158; --ok-soft:rgba(48,209,88,.11); --ok-ink:#5be37a;
+  --danger:#ff453a; --danger-soft:rgba(255,69,58,.11);
+  --p-n:#64d2ff; --p-v:#ff9f0a; --p-a:#ffd60a; --p-na:#ffb340;
+  --p-adv:#bf5af2; --p-prt:rgba(235,235,245,.40); --p-aux:rgba(235,235,245,.32); --p-oth:rgba(235,235,245,.48);
+  --field:rgba(118,118,128,.14);
+  --hov:rgba(255,255,255,.045); --press:rgba(255,255,255,.075);
+  --track:rgba(255,255,255,.12); --bar:rgba(255,255,255,.10);
+  --grab:rgba(235,235,245,.28);
+  --shadow-sm:0 1px 1px rgba(0,0,0,.16);
+  --shadow:0 -24px 60px rgba(0,0,0,.40);
+  --shadow-lg:0 28px 80px rgba(0,0,0,.46);
+  --sheetline:rgba(255,255,255,.11); --layer-line:rgba(255,255,255,.14);
+  --radius:12px; --radius-lg:18px; --radius-xl:26px;
+  --ios-tabbar-h:54px;
+  background-color:#08080a;
+  background-image:
+    radial-gradient(58% 42% at 88% -4%,rgba(10,132,255,.22),transparent 62%),
+    radial-gradient(50% 40% at 8% 22%,rgba(191,90,242,.12),transparent 66%),
+    radial-gradient(64% 46% at 48% 104%,rgba(64,156,255,.08),transparent 70%),
+    linear-gradient(180deg,#08080a 0%,#0a0a0e 100%);
+  background-attachment:fixed;
+}
+/* —— 浅色令牌 —— */
+body.ui-ios.warm{
+  --bg:#eef1f6; --bg-2:#e6eaf2;
+  --surface:rgba(255,255,255,.58); --surface-2:rgba(255,255,255,.44);
+  --glass:rgba(255,255,255,.56); --glass-strong:rgba(255,255,255,.78);
+  --glass-line:rgba(255,255,255,.72); --glass-highlight:rgba(255,255,255,.90);
+  --line:rgba(60,60,67,.12); --hairline:rgba(60,60,67,.10);
+  --ink:#0b0b0f; --ink-2:rgba(60,60,67,.70); --ink-3:rgba(60,60,67,.44); --ink-mute:rgba(60,60,67,.25);
+  --paper:#fff;
+  --accent:#007aff; --accent-2:#0066d6;
+  --accent-soft:rgba(0,122,255,.10); --accent-ink:#007aff; --accent-ink-2:#0066d6;
+  --moss:#34c759; --star:#ffcc00;
+  --star-soft:rgba(255,204,0,.14); --moss-soft:rgba(52,199,89,.10);
+  --ok:#34c759; --ok-soft:rgba(52,199,89,.10); --ok-ink:#248a3d;
+  --danger:#ff3b30; --danger-soft:rgba(255,59,48,.09);
+  --p-n:#007aff; --p-v:#ff9500; --p-a:#b8860b; --p-na:#c26a00;
+  --p-adv:#af52de; --p-prt:rgba(60,60,67,.48); --p-aux:rgba(60,60,67,.40); --p-oth:rgba(60,60,67,.56);
+  --field:rgba(118,118,128,.10);
+  --hov:rgba(0,0,0,.03); --press:rgba(0,0,0,.055);
+  --track:rgba(60,60,67,.14); --bar:rgba(60,60,67,.12);
+  --grab:rgba(60,60,67,.22);
+  --shadow-sm:0 1px 1px rgba(0,0,0,.035);
+  --shadow:0 -24px 60px rgba(0,0,0,.10);
+  --shadow-lg:0 28px 80px rgba(0,0,0,.12);
+  --sheetline:rgba(60,60,67,.12); --layer-line:rgba(60,60,67,.14);
+  background-color:#eef1f6;
+  background-image:
+    radial-gradient(60% 44% at 88% -4%,rgba(0,122,255,.16),transparent 64%),
+    radial-gradient(52% 40% at 6% 22%,rgba(175,82,222,.09),transparent 68%),
+    radial-gradient(66% 48% at 48% 104%,rgba(255,255,255,.72),transparent 70%),
+    linear-gradient(180deg,#eef1f6 0%,#e9edf4 100%);
+}
+body.ui-ios,body.ui-ios.warm{font-family:var(--sans);line-height:1.5;color:var(--ink)}
+body.ui-ios .wrap{max-width:620px}
+body.ui-ios main{padding:8px 18px calc(146px + env(safe-area-inset-bottom))}
+
+/* 顶栏和搜索：只留一层极薄玻璃，不要大色块 */
+body.ui-ios .topbar{
+  position:sticky;top:0;z-index:40;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 18px 4px;
+  background:transparent;border:0;
+}
+body.ui-ios .topbar::after{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 82%,transparent) 0%,color-mix(in srgb,var(--bg) 55%,transparent) 62%,transparent 100%);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);
+  backdrop-filter:blur(18px) saturate(160%);
+}
+body.ui-ios .brand{flex-direction:column;align-items:flex-start;gap:0;overflow:visible}
+body.ui-ios .brand .b1{font-family:var(--sans);font-size:20px;font-weight:600;letter-spacing:-.035em;line-height:1.2}
+body.ui-ios .brand .b2{display:block;font-family:var(--sans);font-size:10.5px;font-weight:400;letter-spacing:.01em;color:var(--ink-3);line-height:1.3}
+body.ui-ios .brand small{display:block;padding:0;border:0;margin-top:1px;font-size:10.5px;color:var(--ink-3);line-height:1.3}
+body.ui-ios .avbtn{
+  width:34px;height:34px;border-radius:50%;background:var(--glass);
+  border:1px solid var(--glass-line);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+  box-shadow:inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios .av{font-weight:600;background:rgba(255,255,255,.08)}
+body.ui-ios.warm .av{background:rgba(255,255,255,.50)}
+body.ui-ios .avdrop{
+  min-width:210px;padding:6px;border-radius:18px;
+  background:var(--glass-strong);border:1px solid var(--glass-line);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios .avdrop .mi{padding:9px 11px;border-radius:11px;font-family:var(--sans);font-size:13.5px;font-weight:400}
+body.ui-ios .avdrop .mi:hover{background:var(--hov)}
+body.ui-ios .avdrop .sep{background:var(--hairline);margin:4px 8px}
+
+body.ui-ios .searchwrap{padding:2px 18px 8px}
+body.ui-ios .searchbox{position:relative}
+body.ui-ios .searchbox input{
+  height:36px;padding:0 34px 0 34px;border-radius:10px;
+  background:var(--glass);border:1px solid var(--glass-line);
+  color:var(--ink);font-size:14px;font-weight:400;
+  -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+  box-shadow:inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios .searchbox input::placeholder{color:var(--ink-3)}
+body.ui-ios .searchbox input:focus{box-shadow:inset 0 1px 0 var(--glass-highlight),0 0 0 2px var(--accent-soft)}
+body.ui-ios .searchbox .sicon{left:11px;width:14px;height:14px;color:var(--ink-3)}
+body.ui-ios .searchbox .clr{right:1px;top:1px;width:34px;height:34px;color:var(--ink-3)}
+
+/* 底部 tab：薄玻璃条，选中只亮图标和一个小点，不再铺一块蓝 */
+body.ui-ios .segs{
+  position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  z-index:55;transform:translateX(-50%);
+  width:min(calc(100% - 32px),420px);height:var(--ios-tabbar-h);
+  display:flex;gap:0;padding:5px;background:transparent;border:0;
+}
+body.ui-ios .segs::before{
+  content:"";position:absolute;inset:0;border-radius:21px;z-index:-1;
+  background:var(--glass);border:1px solid var(--glass-line);
+  -webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%);
+  box-shadow:0 16px 40px rgba(0,0,0,.18),inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios.warm .segs::before{box-shadow:0 16px 40px rgba(34,50,80,.10),inset 0 1px 0 var(--glass-highlight)}
+body.ui-ios .segs button{
+  position:relative;flex:1;height:44px;border-radius:16px;background:transparent;
+  display:flex;flex-direction:column;gap:1px;align-items:center;justify-content:center;
+  color:var(--ink-3);font-size:10px;font-weight:500;letter-spacing:0;
+  transition:color .18s,background-color .18s;
+}
+body.ui-ios .segs button .tic{display:block;width:21px;height:21px;stroke-width:1.85}
+body.ui-ios .segs button:hover{color:var(--ink-2)}
+body.ui-ios .segs button.on{color:var(--accent);background:transparent;font-weight:600}
+body.ui-ios .segs button.on::after{
+  content:"";position:absolute;left:50%;bottom:2px;width:3px;height:3px;border-radius:50%;
+  background:var(--accent);transform:translateX(-50%);
+}
+body.ui-ios .segs button.on .tic{stroke-width:2.1;filter:drop-shadow(0 0 9px rgba(10,132,255,.38))}
+
+/* 标题：大标题但不粗不黑 */
+body.ui-ios .sec-head{align-items:center;margin:14px 2px 10px}
+body.ui-ios .sec-title{font-family:var(--sans);font-size:28px;font-weight:600;letter-spacing:-.035em;line-height:1.18}
+body.ui-ios .sec-sub{font-size:12.5px;color:var(--ink-3);margin-top:4px;letter-spacing:0;line-height:1.45}
+body.ui-ios .learn-head{margin:16px 2px 8px}
+body.ui-ios .learn-title{font-family:var(--sans);font-size:28px;font-weight:600;letter-spacing:-.035em;line-height:1.22}
+body.ui-ios .learn-title .accent{color:var(--accent);font-weight:600}
+body.ui-ios .learn-sub{font-size:12.5px;color:var(--ink-3);margin-top:4px;letter-spacing:0}
+body.ui-ios .learn-bar{margin:10px 0 16px}
+body.ui-ios .bar{height:2px;border-radius:999px;background:var(--track);margin-top:10px}
+body.ui-ios .bar i{border-radius:999px;background:var(--accent);opacity:.8}
+body.ui-ios .sect{font-family:var(--sans);font-size:11.5px;font-weight:500;letter-spacing:.02em;color:var(--ink-3);margin:22px 2px 6px}
+body.ui-ios .srhead{font-family:var(--sans);font-size:11.5px;font-weight:500;letter-spacing:.02em;color:var(--ink-3);margin:22px 2px 6px}
+body.ui-ios .hair{background:var(--hairline);margin:20px 2px}
+
+/* 列表：直接贴在背景上，用细线分隔；不再做整块白卡 */
+body.ui-ios .list{
+  background:transparent;border-radius:0;padding:0;box-shadow:none;
+  border-top:1px solid var(--hairline);
+}
+body.ui-ios .item{padding:12px 2px;gap:12px;border:0;border-bottom:1px solid var(--hairline);background:transparent}
+body.ui-ios .item:last-child{border-bottom:0}
+body.ui-ios .item:active{opacity:1;background:var(--hov)}
+body.ui-ios .l1{font-size:15.5px;font-weight:500;letter-spacing:-.012em}
+body.ui-ios .l2{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+body.ui-ios .l3{font-size:11px;color:var(--ink-3);margin-top:3px}
+body.ui-ios .cover{border-radius:9px;box-shadow:none;background:var(--field)}
+body.ui-ios .cover.big{border-radius:11px}
+body.ui-ios .cover.xl{border-radius:13px}
+body.ui-ios .tick{width:32px;height:32px;border-radius:50%;background:transparent;color:var(--ink-3)}
+body.ui-ios .tick:hover{background:var(--hov);color:var(--ink-2)}
+body.ui-ios .tick.on{color:var(--accent);background:transparent}
+body.ui-ios .tick.star.on{color:var(--star);background:transparent}
+body.ui-ios .tick.del{color:var(--danger);background:transparent}
+body.ui-ios .mini{color:var(--ink-3);width:30px;height:30px}
+body.ui-ios .grp{
+  background:transparent;border:0;border-radius:0;padding:0;margin:0;
+  box-shadow:none;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);
+}
+body.ui-ios .grp>summary{padding:12px 2px;font-family:var(--sans);font-size:14px;font-weight:500}
+body.ui-ios .grp>summary::after{color:var(--ink-3)}
+body.ui-ios .grp .list{border-top:0}
+body.ui-ios .albumgrid{gap:16px;margin-top:12px}
+body.ui-ios .albumcard .cov{border-radius:14px;box-shadow:none}
+body.ui-ios .albumcard .nm{font-family:var(--sans);font-size:13px;font-weight:500;margin-top:8px}
+body.ui-ios .albumcard .mt{font-size:11px;color:var(--ink-3)}
+
+/* 设置行 / 账号 / 导入 / 复习条：全部行式，不做单个小卡片 */
+body.ui-ios .setrow{
+  min-height:50px;padding:12px 2px;margin:0;
+  background:transparent;border:0;border-bottom:1px solid var(--hairline);
+  border-radius:0;box-shadow:none;
+}
+body.ui-ios .setrow .k{font-family:var(--sans);font-size:14.5px;font-weight:400}
+body.ui-ios .setrow .k small{font-size:11px;color:var(--ink-3);font-family:var(--sans);font-weight:400;margin-top:2px}
+body.ui-ios .updrow{
+  padding:12px 2px;margin:0;background:transparent;
+  border:0;border-bottom:1px solid var(--hairline);border-radius:0;box-shadow:none;
+}
+body.ui-ios .updrow .k b{font-family:var(--sans);font-size:14.5px;font-weight:500}
+body.ui-ios .updrow .k small{font-size:11px;color:var(--ink-3)}
+body.ui-ios .accbox{
+  background:transparent;border:0;border-bottom:1px solid var(--hairline);
+  border-radius:0;padding:14px 2px;margin:0 0 4px;box-shadow:none;
+}
+body.ui-ios .accbox .l1{font-family:var(--sans);font-size:15px;font-weight:500}
+body.ui-ios .accbox .l2{font-size:12px;color:var(--ink-3)}
+body.ui-ios .impbox{
+  background:transparent;border:0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);
+  border-radius:0;padding:12px 2px;margin:12px 0;box-shadow:none;
+}
+body.ui-ios .impbox summary{font-family:var(--sans);font-size:13.5px;font-weight:500;color:var(--ink)}
+body.ui-ios .impbox summary::before{color:var(--accent)}
+body.ui-ios .impbox .sel{background:var(--field)}
+body.ui-ios .duebar{
+  background:transparent;border:0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);
+  border-radius:0;padding:12px 2px;margin:10px 0 16px;box-shadow:none;
+}
+body.ui-ios .duebar .t{font-family:var(--sans);font-size:13px;font-weight:500;letter-spacing:0}
+body.ui-ios .duebar .n{font-size:12px;color:var(--ink-3)}
+body.ui-ios .duebar .go{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--accent)}
+body.ui-ios .mine-foot{font-size:12px;color:var(--ink-3)}
+
+/* 按钮：小、薄、玻璃边；主操作也只给淡淡的 accent tint */
+body.ui-ios .btn-main{
+  height:40px;padding:0 18px;border-radius:20px;
+  background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);
+  color:var(--accent);font-family:var(--sans);font-size:14px;font-weight:500;letter-spacing:0;
+  box-shadow:inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios.warm .btn-main{color:var(--accent)}
+body.ui-ios .btn-main:hover{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+body.ui-ios .btn-main:active{transform:scale(.985)}
+body.ui-ios .btn-ghost{
+  height:40px;padding:0 16px;border-radius:20px;background:transparent;
+  color:var(--ink-2);font-family:var(--sans);font-size:14px;font-weight:400;
+}
+body.ui-ios .btn-ghost:hover{color:var(--ink);background:var(--hov)}
+body.ui-ios .btn-danger{
+  height:30px;padding:0 10px;border-radius:15px;background:transparent;color:var(--danger);font-size:13px;
+}
+body.ui-ios .toolbtn{
+  height:30px;padding:0 11px;border-radius:15px;
+  background:transparent;border:1px solid var(--line);
+  color:var(--ink-2);font-family:var(--sans);font-size:12.5px;font-weight:400;
+}
+body.ui-ios .toolbtn:hover{color:var(--ink);background:var(--hov)}
+body.ui-ios .toolbtn.on{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+body.ui-ios .btn-primary{
+  height:40px;padding:0 18px;border-radius:20px;background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);color:var(--accent);font-size:14px;
+}
+body.ui-ios .sel{
+  height:34px;padding:0 10px;border-radius:10px;background:var(--field);
+  border:1px solid var(--line);color:var(--ink);font-family:var(--sans);font-size:13px;
+}
+body.ui-ios .code{background:var(--field);border:1px solid var(--line);border-radius:10px;font-size:11.5px}
+
+/* 开关：小一档，绿色只出现在开关本身 */
+body.ui-ios .swbtn{
+  width:48px;height:28px;padding:0;border-radius:999px;background:var(--surface-2);
+  border:1px solid var(--line);color:transparent;font-size:0;position:relative;flex:0 0 auto;
+  transition:background-color .2s,border-color .2s;box-shadow:none;
+}
+body.ui-ios .swbtn::after{
+  content:"";position:absolute;left:2px;top:2px;width:22px;height:22px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:transform .2s cubic-bezier(.2,.8,.2,1);
+}
+body.ui-ios .swbtn.on{background:#34c759;border-color:transparent;color:transparent}
+body.ui-ios .swbtn.on::after{transform:translateX(20px)}
+
+/* 筛选 chip：透明描边胶囊，选中只染字和边 */
+body.ui-ios .chips{gap:7px;margin:10px 0 8px}
+body.ui-ios .chip{
+  height:28px;padding:0 11px;margin:0;border-radius:999px;
+  border:1px solid var(--line);background:transparent;
+  color:var(--ink-2);font-family:var(--sans);font-size:12.5px;font-weight:400;
+  gap:4px;box-shadow:none;
+}
+body.ui-ios .chip:hover{background:var(--hov);color:var(--ink)}
+body.ui-ios .chip.on{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--accent);font-weight:500;box-shadow:none}
+body.ui-ios .chip.on::after{display:none}
+body.ui-ios .chip .sup{color:inherit;opacity:.7}
+body.ui-ios .learn-filters{gap:14px;margin:10px 0 16px}
+body.ui-ios .learn-filter-row{gap:8px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+body.ui-ios .filter-label{flex:0 0 30px;padding-top:6px;font-family:var(--sans);font-size:10.5px;letter-spacing:.02em;color:var(--ink-3)}
+body.ui-ios .learn-filter-row .chips{flex-wrap:nowrap;margin:0}
+body.ui-ios .learn-filter-row .chip{margin-right:0;white-space:nowrap}
+
+/* 分段控件：半透明底，选中是一层更薄的玻璃 */
+body.ui-ios .segtext{
+  display:inline-flex;gap:2px;padding:2px;border-radius:8px;
+  background:var(--field);border:1px solid var(--line);
+  font-size:12px;flex:0 0 auto;
+}
+body.ui-ios .segtext button{
+  margin:0;padding:0 10px;height:26px;border-radius:6px;background:transparent;
+  color:var(--ink-3);font-family:var(--sans);font-size:12px;font-weight:400;
+  transition:background-color .16s,color .16s,box-shadow .16s;
+}
+body.ui-ios .segtext button.on{
+  background:var(--glass-strong);color:var(--ink);font-weight:500;
+  box-shadow:inset 0 1px 0 var(--glass-highlight),0 1px 3px rgba(0,0,0,.10);
+}
+body.ui-ios .segtext button.on::after{display:none}
+
+/* 首页：没有主视觉大卡，只有字、细线和一点环境光 */
+body.ui-ios .herohead{
+  position:relative;overflow:visible;
+  padding:26px 2px 14px;margin:0;
+  background:transparent;border:0;border-radius:0;box-shadow:none;
+}
+body.ui-ios .herohead::after{display:none}
+body.ui-ios .herohead .ht{font-family:var(--sans);font-size:28px;font-weight:600;letter-spacing:-.04em;line-height:1.26;position:relative;z-index:1}
+body.ui-ios .herohead .ht .accent{color:var(--accent);font-weight:600}
+body.ui-ios .herohead .ht .sep{background:var(--accent);opacity:.55}
+body.ui-ios .herohead .hs{font-size:12.5px;color:var(--ink-3);margin-top:8px;line-height:1.55;position:relative;z-index:1}
+body.ui-ios .herohead .hln{gap:16px;margin-top:16px;position:relative;z-index:1}
+body.ui-ios .herohead .hln button{
+  font-family:var(--sans);font-size:12.5px;font-weight:400;padding:4px 0;
+  border-radius:0;background:transparent;border:0;color:var(--ink-2);
+  position:relative;
+}
+body.ui-ios .herohead .hln button.on{background:transparent;color:var(--ink);border-color:transparent;font-weight:500}
+body.ui-ios .herohead .hln button.on::after{
+  content:"";position:absolute;left:0;right:12px;bottom:0;height:1px;background:var(--accent);opacity:.55;
+}
+body.ui-ios .herohead .hln button .cnt{font-family:var(--sans);font-size:10.5px;color:var(--ink-3);opacity:1}
+body.ui-ios .nowcard{
+  background:transparent;border:0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);
+  border-radius:0;padding:15px 2px;margin:0 0 12px;box-shadow:none;
+}
+body.ui-ios .nowcard .k{font-family:var(--sans);font-size:10.5px;font-weight:500;letter-spacing:.05em;color:var(--ink-3)}
+body.ui-ios .nowcard .t{font-family:var(--sans);font-size:17px;font-weight:500;margin-top:5px;letter-spacing:-.015em}
+body.ui-ios .nowcard .a{font-size:12px;color:var(--ink-3)}
+body.ui-ios .nowcard .acts{gap:16px;margin-top:12px}
+body.ui-ios .wordstrip{gap:0;padding:2px 18px 8px;margin:0 -18px}
+body.ui-ios .wordstrip button{
+  height:34px;padding:0 12px;margin-right:7px;border-radius:10px;
+  background:var(--glass);border:1px solid var(--glass-line);
+  font-family:var(--sans);font-size:13.5px;font-weight:400;box-shadow:none;
+  -webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%);
+}
+body.ui-ios .wordstrip button:hover{background:var(--surface-2)}
+body.ui-ios .wordstrip button span{font-size:10.5px;color:var(--ink-3)}
+
+/* 歌词：行式，不做每句卡片；当前句只加左侧细线和亮度 */
+body.ui-ios .lblock{
+  padding:11px 10px;margin:0;border:0;border-bottom:1px solid var(--hairline);
+  border-radius:0;background:transparent;
+  transition:background-color .2s,opacity .2s;
+}
+body.ui-ios .lblock:active{background:var(--hov)}
+body.ui-ios .lblock.playing{background:transparent}
+body.ui-ios .line{font-size:17.5px;line-height:1.8;letter-spacing:-.01em}
+body.ui-ios .line.en{font-size:14.5px}
+body.ui-ios .romaji{font-size:10px;color:var(--ink-3)}
+body.ui-ios .lblock .zh{font-size:12.5px;color:var(--ink-3);border-left:0;padding-left:0;margin-top:6px}
+body.ui-ios .legend{font-family:var(--sans);font-size:11px;color:var(--ink-3);gap:12px}
+body.ui-ios #plyric.has-active .lblock{opacity:.22}
+body.ui-ios #plyric.has-active .lblock.playing{opacity:1;background:transparent}
+body.ui-ios #plyric.has-active .lblock.playing::before{
+  content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;border-radius:2px;background:var(--accent);
+}
+
+/* 迷你播放条：薄玻璃，播放键不铺色 */
+body.ui-ios #minibar{bottom:calc(var(--ios-tabbar-h) + 18px + env(safe-area-inset-bottom,0px));padding:0 12px}
+body.ui-ios #minibar .inner{
+  max-width:620px;padding:7px 10px;border-radius:17px;
+  background:var(--glass);border:1px solid var(--glass-line);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);
+  box-shadow:0 16px 40px rgba(0,0,0,.18),inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios #minibar .mbprog{display:none}
+body.ui-ios #minibar .t1{font-family:var(--sans);font-size:13px;font-weight:500}
+body.ui-ios #minibar .t2{font-size:10.5px;color:var(--ink-3)}
+body.ui-ios #playbtn{
+  width:32px;height:32px;border-radius:50%;background:transparent;border:1px solid var(--line);
+  color:var(--accent);font-size:13px;box-shadow:none;
+}
+body.ui-ios #playbtn:hover{background:var(--hov)}
+body.ui-ios #minibar .nbtn{width:30px;height:30px;color:var(--ink-3)}
+body.ui-ios #minibar .modechip{font-family:var(--sans);color:var(--accent);font-size:11.5px}
+
+/* 全屏跟唱：内容干净，控制区是一层薄玻璃 */
+body.ui-ios #player{background:var(--bg)}
+body.ui-ios #player .phead{padding:calc(10px + env(safe-area-inset-top,0px)) 18px 6px}
+body.ui-ios #player .phead .a{font-family:var(--sans);font-size:15px;font-weight:500;letter-spacing:-.01em}
+body.ui-ios #player .phead .b{font-size:11px;color:var(--ink-3)}
+body.ui-ios #player .phead .pcover{border-radius:8px;box-shadow:none}
+body.ui-ios #player .round{width:34px;height:34px;background:transparent;border:1px solid var(--line);color:var(--ink-2)}
+body.ui-ios #player .plyrics{padding:14px 18px 24px}
+body.ui-ios #player .pctl{
+  padding:10px 18px calc(16px + env(safe-area-inset-bottom));
+  background:var(--glass);border-top:1px solid var(--glass-line);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios #player .pctl::before{display:none}
+body.ui-ios #player .tracknav{width:36px;height:36px;background:transparent;border:1px solid var(--line);color:var(--ink-2)}
+body.ui-ios #player .navbtn{font-family:var(--sans);font-size:12.5px;font-weight:400;color:var(--ink-2);min-width:54px}
+body.ui-ios #player .big{
+  width:54px;height:54px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-line);
+  color:var(--accent);box-shadow:inset 0 1px 0 var(--glass-highlight),0 10px 28px rgba(0,0,0,.14);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+}
+body.ui-ios #player .scope2{background:var(--field);padding:2px;border-radius:8px;border:1px solid var(--line)}
+body.ui-ios #player .scope2 .half{height:26px;border-radius:6px;font-family:var(--sans);font-size:12px;padding:0 10px;color:var(--ink-3)}
+body.ui-ios #player .scope2 .half + .half{border-left:0}
+body.ui-ios #player .scope2 .half.on{background:var(--glass-strong);color:var(--ink);box-shadow:none}
+body.ui-ios #player .scope2 .half.on::after{display:none}
+body.ui-ios #player .chipcycle{font-family:var(--sans);font-size:12px;padding:0 7px;height:30px;border-radius:8px;color:var(--ink-3)}
+body.ui-ios #player .chipcycle.on{background:transparent;color:var(--accent)}
+body.ui-ios #player .chipcycle.on::after{display:none}
+body.ui-ios #player .time{font-size:10.5px;color:var(--ink-3)}
+body.ui-ios #player input[type=range]{accent-color:var(--accent)}
+body.ui-ios #displaybox{
+  border-radius:16px;border:1px solid var(--glass-line);
+  background:var(--glass-strong);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 var(--glass-highlight);padding:6px 12px;
+}
+body.ui-ios #displaybox .dr{padding:9px 0;font-family:var(--sans);font-size:12.5px}
+body.ui-ios #displaybox .dr button{font-family:var(--sans);font-size:12.5px;color:var(--ink-3);background:transparent}
+body.ui-ios #displaybox .dr button.on{background:transparent;color:var(--accent);font-weight:500;padding:0}
+body.ui-ios #displaybox .dr button.on::after{display:none}
+
+/* 词条抽屉：真正像 iOS sheet */
+body.ui-ios .sheet{
+  border-radius:26px 26px 0 0;border:1px solid var(--glass-line);border-bottom:0;
+  background:var(--glass-strong);
+  -webkit-backdrop-filter:blur(34px) saturate(180%);backdrop-filter:blur(34px) saturate(180%);
+  box-shadow:0 -24px 70px rgba(0,0,0,.28),inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios .sheet .grab{width:34px;height:4px;background:var(--grab);margin:9px auto 7px}
+body.ui-ios .sheet .pop-body{padding:0 18px 8px}
+body.ui-ios #pop .r1{padding-bottom:10px;border-bottom:1px solid var(--hairline)}
+body.ui-ios #pop .w1{font-family:var(--sans);font-size:30px;font-weight:600;letter-spacing:-.03em}
+body.ui-ios #pop .w2{font-family:var(--sans);font-size:14px;color:var(--ink-2);font-weight:400}
+body.ui-ios #pop .w3{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+body.ui-ios #pop .mg{font-family:var(--sans);font-size:16px;line-height:1.55;font-weight:400}
+body.ui-ios #pop .mt{font-size:11px;color:var(--ink-3)}
+body.ui-ios #pop .icbtn{width:32px;height:32px;background:transparent;border:1px solid var(--line);color:var(--ink-3)}
+body.ui-ios #pop .icbtn.on{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+body.ui-ios #pop .icbtn.star.on{background:var(--star-soft);border-color:transparent;color:var(--star)}
+body.ui-ios #pop input{height:36px;background:var(--field);border:1px solid var(--line);border-radius:9px;font-family:var(--sans);font-size:13px}
+body.ui-ios #pop .pop-more{font-family:var(--sans);font-size:11px;color:var(--ink-3)}
+body.ui-ios .pop-sec-t{font-family:var(--sans);font-size:10.5px;font-weight:500;letter-spacing:.04em;color:var(--ink-3)}
+body.ui-ios .exrow{padding:9px 0;border-bottom:1px solid var(--hairline)}
+body.ui-ios .exrow .exico{width:28px;height:28px;background:transparent;border:1px solid var(--line);color:var(--ink-3)}
+body.ui-ios .exrow.on .exico{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+
+/* 弹窗 / 闸门：玻璃卡，按钮细线，不铺大色块 */
+body.ui-ios #dlg{background:rgba(0,0,0,.22);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+body.ui-ios .dlgcard{
+  background:var(--glass-strong);border:1px solid var(--glass-line);border-radius:22px;padding:20px;
+  -webkit-backdrop-filter:blur(32px) saturate(180%);backdrop-filter:blur(32px) saturate(180%);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios .dlgcard .dlgt{font-family:var(--sans);font-size:17px;font-weight:600;letter-spacing:-.01em}
+body.ui-ios .dlgcard .dlgb{font-size:13px;color:var(--ink-2);line-height:1.55}
+body.ui-ios .dlgcard .dlga{gap:8px;margin-top:18px}
+body.ui-ios .dlgcard .dlga button{
+  height:38px;border-radius:19px;background:transparent;border:1px solid var(--line);
+  color:var(--ink-2);font-family:var(--sans);font-size:13px;font-weight:400;
+}
+body.ui-ios .dlgcard .dlga .btn-main{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 26%,transparent);color:var(--accent);font-weight:500}
+body.ui-ios .gatecard{
+  background:var(--glass-strong);border:1px solid var(--glass-line);border-radius:24px;
+  -webkit-backdrop-filter:blur(34px) saturate(180%);backdrop-filter:blur(34px) saturate(180%);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 var(--glass-highlight);
+}
+body.ui-ios .gatecard .gtitle{font-family:var(--sans);font-size:23px;font-weight:600;letter-spacing:-.03em}
+body.ui-ios .gatecard .gsub{font-size:12.5px;color:var(--ink-3)}
+body.ui-ios .gatecard .sel{background:var(--field);border:1px solid var(--line);border-radius:9px}
+body.ui-ios .gcode{background:var(--field);border:1px solid var(--line);border-radius:10px}
+body.ui-ios .pickitem{background:transparent;border:1px solid var(--line);border-radius:10px}
+body.ui-ios .pickitem.on{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 26%,transparent);color:var(--accent)}
+
+/* 复习：细线卡片 + 玻璃反馈 */
+body.ui-ios .revwrap{max-width:540px}
+body.ui-ios .revx{font-family:var(--sans);font-size:13px;color:var(--accent)}
+body.ui-ios .revcount{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+body.ui-ios .revbar{height:2px;border-radius:999px;background:var(--track);margin-top:8px}
+body.ui-ios .revbar i{border-radius:999px;background:var(--accent);opacity:.75}
+body.ui-ios .revkind{font-family:var(--sans);font-size:10.5px;letter-spacing:.04em;color:var(--ink-3)}
+body.ui-ios .revprompt .rw1{font-family:var(--sans);font-size:36px;font-weight:600;letter-spacing:-.03em}
+body.ui-ios .revprompt .rw2,body.ui-ios .revprompt .rw3,body.ui-ios .revprompt .rw4{font-family:var(--sans)}
+body.ui-ios .revprompt .rw4{font-size:18px;font-weight:500}
+body.ui-ios .revopts{gap:8px}
+body.ui-ios .revopt{
+  min-height:50px;padding:12px 14px;border:1px solid var(--line);
+  border-radius:12px;background:transparent;font-size:15px;box-shadow:none;
+}
+body.ui-ios .revopt .k{width:22px;height:22px;border-radius:50%;border-color:var(--line);background:transparent;color:var(--ink-3);font-size:10px}
+body.ui-ios .revopt:hover{background:var(--hov);border-color:var(--ink-mute)}
+body.ui-ios .revopt.right{border-color:var(--ok);background:var(--ok-soft)}
+body.ui-ios .revopt.wrong{border-color:var(--danger);background:var(--danger-soft)}
+body.ui-ios .revfeed{
+  border:1px solid var(--glass-line);border-radius:14px;background:var(--glass);
+  box-shadow:inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+}
+body.ui-ios .revfeed .fnext{height:32px;padding:0 13px;border-radius:16px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);color:var(--accent);font-size:12.5px;font-weight:500}
+body.ui-ios .rwplay{background:transparent;border:1px solid var(--line);color:var(--accent)}
+body.ui-ios .revinp{height:50px;border-radius:12px;background:var(--field);border:1px solid var(--line);font-family:var(--sans)}
+body.ui-ios .revinok{height:50px;border-radius:12px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);color:var(--accent)}
+body.ui-ios .revdone .rd-t{font-family:var(--sans);font-size:11.5px;letter-spacing:.04em}
+body.ui-ios .revdone .rd-big{font-family:var(--sans);font-size:54px;font-weight:600;letter-spacing:-.04em}
+body.ui-ios .revdone .rd-sub{font-size:12.5px;color:var(--ink-3)}
+
+/* 空状态 / 页脚：不套大盒子 */
+body.ui-ios .emptybox{padding:42px 12px;background:transparent;border:0;border-radius:0}
+body.ui-ios .emptybox .et{font-family:var(--sans);font-size:17px;font-weight:500}
+body.ui-ios .emptybox .es{font-size:12.5px;color:var(--ink-3);line-height:1.6}
+body.ui-ios .empty{color:var(--ink-3)}
+body.ui-ios .foot{font-family:var(--sans);font-size:10px;color:var(--ink-3);letter-spacing:0;margin-top:24px}
+body.ui-ios .hint{font-size:11px;color:var(--ink-3)}
+body.ui-ios .meta{font-size:11px;color:var(--ink-3)}
+body.ui-ios .glogo{border-radius:18px}
+
+@media (max-width:390px){
+  body.ui-ios .sec-title,body.ui-ios .learn-title,body.ui-ios .herohead .ht{font-size:26px}
+  body.ui-ios #pop .w1{font-size:28px}
+  body.ui-ios .segs{width:calc(100% - 24px)}
+}
+@media (prefers-reduced-transparency:reduce){
+  body.ui-ios .topbar::after,body.ui-ios .segs::before,body.ui-ios #minibar .inner,
+  body.ui-ios .sheet,body.ui-ios .avdrop,body.ui-ios .dlgcard,body.ui-ios .gatecard,
+  body.ui-ios #displaybox,body.ui-ios #player .pctl,body.ui-ios .revfeed{
+    -webkit-backdrop-filter:none;backdrop-filter:none;background:var(--bg-2);
+  }
+}
+
+
+/* ── 多语言标签 / 学习语言 ── */
+.langbadge{display:inline-block;font-size:10px;line-height:1;padding:3px 6px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent-ink);margin-right:5px;vertical-align:1px;
+  font-family:var(--sans);font-weight:500;white-space:nowrap}
+body.ui-ios .langbadge{background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);padding:2px 6px}
+.learn-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.learn-head>div:first-child{flex:1 1 220px;min-width:0}
+.learn-head #learn-lang{flex:0 0 auto}
+.tagless{opacity:.7}
+
+.chip .n{font-size:9.5px;opacity:.55;margin-left:3px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -1153,10 +1719,10 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 
 <div class="wrap">
   <nav class="segs" id="tabs">
-    <button id="tab-learn" class="on">学词</button>
-    <button id="tab-songs">曲库</button>
-    <button id="tab-mine">我的词</button>
-    <button id="tab-me">我的</button>
+    <button id="tab-learn" class="on"><svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg><span>学词</span></button>
+    <button id="tab-songs"><svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 6 4 14" /><path d="M12 6v14" /><path d="M8 8v12" /><path d="M4 4v16" /></svg><span>曲库</span></button>
+    <button id="tab-mine"><svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg><span>我的词</span></button>
+    <button id="tab-me"><svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg><span>我的</span></button>
   </nav>
 
   <main>
@@ -1312,6 +1878,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261018g"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261018o"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
