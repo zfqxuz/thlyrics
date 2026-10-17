@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zr';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zr';
-import { icon } from './icons.js?v=20261017zr';
+import { V } from './version.js?v=20261017zs';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zs';
+import { icon } from './icons.js?v=20261017zs';
 
 (() => {
   'use strict';
@@ -2669,6 +2669,7 @@ import { icon } from './icons.js?v=20261017zr';
     }
     return { v: 2, items };
   }
+  let shCode = '';
   const shareCode = () => 'TL1.' + b64u(JSON.stringify(shareSources()));
   async function importShareCode(code, onStep) {
     const raw = String(code || '').trim().replace(/^TL1[.\s]*/, '').replace(/\s+/g, '');
@@ -2805,7 +2806,7 @@ import { icon } from './icons.js?v=20261017zr';
         <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
       <div class="setrow"><div class="k">清空进度</div><button class="btn-danger" id="m-clear">清空</button></div>
       <div class="sect">分享歌单</div>
-      <textarea class="code" id="sh-code" placeholder="分享码"></textarea>
+      <textarea class="code" id="sh-code" placeholder="分享码">${esc(shCode)}</textarea>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn" id="sh-gen">生成分享码</button>
         <button class="toolbtn on" id="sh-imp">导入分享码</button>
@@ -2866,6 +2867,7 @@ import { icon } from './icons.js?v=20261017zr';
     const shStat = $('sh-stat');
     if ($('sh-gen')) $('sh-gen').onclick = async () => {
       const code = shareCode();
+      shCode = code;
       $('sh-code').value = code;
       try { await navigator.clipboard.writeText(code); shMsg = '已生成并复制（' + Object.keys(S.imp || {}).length + ' 首的来源）'; }
       catch { shMsg = '已生成（点「复制」）'; }
@@ -3606,7 +3608,13 @@ import { icon } from './icons.js?v=20261017zr';
   let wordNav = null, detailPushed = false;
   function wordNavFor(id) {
     if (wordNav && wordNav.ids.indexOf(Number(id)) >= 0) return wordNav;   // 已定格且含当前词 → 沿用
-    const list = deckList();
+    let list = deckList();
+    // 直接深链接 / 从词条页再点进来时，这个词可能不在当前筛选里 —— 那就用「曲库里出现过的全部词」当上下文，
+    // 否则上下两个按钮会显示成「到头了」（用户看到的就是这个）
+    if (!list.some((x) => Number(x.id) === Number(id))) {
+      list = VOCAB.filter((v) => LIBW.has(v.word));
+      if (!list.some((x) => Number(x.id) === Number(id))) list = VOCAB.slice();
+    }
     wordNav = { ids: list.map((x) => x.id), from: lastMainHash || '#/learn', scroll: 0 };
     return wordNav;
   }
