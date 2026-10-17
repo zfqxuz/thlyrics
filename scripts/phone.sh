@@ -41,7 +41,7 @@ case "${1:-}" in
   start) $ADB shell am start -n com.zfqxuz.thlyrics/.MainActivity ;;
   stop)  $ADB shell am force-stop com.zfqxuz.thlyrics ;;
   cdp)
-    sock=$($ADB shell cat /proc/net/unix | grep -o 'webview_devtools_remote[0-9]*' | head -1 | tr -d '\r')
+    sock=$($ADB shell cat /proc/net/unix | grep webview_devtools_remote | sed 's/.*@//' | head -1 | tr -d '\r')
     [ -z "$sock" ] && { echo "没找到 webview socket（App 得先起来）"; exit 1; }
     $ADB forward tcp:9222 localabstract:"$sock"
     echo "CDP: $sock → http://127.0.0.1:9222"

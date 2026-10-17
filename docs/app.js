@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018a';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018a';
-import { icon } from './icons.js?v=20261018a';
+import { V } from './version.js?v=20261018b';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018b';
+import { icon } from './icons.js?v=20261018b';
 
 (() => {
   'use strict';
@@ -4139,6 +4139,7 @@ import { icon } from './icons.js?v=20261018a';
     if ($('p-help')) $('p-help').onclick = () => showDialog({
       title: '快捷键',
       body: '空格 播放/暂停<br>↑ ↓ 上/下一句<br>L 单句/全曲<br>O 播放顺序<br>Esc 收起播放器',
+      actions: [{ label: '关闭' }],
     });
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
