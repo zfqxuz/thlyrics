@@ -217,12 +217,15 @@ body:not(.warm) .topbar{background:rgba(23,26,31,.72)}
 .iconbtn:hover{background:var(--hov);color:var(--ink)}
 .iconbtn:active{transform:scale(.92);background:var(--press)}
 
-/* ── 搜索：平时是一个图标，点开后是整条输入条（无边框） ── */
-.searchwrap{display:none;padding:10px 18px 4px}
-.searchwrap.on{display:block}
+/* ── 搜索：常驻一条，图标在输入框里（不再有单独的搜索按钮） ── */
+.searchwrap{padding:4px 18px 6px}
 .searchbox{position:relative}
+.searchbox .sicon{
+  position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;color:var(--ink-3);pointer-events:none;
+}
 .searchbox input{
-  width:100%;height:42px;padding:0 38px 0 14px;
+  width:100%;height:42px;padding:0 38px 0 38px;
   border-radius:21px;border:0;
   background:var(--field);color:var(--ink);
   font-size:14px;outline:none;
@@ -464,19 +467,6 @@ body.warm .btn-main{color:#fff8ec}
 .herohead .ht .accent{color:var(--accent)}
 .herohead .ht .sep{display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin:0 4px 4px;vertical-align:middle}
 .herohead .hs{font-size:13px;color:var(--ink-2);margin-top:12px;line-height:1.7}
-.homesearch{display:flex;gap:8px;margin-top:18px}
-.homesearch input{
-  flex:1;min-width:0;height:44px;padding:0 14px;border-radius:22px;border:0;
-  background:var(--field);color:var(--ink);font-size:14px;outline:none;
-}
-.homesearch input::placeholder{color:var(--ink-3)}
-.homesearch input:focus{background:var(--surface-2)}
-.homesearch button{
-  width:64px;height:44px;border-radius:22px;border:0;
-  background:var(--accent);color:#fff8ec;font-weight:600;font-size:13px;
-}
-.homesearch button:hover{background:var(--accent-2)}
-
 /* 「曲库 · 学词 · 生词本」改成轻链接列 */
 .herohead .hln{display:flex;gap:18px;margin-top:18px;flex-wrap:wrap}
 .herohead .hln button{
@@ -1123,7 +1113,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 <div class="topbar">
   <div class="brand" id="brand" style="cursor:pointer"><span class="b1">TH Lyrics</span><span class="b2">歌詞から、言葉を学ぶ</span><small id="headstat"></small></div>
   <div class="row" style="gap:8px;flex-wrap:nowrap">
-    <button class="iconbtn" id="btn-search" title="搜索"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /> <path d="m21 21-4.3-4.3" /></svg></button>
     <div class="avwrap">
       <button class="avbtn" id="btn-av" title="我的"></button>
       <div class="avdrop" id="avdrop" hidden></div>
@@ -1133,7 +1122,8 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
 
 <div class="searchwrap" id="searchwrap">
   <div class="searchbox">
-    <input id="q" placeholder="搜词 / 释义 / 曲名 / 社团 / 原曲…" autocomplete="off">
+    <svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /> <path d="m21 21-4.3-4.3" /></svg>
+    <input id="q" placeholder="搜词 / 释义 / 曲名 / 社团 / 原曲…" autocomplete="off" enterkeyhint="search">
     <button class="clr" id="q-clear" title="清空">×</button>
   </div>
 </div>
@@ -1297,6 +1287,6 @@ details.src summary{font-size:12px;color:var(--ink-3);cursor:pointer;padding:6px
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261017zc"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261017zd"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

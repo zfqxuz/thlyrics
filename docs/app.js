@@ -1,7 +1,7 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261017zc';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zc';
-import { icon } from './icons.js?v=20261017zc';
+import { V } from './version.js?v=20261017zd';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261017zd';
+import { icon } from './icons.js?v=20261017zd';
 
 (() => {
   'use strict';
@@ -174,7 +174,7 @@ import { icon } from './icons.js?v=20261017zc';
     if ($('av-theme')) $('av-theme').onclick = () => { S.theme = light ? 'dark' : 'warm'; save(); applyTheme(); renderAv(); };
     if ($('av-home')) $('av-home').onclick = () => { close(); go('#/home'); };
     if ($('av-songs')) $('av-songs').onclick = () => { close(); go('#/songs'); };
-    if ($('av-search')) $('av-search').onclick = () => { close(); $('searchwrap').classList.add('on'); $('q').focus(); };
+    if ($('av-search')) $('av-search').onclick = () => { close(); $('q').focus(); };
     if ($('av-me')) $('av-me').onclick = () => { close(); go('#/me'); };
     if ($('av-admin')) $('av-admin').onclick = () => { close(); go('#/admin'); };
     if ($('av-out')) $('av-out').onclick = () => { ACC = null; saveAcc(); close(); renderAv(); showGate(''); };
@@ -1088,10 +1088,6 @@ import { icon } from './icons.js?v=20261017zc';
       <div class="herohead">
         <div class="ht">今日から、<span class="accent">東方</span>の<br>歌詞で言葉を学ぶ。</div>
         <div class="hs">——三首歌里挑五个词；先听懂，再背下。</div>
-        <div class="homesearch">
-          <input id="h-q" placeholder="搜曲名、社团、原曲、词…" autocomplete="off">
-          <button id="h-go">搜索</button>
-        </div>
         <div class="hln">
           <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
           <button id="h-words">学词</button>
@@ -1115,9 +1111,6 @@ import { icon } from './icons.js?v=20261017zc';
       <div class="sec-sub">今天学这些</div>
       <div class="wordstrip">${due.map((v) => `<button data-w="${v.id}">${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`).join('') || '<span class="meta">暂无</span>'}</div>`;
     const goHome = (h) => { location.hash = h; };
-    $('h-go').onclick = () => { const q = ($('h-q').value || '').trim(); if (q) goHome('#/search/' + encodeURIComponent(q)); };
-    $('h-q').onkeydown = (e) => { if (e.key === 'Enter') $('h-go').click(); };
-    $('h-q').oninput = (e) => { const v = e.target.value.trim(); if (v) { clearTimeout(homeQt); homeQt = setTimeout(() => goHome('#/search/' + encodeURIComponent(v)), 320); } };
     $('h-songs').onclick = () => goHome('#/songs');
     $('h-words').onclick = () => goHome('#/learn');
     $('h-mine').onclick = () => goHome('#/mine');
@@ -1132,7 +1125,6 @@ import { icon } from './icons.js?v=20261017zc';
       else goHome('#/word/' + el.dataset.w);
     }));
   }
-  let homeQt = null;
 
   // ────────────── 复习：验证式（出题判定，不是自评） ──────────────
   // 想法来自多邻国（练习即验证 / 答完立刻给正解 / 错题本轮回炉）和有道（到期才复习）。
@@ -2523,11 +2515,11 @@ import { icon } from './icons.js?v=20261017zc';
         </div>
       </div>
       <div class="row" style="margin:2px 0 0">
-        <input id="qs" class="sel" style="flex:1;min-width:150px;height:34px" placeholder="搜曲名 / 社团 / 专辑" value="${esc(songQ)}">
         ${curTrack ? `<button class="toolbtn on" id="jump-cur">${icon('play','in')}正在播放</button>` : ''}
-        <select id="tsort" class="sel" style="height:34px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        <select id="tsort" class="sel" style="height:34px;margin-left:auto">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
       </div>
       <div class="chips">
+        ${songQ ? `<button class="chip on" id="qs-clear">${esc(songQ)} ${icon('x','in')}</button>` : ''}
         <button class="chip ${filter === 'all' ? 'on' : ''}" data-f="all">全部</button>
         <button class="chip ${filter === 'audio' ? 'on' : ''}" data-f="audio">有音频</button>
         <button class="chip ${filter === 'zh' ? 'on' : ''}" data-f="zh">有中文</button>
@@ -2558,13 +2550,7 @@ import { icon } from './icons.js?v=20261017zc';
     impState.open = false;
     $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; renderSongs(); }));
     $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; renderSongs(); }));
-    if ($('qs')) $('qs').oninput = (e) => {
-      songQ = e.target.value;
-      const pos = e.target.selectionStart;
-      renderSongs();
-      const n = $('qs');
-      if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch {} }
-    };
+    if ($('qs-clear')) $('qs-clear').onclick = () => { songQ = ''; renderSongs(); };
     $('view-songs').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
       if (e.target.closest('[data-del]') || e.target.closest('[data-cur]')) return;
       go('#/track/' + el.dataset.id);
@@ -3691,7 +3677,7 @@ import { icon } from './icons.js?v=20261017zc';
     if (v !== 'search') lastNonSearch = '#/' + path;
     if (v === 'word') { show('view-word'); return showWord(parts[1]); }
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
-    if (v === 'search') { show('view-search'); $('searchwrap').classList.add('on'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
+    if (v === 'search') { show('view-search'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
     if (v === 'home') { show('view-home'); return renderHome(); }
     if (v === 'review') { show('view-review'); if (revDeck.length && revI >= revDeck.length) startReview(REVIEW_N); return renderReview(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
@@ -3749,16 +3735,23 @@ import { icon } from './icons.js?v=20261017zc';
     $('tab-songs').onclick = () => go('#/songs');
     $('tab-mine').onclick = () => go('#/mine');
     if ($('tab-me')) $('tab-me').onclick = () => go('#/me');
-    $('btn-search').onclick = () => { const w = $('searchwrap'); w.classList.toggle('on'); if (w.classList.contains('on')) $('q').focus(); else if (location.hash.startsWith('#/search')) go(lastNonSearch); };
-    let qt = null;
-    $('q').oninput = (e) => {
-      clearTimeout(qt);
-      const v = e.target.value;
-      qt = setTimeout(() => {
-        if (v.trim()) { history.replaceState(null, '', '#/search/' + encodeURIComponent(v.trim())); show('view-search'); showSearch(v.trim()); }
-        else if (location.hash.startsWith('#/search')) go(lastNonSearch);
-      }, 180);
+    // 全局搜索：打字不重渲染输入框（输入法组字期间不触发），只重渲染下面的结果区
+    let qt = null, qComposing = false;
+    const runQuery = () => {
+      const v = ($('q').value || '');
+      if (v.trim()) {
+        history.replaceState(null, '', '#/search/' + encodeURIComponent(v.trim()));
+        show('view-search'); showSearch(v.trim());
+      } else if (location.hash.startsWith('#/search')) go(lastNonSearch);
     };
+    $('q').addEventListener('compositionstart', () => { qComposing = true; });
+    $('q').addEventListener('compositionend', () => { qComposing = false; clearTimeout(qt); qt = setTimeout(runQuery, 120); });
+    $('q').oninput = () => {
+      if (qComposing) return;                 // 中文/日文输入法组字中：别打断
+      clearTimeout(qt);
+      qt = setTimeout(runQuery, 180);
+    };
+    $('q').onkeydown = (e) => { if (e.key === 'Enter') { clearTimeout(qt); runQuery(); } };
     $('q-clear').onclick = () => { $('q').value = ''; if (location.hash.startsWith('#/search')) go(lastNonSearch); };
 
     bindAudio();

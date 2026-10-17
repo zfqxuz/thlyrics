@@ -152,6 +152,7 @@ const INDEX_KEY = `${PREFIX}_index.json`;
 
 // ─────────── 记录合并（和时间戳规则同前端：谁改得晚听谁的） ───────────
 const n0 = (v) => (Number(v) || 0);
+const loggerWarn = (...a) => { try { console.warn('[sep]', ...a); } catch { /* 忽略 */ } };
 function mergeStates(a, b) {
   const A = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, clearedAt: 0 }, a || {});
   const B = Object.assign({ known: {}, notes: {}, audio: {}, imp: {}, del: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, clearedAt: 0 }, b || {});
@@ -293,6 +294,7 @@ function httpGetBuf(url, headers, timeout) {
 // 不是 AI 分轨（Demucs 那类要容器镜像，本机没有 docker 打不了包），质量档次写在返回里。
 // 同一来源只解析一次：L1 来源缓存（平台+id）→ L2 内容缓存（音频 sha256）→ 都没有才真算。
 const SEP_DAILY = 3;                       // 每人每天最多 3 首
+const SEP_ENGINE = ENV.SEP_ENGINE || 'mdx';   // mdx = AI 分轨；其它 = 声道相消
 const SEP_TTL_DAYS = 3650;
 let SEP_MODS = null;
 
@@ -431,24 +433,219 @@ async function sepRun(taskId) {
     const dl = await httpGetBuf(a.url, { 'User-Agent': NET_UA, Referer: 'https://music.163.com/' }, 60000);
     if (dl.status !== 200 || !dl.body || !dl.body.length) throw new Error('音频下载失败');
     const sha = crypto.createHash('sha256').update(dl.body).digest('hex');
-    const outKey = `sep/out/${sha}.mp3`;
-    let size = 0, reused = false;
-    if (await ossHead(outKey)) { reused = true; }
+    let engine = 'side-cancel', size = 0, reused = false, ms = null;
+    const keyOf = (e) => `sep/out/${e}/${sha}.mp3`;
+    if (SEP_ENGINE === 'mdx' && await ossHead(keyOf('mdx-kara2'))) { engine = 'mdx-kara2'; reused = true; }
     else {
-      const r = await vocalCut(dl.body);
+      let r = null;
+      if (SEP_ENGINE === 'mdx') {
+        try { r = await vocalCutMdx(dl.body); engine = 'mdx-kara2'; }
+        catch (e) { loggerWarn('mdx 失败，退回声道相消：' + ((e && e.message) || e)); r = null; }
+      }
+      if (!r) { engine = 'side-cancel'; r = await vocalCut(dl.body); }
+      ms = r.ms || null;
+      const outKey = keyOf(engine);
       const put = await ossRequest('PUT', outKey, r.mp3, 'audio/mpeg');
       if (put.status !== 200) throw new Error('上传失败 ' + put.status);
       size = r.mp3.length;
     }
-    const url = ossSign(outKey);
-    const rec = { src, id, url, size, engine: 'side-cancel', at: Date.now() };
-    await ossPutJson('sep/cache/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json', rec);
-    await upd({ status: 'done', url, size, engine: 'side-cancel', cached: reused, ms: Date.now() - t0, u: Date.now() });
+    const url = ossSign(keyOf(engine));
+    const rec = { src, id, url, size, engine, at: Date.now() };
+    await ossPutJson('sep/cache/' + engine + '/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json', rec);
+    await upd({ status: 'done', url, size, engine, cached: reused, ms, detail: ms, u: Date.now() });
   } catch (e) {
     await upd({ status: 'error', error: String((e && e.message) || e), ms: Date.now() - t0, u: Date.now() });
   } finally {
     try { const act = await ossGetJson(sepActiveKey(tk.uid)); if (act && act.taskId === taskId) await ossPutJson(sepActiveKey(tk.uid), { taskId: '', at: Date.now() }); } catch { /* 忽略 */ }
   }
+}
+
+// ── AI 分轨：UVR-MDX-NET KARA2（ONNX）──
+// 管线：STFT(5120, hop 1024, periodic Hann, 反射补边) → 2048 bins 分块(256 帧, 边 32 帧)
+//      → 模型 → iSTFT 重叠相加 → MP3。模型和 ORT 都不进包，冷启动从 OSS 拉（/tmp 缓存）。
+const MDX = { n: 5120, hop: 1024, bins: 2048, dimT: 256, off: 32 };
+const MDX_STRIDE = MDX.dimT - 2 * MDX.off;
+let ORT = null, ORT_ERR = null, MDX_SESS = null, MDX_ERR = null, FFT_T = null;
+
+function loadOrt() {
+  if (ORT || ORT_ERR) return ORT;
+  try { ORT = require('./vendor/onnxruntime-node'); } catch (e) { ORT_ERR = e; }
+  return ORT;
+}
+
+/** 5120 = 5 × 1024：5 个 radix-2 FFT + 一次混合基合并（预分配，热路径不 new） */
+function initFft() {
+  if (FFT_T) return FFT_T;
+  const N = MDX.n, P = 5, M = 1024;
+  const REV = new Uint16Array(M);
+  for (let i = 0; i < M; i++) { let x = i, r = 0; for (let b = 0; b < 10; b++) { r = (r << 1) | (x & 1); x >>= 1; } REV[i] = r; }
+  const COS = new Float64Array(M / 2), SIN = new Float64Array(M / 2);
+  for (let i = 0; i < M / 2; i++) { COS[i] = Math.cos(-2 * Math.PI * i / M); SIN[i] = Math.sin(-2 * Math.PI * i / M); }
+  const TC = new Float64Array(P * N), TS = new Float64Array(P * N);
+  for (let r = 0; r < P; r++) for (let k = 0; k < N; k++) { const a = -2 * Math.PI * ((r * k) % N) / N; TC[r * N + k] = Math.cos(a); TS[r * N + k] = Math.sin(a); }
+  const sub = [];
+  for (let r = 0; r < P; r++) sub.push([new Float64Array(M), new Float64Array(M)]);
+  const win = new Float64Array(N);
+  for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  FFT_T = { N, P, M, REV, COS, SIN, TC, TS, sub, win, zr: new Float64Array(N), zi: new Float64Array(N) };
+  return FFT_T;
+}
+
+function fft1024(t, re, im, inv) {
+  const { M, REV, COS, SIN } = t;
+  for (let i = 0; i < M; i++) { const j = REV[i]; if (j > i) { let x = re[i]; re[i] = re[j]; re[j] = x; x = im[i]; im[i] = im[j]; im[j] = x; } }
+  const sgn = inv ? -1 : 1;
+  for (let len = 2; len <= M; len <<= 1) {
+    const half = len >> 1, step = M / len;
+    for (let i = 0; i < M; i += len) {
+      for (let j = 0; j < half; j++) {
+        const q = j * step, c = COS[q], s = sgn * SIN[q];
+        const a = i + j, b = a + half;
+        const xr = re[b] * c - im[b] * s, xi = re[b] * s + im[b] * c;
+        re[b] = re[a] - xr; im[b] = im[a] - xi;
+        re[a] += xr; im[a] += xi;
+      }
+    }
+  }
+}
+
+function fft5120(t, re, im, inverse) {
+  const { N, P, M, TC, TS, sub } = t;
+  for (let r = 0; r < P; r++) {
+    const sr = sub[r][0], si = sub[r][1];
+    for (let k = 0; k < M; k++) { sr[k] = re[k * P + r]; si[k] = im[k * P + r]; }
+    fft1024(t, sr, si, inverse);
+  }
+  const sgn = inverse ? -1 : 1;
+  for (let k = 0; k < N; k++) {
+    let sr = 0, si = 0;
+    for (let r = 0; r < P; r++) {
+      const a = sub[r][0][k % M], b = sub[r][1][k % M];
+      const c = TC[r * N + k], s = sgn * TS[r * N + k];
+      sr += a * c - b * s; si += a * s + b * c;
+    }
+    re[k] = sr; im[k] = si;
+  }
+}
+
+const refl = (x, i) => { const n = x.length; if (i >= 0 && i < n) return x[i]; if (i < 0) { let k = -i; while (k >= n) k = 2 * n - k - 2; return x[k]; } let k = 2 * n - i - 2; while (k < 0) k = -k; return x[k]; };
+
+/** 一帧：两个声道打包进一次复数 FFT（省一半） */
+function mdxForward(t, L, R, start, Lre, Lim, Rre, Rim) {
+  const { zr, zi, win, N, N: n } = t;
+  for (let i = 0; i < n; i++) { zr[i] = refl(L, start + i) * win[i]; zi[i] = refl(R, start + i) * win[i]; }
+  fft5120(t, zr, zi);
+  for (let k = 0; k < MDX.bins; k++) {
+    const j = (N - k) % N;
+    const a = zr[k], b = zi[k], c = zr[j], d = zi[j];
+    Lre[k] = 0.5 * (a + c); Lim[k] = 0.5 * (b - d);
+    Rre[k] = 0.5 * (b + d); Rim[k] = 0.5 * (c - a);
+  }
+}
+
+function mdxInverse(t, Lre, Lim, Rre, Rim, outL, outR, wsum, start) {
+  const { zr, zi, win, N } = t;
+  zr.fill(0); zi.fill(0);
+  zr[0] = Lre[0]; zi[0] = Rre[0];
+  for (let k = 1; k < MDX.bins; k++) {
+    zr[k] = Lre[k] - Rim[k]; zi[k] = Lim[k] + Rre[k];
+    const j = N - k;
+    zr[j] = Lre[k] + Rim[k]; zi[j] = Rre[k] - Lim[k];
+  }
+  fft5120(t, zr, zi, true);
+  for (let i = 0; i < N; i++) {
+    const p = start + i;
+    if (p < 0 || p >= outL.length) continue;
+    const w = win[i];
+    outL[p] += (zr[i] / N) * w; outR[p] += (zi[i] / N) * w; wsum[p] += w * w;
+  }
+}
+
+async function mdxSession() {
+  if (MDX_SESS || MDX_ERR) return MDX_SESS;
+  try {
+    const ort = loadOrt();
+    if (!ort) throw ORT_ERR || new Error('ORT 不可用');
+    const mp = '/tmp/kara2.onnx';
+    if (!fs.existsSync(mp) || fs.statSync(mp).size < 1e6) {
+      const r = await ossRequest('GET', 'sep/models/kara2.onnx', null, null, true);
+      if (r.status !== 200) throw new Error('模型下载失败 ' + r.status);
+      fs.writeFileSync(mp, r.body);
+    }
+    MDX_SESS = await ort.InferenceSession.create(mp, { executionProviders: ['cpu'], intraOpNumThreads: 2, interOpNumThreads: 1 });
+  } catch (e) { MDX_ERR = e; MDX_SESS = null; }
+  return MDX_SESS;
+}
+
+/** AI 分轨：输入 mp3 buffer，输出「去掉主唱」的 mp3 */
+async function vocalCutMdx(buf) {
+  const sess = await mdxSession();
+  if (!sess) throw new Error('模型不可用：' + String((MDX_ERR && MDX_ERR.message) || ''));
+  const { MPEGDecoder, lamejs } = await loadSepMods();
+  const t0 = Date.now();
+  const dec = new MPEGDecoder();
+  await dec.ready;
+  const r = await dec.decode(buf);
+  dec.free();
+  if (!r || !r.samplesDecoded) throw new Error('音频解不开');
+  if (r.channelData.length < 2) throw new Error('单声道音轨分不了');
+  const sr = r.sampleRate || 44100, n = r.samplesDecoded;
+  const L = r.channelData[0], R = r.channelData[1];
+  const t = initFft();
+  const total = n + MDX.n;
+  const outL = new Float32Array(total), outR = new Float32Array(total), wsum = new Float32Array(total);
+  const Lre = new Float64Array(MDX.bins), Lim = new Float64Array(MDX.bins), Rre = new Float64Array(MDX.bins), Rim = new Float64Array(MDX.bins);
+  const inp = new Float32Array(4 * MDX.bins * MDX.dimT);
+  const nFrames = 1 + Math.floor(n / MDX.hop);
+  const pad = MDX.n / 2;
+  const t1 = Date.now();
+  let chunks = 0;
+  for (let f0 = -MDX.off; f0 < nFrames; f0 += MDX_STRIDE) {
+    inp.fill(0);
+    for (let ti = 0; ti < MDX.dimT; ti++) {
+      const fi = f0 + ti;
+      if (fi < 0 || fi >= nFrames) continue;
+      mdxForward(t, L, R, fi * MDX.hop - pad, Lre, Lim, Rre, Rim);
+      for (let k = 0; k < 3; k++) { Lre[k] = 0; Lim[k] = 0; Rre[k] = 0; Rim[k] = 0; }   // 极低频置零
+      for (let k = 0; k < MDX.bins; k++) {
+        inp[(0 * MDX.bins + k) * MDX.dimT + ti] = Lre[k];
+        inp[(1 * MDX.bins + k) * MDX.dimT + ti] = Lim[k];
+        inp[(2 * MDX.bins + k) * MDX.dimT + ti] = Rre[k];
+        inp[(3 * MDX.bins + k) * MDX.dimT + ti] = Rim[k];
+      }
+    }
+    const out = await sess.run({ input: new ORT.Tensor('float32', inp, [1, 4, MDX.bins, MDX.dimT]) });
+    const o = out.output.data;
+    chunks++;
+    for (let ti = MDX.off; ti < MDX.dimT - MDX.off; ti++) {
+      const fi = f0 + ti;
+      if (fi < 0 || fi >= nFrames) continue;
+      for (let k = 0; k < MDX.bins; k++) {
+        Lre[k] = o[(0 * MDX.bins + k) * MDX.dimT + ti]; Lim[k] = o[(1 * MDX.bins + k) * MDX.dimT + ti];
+        Rre[k] = o[(2 * MDX.bins + k) * MDX.dimT + ti]; Rim[k] = o[(3 * MDX.bins + k) * MDX.dimT + ti];
+      }
+      mdxInverse(t, Lre, Lim, Rre, Rim, outL, outR, wsum, fi * MDX.hop - pad);
+    }
+  }
+  const t2 = Date.now();
+  let peak = 0;
+  for (let i = 0; i < total; i++) { const w = wsum[i]; if (w > 1e-6) { outL[i] /= w; outR[i] /= w; } }
+  for (let i = 0; i < n; i++) { const a = outL[i] < 0 ? -outL[i] : outL[i], b = outR[i] < 0 ? -outR[i] : outR[i]; if (a > peak) peak = a; if (b > peak) peak = b; }
+  const g = peak > 0.98 ? 0.98 / peak : 1;
+  const iL = new Int16Array(n), iR = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = outL[i] * g * 32767, b = outR[i] * g * 32767;
+    iL[i] = a > 32767 ? 32767 : a < -32768 ? -32768 : a | 0;
+    iR[i] = b > 32767 ? 32767 : b < -32768 ? -32768 : b | 0;
+  }
+  const enc = new lamejs.Mp3Encoder(2, sr, 192);
+  const parts = [];
+  for (let i = 0; i < n; i += 1152) {
+    const b = enc.encodeBuffer(iL.subarray(i, i + 1152), iR.subarray(i, i + 1152));
+    if (b.length) parts.push(Buffer.from(b));
+  }
+  const fb = enc.flush(); if (fb.length) parts.push(Buffer.from(fb));
+  return { mp3: Buffer.concat(parts), sr, dur: n / sr, ms: { decode: t1 - t0, sep: t2 - t1, enc: Date.now() - t2, chunks } };
 }
 
 /** 每人每天 3 首（按天记，跨天自动重置） */
@@ -868,7 +1065,7 @@ exports.handler = async (event) => {
       const trackId = String(body.trackId || '').trim().slice(0, 80);
       if (!id || !trackId) return reply(req, 400, { error: '缺 id / trackId' });
       if (!/^[A-Za-z0-9_-]+$/.test(id)) return reply(req, 400, { error: 'id 不对' });
-      const cacheKey = 'sep/cache/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json';
+      const cacheKey = 'sep/cache/' + (SEP_ENGINE === 'mdx' ? 'mdx-kara2' : 'side-cancel') + '/' + crypto.createHash('sha1').update(src + ':' + id).digest('hex') + '.json';
       const hit = await ossGetJson(cacheKey).catch(() => null);
       if (hit && hit.url) return reply(req, 200, { ok: true, cached: true, url: hit.url, size: hit.size || 0, engine: hit.engine });
       const act = await ossGetJson(sepActiveKey(me.sub)).catch(() => null);
