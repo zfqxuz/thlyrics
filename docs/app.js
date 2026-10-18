@@ -2823,8 +2823,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     d.hidden = false;
     d.innerHTML = `<div class="dlgcard">
       <div class="dlgt">网易云登录</div>
-      <div class="gdesc">用网易云 App 扫码。登录后会员曲才能放完整版。</div>
-      <div id="qrbox" style="margin-top:12px;text-align:center;min-height:200px"><img id="qrimg" alt="" style="width:200px;height:200px;border-radius:12px;background:var(--field)"></div>
+      <div class="row" style="margin-top:10px"><button class="btn-main" id="qr-open" style="flex:1">在网易云里确认登录</button></div>
+      <div id="qrbox" style="margin-top:14px;text-align:center;min-height:200px"><img id="qrimg" alt="" style="width:180px;height:180px;border-radius:12px;background:var(--field)"></div>
       <div class="gdesc" id="qrmsg">加载中…</div>
       <div class="dlga"><button class="toolbtn" id="qr-close">关闭</button></div>
     </div>`;
@@ -2835,7 +2835,18 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (!j.img) throw new Error('没有二维码');
       qrKey = j.key;
       const img = $('qrimg'); if (img) img.src = j.img;
-      setMsg('等待扫码');
+      const link = 'https://music.163.com/login?codekey=' + encodeURIComponent(qrKey);
+      // 手机上不能自己扫自己：优先「跳去网易云确认」，扫码留给另一台设备
+      if ($('qr-open')) $('qr-open').onclick = () => {
+        try { window.open(link, '_system'); } catch { /* 忽略 */ }
+        try {
+          const a = document.createElement('a');
+          a.href = link; a.target = '_blank'; a.rel = 'noopener';
+          document.body.appendChild(a); a.click(); a.remove();
+        } catch { /* 忽略 */ }
+        setMsg('在网易云里点「确认登录」');
+      };
+      setMsg('等待确认');
       if (qrTimer) clearInterval(qrTimer);
       qrTimer = setInterval(async () => {
         if (!qrKey) return;
