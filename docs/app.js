@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018y';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018y';
-import { icon } from './icons.js?v=20261018y';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018y';
+import { V } from './version.js?v=20261018zb';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zb';
+import { icon } from './icons.js?v=20261018zb';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018zb';
 
 (() => {
   'use strict';
@@ -4807,6 +4807,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       for (const r of records) if (r.addedNodes && r.addedNodes.length) { hit = true; break; }
       if (hit) scheduleI18n();
     });
-    mo.observe(document.body, { childList: true, subtree: true });
+    // 文案节点既有新插入的，也有原地改 textContent 的，两种都要看；翻译本身是幂等的，不会自激
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
 })();

@@ -234,7 +234,8 @@ export function translateNode(root) {
             if (p2) { changed = true; return p2; }
             return part;
           });
-          if (changed) { node.nodeValue = raw.replace(key, done.join(' · ')); return; }
+          if (changed) node.nodeValue = raw.replace(key, done.join(' · '));
+          return;      // 含分隔符的整句就按段处理，别再拿整串去套模式（会把某一段翻一半）
         }
         const hit = applyPatterns(curLocale, key);
         if (hit) node.nodeValue = raw.replace(key, hit);

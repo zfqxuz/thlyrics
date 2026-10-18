@@ -83,6 +83,18 @@ const POS_MAP = new Map([
 
 const WORD_OK = /^[\p{L}][\p{L}'’\-]*$/u;
 
+/** 词频前 2 万的词集合：用来判断「这次没上榜的原形，有没有上过榜的活用形」 */
+function topSet(lang) {
+  const p = path.join(FREQ, lang + '_50k.txt');
+  if (!fs.existsSync(p)) return new Set();
+  const set = new Set();
+  for (const line of fs.readFileSync(p, 'utf8').split('\n').slice(0, 20000)) {
+    const w = line.split(/\s+/)[0];
+    if (w) set.add(w.toLowerCase());
+  }
+  return set;
+}
+
 function loadFreq(lang) {
   const p = path.join(FREQ, lang + '_50k.txt');
   if (!fs.existsSync(p)) return null;
@@ -133,8 +145,23 @@ async function scanZhDump(want, freq, koLevels) {
     const raw = String(o.word || o.title || '').trim();
     if (!raw || !WORD_OK.test(raw)) continue;
     const key = raw.toLowerCase();
-    const rank = freq.get(lang)?.get(key);
+    let rank = freq.get(lang)?.get(key);
     const lv = lang === 'ko' && koLevels ? koLevels.get(raw) : null;
+    if (!rank) {
+      // 原形本身没上榜，但它的活用形上榜了（않다→않아、chanter→chante、hablar→hablo）：
+      // 这种词才是歌词里真正需要看懂的原形，按“最好的活用形排名”收进来
+      const top = TOP.get(lang);
+      if (top && top.size) {
+        const forms = genForms(lang, { word: key, pos: POS_MAP.get(String(o.pos || '').toLowerCase()) || '' });
+        for (const f of forms) {
+          const r = freq.get(lang)?.get(f.toLowerCase());
+          if (r && (!rank || r < rank)) {
+            rank = r;
+            if (r <= 20000) break;
+          }
+        }
+      }
+    }
     if (!rank && !(lv && (lv.topik || lv.nikl))) continue;
     const glosses = [];
     for (const s of (o.senses || []).slice(0, 3)) {
@@ -376,6 +403,7 @@ function loadCurated(lang) {
   } catch { return []; }
 }
 
+const TOP = new Map(LANGS.map((x) => [x.id, topSet(x.id)]));
 const want = new Set(LANGS.map((x) => x.id));
 const freqAll = new Map(LANGS.map((L) => [L.id, loadFreq(L.id) || new Map()]));
 for (const [k, v] of freqAll) FREQ_MAP.set(k, v);
