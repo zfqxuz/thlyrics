@@ -2894,14 +2894,21 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         const st = useLocal
           ? (api === '/qq/qr' ? await qqQrPoll() : await neteaseQrPoll(qrKey))
           : await fcJson(api + '?key=' + encodeURIComponent(qrKey));
-        if (st.code === 801) setMsg('已扫码，请在手机上确认');
-        else if (st.code === 802) { setMsg('二维码过期，关掉重开'); clearInterval(qrTimer); qrTimer = null; }
-        else if (st.code === 803 && st.cookie) {
+        try { (window.__bindLog = window.__bindLog || []).push({ t: Date.now(), api, state: st.state, code: st.code, cookie: !!st.cookie, err: st.error || '' }); } catch {}
+        // 两家统一用 state：wait / scanned / expired / ok
+        if (st.state === 'wait') setMsg('等待扫码');
+        else if (st.state === 'scanned') setMsg('已扫码，请在手机上确认');
+        else if (st.state === 'expired') { setMsg('二维码过期，关掉重开'); clearInterval(qrTimer); qrTimer = null; }
+        else if (st.state === 'ok') {
           clearInterval(qrTimer); qrTimer = null;
+          if (!st.cookie) { setMsg('没拿到凭证，再试一次'); return; }
           onCookie(st.cookie);
-          closeQrPanel();
-          toast('已绑定');
-          renderMe();
+          const box = $('qrbox'); if (box) box.hidden = true;
+          const sv = $('qr-save'); if (sv) sv.hidden = true;
+          const cp = $('qr-copy'); if (cp) cp.hidden = true;
+          setMsg('✓ 绑定成功');
+          toast('绑定成功');
+          setTimeout(() => { closeQrPanel(); renderMe(); }, 1200);
         }
       } catch { /* 下一轮再试 */ }
     }, 2000);
@@ -3675,12 +3682,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       ${REV_MODES.filter(([k]) => S.learnLang === 'ja' || (k !== 'pick' && k !== 'type')).map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
         <button class="toolbtn swbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}" aria-pressed="${revModeOn(k)}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
       ${isLoggedIn() ? `<div class="sect">音乐平台</div>
-      <div class="setrow"><div class="k">网易云</div>${S.netCookie
-        ? `<button class="toolbtn" id="m-net-out">解绑</button>`
-        : `<button class="toolbtn on" id="m-net-in">绑定</button>`}</div>
-      <div class="setrow"><div class="k">QQ 音乐</div>${S.qqCookie
-        ? `<button class="toolbtn" id="m-qq-out">解绑</button>`
-        : `<button class="toolbtn on" id="m-qq-in">绑定</button>`}</div>` : ''}
+      <div class="setrow"><div class="k">网易云${S.netCookie ? '<small>已绑定</small>' : ''}</div>${S.netCookie
+        ? `<button class="toolbtn on" id="m-net-out">解绑</button>`
+        : `<button class="toolbtn" id="m-net-in">未绑定 · 绑定</button>`}</div>
+      <div class="setrow"><div class="k">QQ 音乐${S.qqCookie ? '<small>已绑定</small>' : ''}</div>${S.qqCookie
+        ? `<button class="toolbtn on" id="m-qq-out">解绑</button>`
+        : `<button class="toolbtn" id="m-qq-in">未绑定 · 绑定</button>`}</div>` : ''}
       <div class="sect">云同步</div>
       ${isLoggedIn() ? `<div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">同步</button>

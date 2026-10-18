@@ -74,12 +74,12 @@ export async function neteaseQrPoll(key) {
   });
   const j = asJson(r.data);
   const code = Number(j.code) || 0;
-  if (code !== 803) return { code };
+  if (code !== 803) return { state: code === 800 ? 'expired' : code === 802 ? 'scanned' : 'wait', code };
   const m = jarFor(HOST('https://music.163.com'));
   const musicU = m.get('MUSIC_U') || '';
   const csrf = m.get('__csrf') || '';
-  if (!musicU) return { code, error: '没拿到登录凭证' };
-  return { code, cookie: 'MUSIC_U=' + musicU + (csrf ? '; __csrf=' + csrf : '') };
+  if (!musicU) return { state: 'ok', code, error: '没拿到凭证' };
+  return { state: 'ok', code, cookie: 'MUSIC_U=' + musicU + (csrf ? '; __csrf=' + csrf : '') };
 }
 
 // ── QQ 音乐 ──
@@ -94,14 +94,14 @@ export async function qqQrStart() {
 export async function qqQrPoll() {
   const m = jarFor('ssl.ptlogin2.qq.com');
   const qrsig = m.get('qrsig') || '';
-  if (!qrsig) return { code: 802 };
+  if (!qrsig) return { state: 'expired', code: 65 };
   const u = QQ_HOSTS + '/ptqrlogin?u1=' + encodeURIComponent('https://graph.qq.com/oauth2.0/login_jump')
     + '&ptqrtoken=' + hash33(qrsig) + '&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052&action=0-0-' + Date.now()
     + '&js_ver=20102616&js_type=1&login_sig=&pt_uistyle=40&aid=716027609&daid=383&pt_3d_aid=100497308&has_onekey=1&pt_3rd_aid=100497308';
   const r = await req(u, { headers: { Referer: 'https://xui.ptlogin2.qq.com/' } });
   const hit = String(r.data || '').match(/ptuiCB\('(\d+)','\d+','([^']*)','\d+','([^']*)'/);
   const code = hit ? Number(hit[1]) : -1;
-  if (code !== 0) return { code: code === 66 ? 800 : code === 67 ? 801 : code === 65 ? 802 : 800 };
+  if (code !== 0) return { state: code === 65 ? 'expired' : code === 67 ? 'scanned' : 'wait', code };
   let next = hit[2];
   for (let i = 0; i < 4 && next; i++) {
     const rr = await req(next, { headers: { Referer: 'https://y.qq.com/' } });
@@ -117,8 +117,8 @@ export async function qqQrPoll() {
     }
   }
   const cookie = keep.join('; ');
-  if (!/qm_keyst|qqmusic_key/.test(cookie)) return { code: 803, error: '没拿到音乐凭证' };
-  return { code: 803, cookie };
+  if (!/qm_keyst|qqmusic_key/.test(cookie)) return { state: 'ok', code: 0, error: '没拿到音乐凭证' };
+  return { state: 'ok', code: 0, cookie };
 }
 
 // ── 取音频地址（带本机 cookie，不经过我们的服务器） ──

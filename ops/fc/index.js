@@ -1317,7 +1317,7 @@ exports.handler = async (event) => {
         } catch (e) { return reply(req, 502, { error: '二维码生成失败' }); }
       }
       const rec = QQ_QR.get(key);
-      if (!rec) return reply(req, 200, { ok: true, code: 802 });
+      if (!rec) return reply(req, 200, { ok: true, state: 'expired' });
       const ptqrtoken = hash33(rec.qrsig);
       try {
         const u = 'https://ssl.ptlogin2.qq.com/ptqrlogin?u1=' + encodeURIComponent('https://graph.qq.com/oauth2.0/login_jump')
@@ -1326,7 +1326,7 @@ exports.handler = async (event) => {
         const r = await httpGet(u, { 'User-Agent': NET_UA, Referer: 'https://xui.ptlogin2.qq.com/', Cookie: 'qrsig=' + rec.qrsig }, 12000);
         const m = r.body.match(/ptuiCB\('(\d+)','\d+','([^']*)','\d+','([^']*)'/);
         const code = m ? Number(m[1]) : -1;
-        if (code !== 0) return reply(req, 200, { ok: true, code: code === 66 ? 800 : code === 67 ? 801 : code === 65 ? 802 : 800 });
+        if (code !== 0) return reply(req, 200, { ok: true, code, state: code === 65 ? 'expired' : code === 67 ? 'scanned' : 'wait' });
         // 登录成功：跟着回调把 cookie 收齐（qm_keyst 在跳转链路上）
         let url = m[2];
         let cookies = 'qrsig=' + rec.qrsig;
@@ -1341,8 +1341,8 @@ exports.handler = async (event) => {
           const v = (cookies.match(new RegExp('(?:^|;\\s*)' + n + '=([^;]+)')) || [])[1];
           return v ? n + '=' + v : '';
         }).filter(Boolean).join('; ');
-        if (!/qm_keyst/.test(keep)) return reply(req, 200, { ok: true, code: 803, error: '没拿到音乐凭证' });
-        return reply(req, 200, { ok: true, code: 803, cookie: keep });
+        if (!/qm_keyst/.test(keep)) return reply(req, 200, { ok: true, code: 0, state: 'ok', error: '没拿到音乐凭证' });
+        return reply(req, 200, { ok: true, code: 0, state: 'ok', cookie: keep });
       } catch (e) { return reply(req, 502, { error: '查询登录状态失败' }); }
     }
 
@@ -1364,12 +1364,13 @@ exports.handler = async (event) => {
         const r = await httpGet('https://music.163.com/api/login/qrcode/client/login?key=' + encodeURIComponent(key) + '&type=1', NET_HEADERS, 10000);
         const j = JSON.parse(r.body);
         const code = Number(j.code) || 0;
-        if (code !== 803) return reply(req, 200, { ok: true, code });
+        const state = code === 800 ? 'expired' : code === 802 ? 'scanned' : code === 803 ? 'ok' : 'wait';
+        if (code !== 803) return reply(req, 200, { ok: true, code, state });
         const raw = [].concat(r.headers['set-cookie'] || []).join('; ');
         const musicU = (raw.match(/MUSIC_U=([^;\s]+)/) || [])[1] || '';
         const csrf = (raw.match(/__csrf=([^;\s]+)/) || [])[1] || '';
-        if (!musicU) return reply(req, 200, { ok: true, code, error: '没拿到登录凭证' });
-        return reply(req, 200, { ok: true, code, cookie: 'MUSIC_U=' + musicU + (csrf ? '; __csrf=' + csrf : '') });
+        if (!musicU) return reply(req, 200, { ok: true, code, state: 'ok', error: '没拿到登录凭证' });
+        return reply(req, 200, { ok: true, code, state: 'ok', cookie: 'MUSIC_U=' + musicU + (csrf ? '; __csrf=' + csrf : '') });
       } catch (e) { return reply(req, 502, { error: '查询登录状态失败' }); }
     }
 
