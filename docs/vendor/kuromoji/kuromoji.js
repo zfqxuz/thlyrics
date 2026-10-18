@@ -8113,25 +8113,39 @@ BrowserDictionaryLoader.prototype = Object.create(DictionaryLoader.prototype);
  * @param {string} url Dictionary URL
  * @param {BrowserDictionaryLoader~onLoad} callback Callback function
  */
+// 改过：安卓打包会把 assets 里的 .dat.gz 解压成 .dat（文件名里没有 .gz 了），
+// 而网页版仍然是 .dat.gz。所以这里两种都试，并且只在数据确实是 gzip 时才解压。
 BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", url, true);
-    xhr.responseType = "arraybuffer";
-    xhr.onload = function () {
-        if (this.status > 0 && this.status !== 200) {
-            callback(xhr.statusText, null);
-            return;
-        }
-        var arraybuffer = this.response;
-
-        var gz = new zlib.Zlib.Gunzip(new Uint8Array(arraybuffer));
-        var typed_array = gz.decompress();
-        callback(null, typed_array.buffer);
-    };
-    xhr.onerror = function (err) {
-        callback(err, null);
-    };
-    xhr.send();
+    var self = this;
+    var tryUrls = [url];
+    if (/\.gz$/.test(url)) tryUrls.push(url.replace(/\.gz$/, ''));
+    else tryUrls.push(url + '.gz');
+    var attempt = 0;
+    function fetchOne() {
+        if (attempt >= tryUrls.length) { callback('dictionary not found', null); return; }
+        var u = tryUrls[attempt++];
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", u, true);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = function () {
+            var buf = this.response;
+            var bytes = buf ? new Uint8Array(buf) : null;
+            var bad = !bytes || this.status > 0 && this.status !== 200
+                || (bytes.length > 1 && bytes[0] === 0x3C);        // '<' → 拿到的是 404 页面
+            if (bad) { fetchOne(); return; }
+            if (bytes.length > 1 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+                try {
+                    var gz = new zlib.Zlib.Gunzip(bytes);
+                    callback(null, gz.decompress().buffer);
+                    return;
+                } catch (e) { callback(e, null); return; }
+            }
+            callback(null, buf);                                   // 未压缩的 .dat，直接用
+        };
+        xhr.onerror = function () { fetchOne(); };
+        xhr.send();
+    }
+    fetchOne();
 };
 
 /**

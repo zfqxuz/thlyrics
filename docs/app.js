@@ -1901,7 +1901,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   let RDL = new Map(), RDL_MAX = 1;   // 读音兜底表（内置曲目里出现过的词 → 罗马音/读音/词性）
   const SEG = ('Segmenter' in Intl) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
   /** 分词结果版本：1 = 旧（假名读音当表面形）· 2 = 修好同音撞车之后（改分词逻辑就 +1，老记录会自动重算） */
-  const SEG_V = 3;      // 3: 词表补到 6604（+158 高频遗漏词）后强制重切，否则缓存的 segs 认不出新词
+  const SEG_V = 4;      // 4: 修好安卓包里词典加载（.dat.gz 被解压成 .dat）后重切，修掉「整行当符号」的旧分词
   function buildDict() {
     DICT = new Map();
     const put = (k, v, form) => { if (k && !DICT.has(k)) DICT.set(k, { v, form }); };
@@ -2019,7 +2019,19 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   }
   /** 本地分词：输出和服务端 /api/segment 完全一致（[表面形, 辞书形, 读音, 词性, 词性细分]） */
   async function segmentLines(lines) {
-    const tk = await ensureKuromoji();
+    try {
+      const tk = await ensureKuromoji();
+      return tokenizeWith(tk, lines);
+    } catch (e) {
+      // 本机词典加载失败时退回服务端分词（导入本来就是联网的）
+      try {
+        const j = await apiJson('/segment', { method: 'POST', body: { lines } });
+        if (j && Array.isArray(j.segs) && j.segs.length === lines.length) return j.segs;
+      } catch { /* 服务端也不行就抛原始错误 */ }
+      throw e;
+    }
+  }
+  function tokenizeWith(tk, lines) {
     return lines.map((text) => tk.tokenize(String(text == null ? '' : text))
       .map((t) => [t.surface_form, t.basic_form && t.basic_form !== '*' ? t.basic_form : t.surface_form,
         t.reading && t.reading !== '*' ? toHira(t.reading) : '', t.pos, t.pos_detail_1])
