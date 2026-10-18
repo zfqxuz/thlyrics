@@ -74,8 +74,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     showDialog({
       title: '退出登录？',
       actions: [
-        { label: '保留本机数据', kind: 'main', onClick: () => { ACC = null; saveAcc(); save(); renderAv(); if (location.hash.startsWith('#/me')) renderMe(); toast('已回到本机模式'); } },
-        { label: '退出并清除', onClick: () => { ACC = null; saveAcc(); S = { known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false }, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true, theme: S.theme || 'dark', ui: S.ui || 'classic', userLocale: S.userLocale || 'auto', learnLang: S.learnLang || 'ja', songLangView: S.songLangView || 'learn', scope: S.scope || 'all', tSort: S.tSort || 'new' }; save(); location.hash = '#/home'; location.reload(); } },
+        { label: '仅退出', kind: 'main', onClick: () => { ACC = null; saveAcc(); save(); renderAv(); if (location.hash.startsWith('#/me')) renderMe(); } },
+        { label: '退出并清空数据', onClick: () => { ACC = null; saveAcc(); S = { known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false }, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true, theme: S.theme || 'dark', ui: S.ui || 'classic', userLocale: S.userLocale || 'auto', learnLang: S.learnLang || 'ja', songLangView: S.songLangView || 'learn', scope: S.scope || 'all', tSort: S.tSort || 'new' }; save(); location.hash = '#/home'; location.reload(); } },
       ],
     });
   }
@@ -89,9 +89,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   let saveN = 0;
-  const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); queueSync(); };
+  const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('存储空间不足'); queueSync(); };
   /** 只落本机、不排云同步（高频写入用，比如播放位置） */
-  const saveLocal = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('本机存储写不进去了'); };
+  const saveLocal = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('存储空间不足'); };
   // 真机排错用的小钩子（不改状态，只读）：浏览器控制台里 __th() 看当前关键状态
   if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, tracks: (typeof IDX !== 'undefined' && IDX) ? IDX.tracks.length : -1, lsBytes: (kvGet(LS_KEY) || '').length });
 
@@ -170,7 +170,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if ((S.theme || 'dark') === 'auto') applyTheme(); }); } catch {} }
 
   // ── 曲目排序：默认按入库时间（新→旧） ──
-  const TRACK_SORTS = [['new', '入库 新→旧'], ['old', '入库 旧→新'], ['az', '标题 升序'], ['azd', '标题 降序']];
+  const TRACK_SORTS = [['new', '最新导入'], ['old', '最早导入'], ['az', '标题 升序'], ['azd', '标题 降序']];
   const trackTime = (t) => Number((t && t.addedAt) || 0);
   const byTitle = (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'ja');
   function sortTracks(list) {
@@ -228,7 +228,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function pickAvatar(file, cb) {
     if (!file) return;
     if (!/^image\//.test(file.type || '')) { toast('选一张图片'); return; }
-    if (file.size > 8 * 1024 * 1024) { toast('图片太大了（8MB 以内）'); return; }
+    if (file.size > 8 * 1024 * 1024) { toast('图片太大（8MB 以内）'); return; }
     const fr = new FileReader();
     fr.onload = () => {
       const img = new Image();
@@ -239,9 +239,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           const side = Math.min(img.width, img.height) || 1;
           g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, SZ, SZ);
           cb(c.toDataURL('image/jpeg', 0.82));
-        } catch { toast('这张图处理不了'); }
+        } catch { toast('图片无法读取'); }
       };
-      img.onerror = () => toast('这张图读不了');
+      img.onerror = () => toast('图片无法读取');
       img.src = String(fr.result);
     };
     fr.readAsDataURL(file);
@@ -255,7 +255,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (!d) return;
     const themeName = ({ dark: '深色', warm: '暖白', auto: '跟随系统' })[S.theme || 'dark'] || '深色';
     d.innerHTML = `
-      <div class="mi">${isLoggedIn() ? avatarHtml(ACC, 'av24') : '<span class="av av24">本</span>'}<span style="flex:1">${isLoggedIn() ? esc(ACC.name) : '本机模式'}</span></div>
+      <div class="mi">${isLoggedIn() ? avatarHtml(ACC, 'av24') : '<span class="av av24">本</span>'}<span style="flex:1">${isLoggedIn() ? esc(ACC.name) : '未登录'}</span></div>
       <div class="sep"></div>
       <button class="mi" id="av-me">${icon('user','in')}我的</button>
       <button class="mi" id="av-theme"><span style="flex:1">主题 · ${themeName}</span></button>
@@ -540,7 +540,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       const r = await tts.speak(text, { lang: lg });
       if (r && r.ok && r.matched) return;
     } catch { /* 系统也没有 */ }
-    if (!silent) toast('语音包未安装');
+    if (!silent) toast('未安装语音包');
   }
   /** 读词：日语读假名，其它语言读原词（不要读音标） */
   const speakWord = (v, silent) => {
@@ -740,7 +740,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (!st) return null;
     if (st.type === 'local') {                                       // 本机文件：没有直链要解析，也没有过期一说
       const u = await mediaStore.url(st);
-      if (!u) throw new Error('本机音频不可用');
+      if (!u) throw new Error('音频不可用');
       return u;
     }
     if (!st.nid) return null;
@@ -836,8 +836,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       try {
         const u = await mediaStore.url(st0);
         if (my !== prepToken) return;
-        if (u) attach(u); else setState('本机音频不可用');
-      } catch { if (my === prepToken) setState('本机音频不可用'); }
+        if (u) attach(u); else setState('音频不可用');
+      } catch { if (my === prepToken) setState('音频不可用'); }
       return;
     }
     const nid = (st0 && st0.nid) || (track.audio && track.audio.nid) || null;
@@ -913,7 +913,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       S.bgAsked = 1; save();
       batteryExempt.check().then((ok) => {
         if (ok) return;
-        toast('后台播放：请在弹窗里点「允许」');
+        toast('后台播放需要授权');
         setTimeout(() => batteryExempt.request(), 900);
       }).catch(() => {});
     }
@@ -1091,7 +1091,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     else if (audio.paused || (wasAll && forceLoop)) audio.play().catch(() => {});
     highlight(false);
     armTapScroll();                               // 滚动推迟：否则第一下就把歌词滚走，第二下落不到同一行
-    if (wasAll && forceLoop) toast('单句循环 · 点「全曲」恢复整首');
+    if (wasAll && forceLoop) toast('单句循环');
   }
   // 单击后不马上滚动，等「双击窗口」过去再滚到当前句 —— 保证双击的第二下落在同一行同一处
   let tapScrollT = null;
@@ -1192,7 +1192,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       el.innerHTML = icon(isStar(v) ? 'star-fill' : 'star', 'in');
       el.title = isStar(v) ? '取消星标' : '星标';
       if (el.closest('.word')) el.closest('.word').classList.toggle('starred', isStar(v));
-      if (on) toast('已收进星标 · 复习时它会出现');
+      if (on) toast('已加入星标');
       // 「星标」标签下这一行会离开列表，需要重渲染；其它标签下原地改就行
       if ((S.dTag || 'undone') === 'star' && $('view-learn') && $('view-learn').contains(el)) renderLearn();
     }));
@@ -1301,7 +1301,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         ${IDX.tracks.length ? `<div class="hln">
           <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
           <button id="h-words">学词</button>
-          <button id="h-mine">我的词 <span class="cnt">${knownN}</span></button>
+          <button id="h-mine">学习记录 <span class="cnt">${knownN}</span></button>
         </div>` : ''}
       </div>
       ${last ? `<div class="nowcard">
@@ -1499,7 +1499,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (!revDeck.length) {
       const pool = dueWords();
       if (!pool.length) {
-        box.innerHTML = `<div class="revwrap">${emptyBox('まだ、星はない。', '点歌词里的 ★ 收词 · 复习时先出现', [['e-rlearn', '去学词']])}</div>`;
+        box.innerHTML = `<div class="revwrap">${emptyBox('まだ、星はない。', '点歌词里的 ★ 收藏', [['e-rlearn', '去学词']])}</div>`;
         $('e-rlearn').onclick = () => go('#/learn');
         return;
       }
@@ -1516,7 +1516,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         </div>
         <div class="row" style="justify-content:center;gap:10px;margin-top:6px">
           <button class="toolbtn" id="rev-again">${icon('rotate-ccw', 'in')}再来一轮</button>
-          <button class="toolbtn" id="rev-mine">${revFrom === '#/learn' ? '回学词' : '回我的词'}</button>
+          <button class="toolbtn" id="rev-mine">${revFrom === '#/learn' ? '回学词' : '回学习记录'}</button>
         </div></div>`;
       $('rev-again').onclick = () => { startReview(revCount()); renderReview(); };
       $('rev-mine').onclick = () => go(revFrom);
@@ -1686,7 +1686,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       $('view-learn').innerHTML = `
         <div class="sec-head"><div><div class="sec-title">学词</div><div class="sec-sub">当前学习：${esc(learnLangLabel())}</div></div>
         <select class="sel" id="learn-lang" style="height:34px">${learnLangOptionsHtml(S.learnLang)}</select></div>
-        ${emptyBox(loading ? '词库加载中…' : (failed ? learnLangLabel() + '词库未安装' : '准备词库…'), '', [['e-learn-back', '换回日语']])}`;
+        ${emptyBox(loading ? '加载中…' : (failed ? learnLangLabel() + ' 词库未安装' : '加载中…'), '', [['e-learn-back', '换回日语']])}`;
       if ($('learn-lang')) $('learn-lang').onchange = (e) => {
         S.learnLang = e.target.value; S.scope = 'all'; save();
         if (S.learnLang !== 'ja' && !langPackReady(S.learnLang) && !LEX_ERRORS.has(S.learnLang)) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
@@ -1709,7 +1709,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="bar learn-bar"><i style="width:${pct}%"></i></div>
       ${dueWords().length
         ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">${T('今天 {n} 个', { n: dueWords().length })}</span><button class="go" id="d-duego">${T('开始 ›')}</button></div>`
-        : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收词 · 答错的重练</span></div>`}
+        : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收藏</span></div>`}
       <div class="row" style="margin:8px 0 2px">
         <button class="toolbtn${filtersOpen ? ' on' : ''}" id="d-ftoggle">筛选${filterSummary() ? ' · ' + esc(filterSummary()) : ''}</button>
         ${filterSummary() ? `<button class="toolbtn" id="d-clear">清除</button>` : ''}
@@ -1997,7 +1997,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (kuroP) return kuroP;
     kuroP = new Promise((resolve, reject) => {
       const build = () => {
-        if (!window.kuromoji) { reject(new Error('kuromoji 没加载上')); return; }
+        if (!window.kuromoji) { reject(new Error('分词器没加载上')); return; }
         window.kuromoji.builder({ dicPath: 'vendor/kuromoji/dict/' }).build((err, tk) => {
           if (err) reject(err); else { kuro = tk; resolve(tk); }
         });
@@ -2006,7 +2006,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       const s = document.createElement('script');
       s.src = 'vendor/kuromoji/kuromoji.js?v=' + V;
       s.onload = build;
-      s.onerror = () => reject(new Error('kuromoji 加载失败'));
+      s.onerror = () => reject(new Error('分词器加载失败'));
       document.head.appendChild(s);
     });
     kuroP.catch(() => { kuroP = null; });     // 失败了下一次还能重试
@@ -2107,7 +2107,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const p = (async () => {
       const j = await getJson(dataUrl(`${lang}/lexicon.json`), { cache: 'no-cache' });
       const entries = (j && j.entries) || [];
-      if (!entries.length) throw new Error('词库为空');
+      if (!entries.length) throw new Error('词库没有内容');
       for (const v of entries) {
         if (!v.lang) v.lang = lang;
         if (!v.forms) v.forms = {};
@@ -2298,11 +2298,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function apiResolve(text) {
     try {
       const j = await apiJson(`/resolve?q=${encodeURIComponent(text)}`, { timeout: 25000 });
-      if (!j.type) throw new Error('解析失败');
+      if (!j.type) throw new Error('读取失败');
       return j;
     } catch (e) {
       const m = (e && e.message) || '';
-      throw new Error(/^HTTP /.test(m) ? `解析失败（${m}）` : m);
+      throw new Error(/^HTTP /.test(m) ? `读取失败（${m}）` : m);
     }
   }
   /** 导入一张歌单：逐首拉歌词+音频，失败的记原因，不阻塞其它 */
@@ -2336,7 +2336,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           }
         }
       } catch (e) {
-        why = (e && e.message) || '接口不可用';
+        why = (e && e.message) || '网络异常';
       }
       if (why) { fail.push({ nid, title, why, tr }); report(title, why, 'fail', tr); return; }
       // 逐行识别语言；日语走 kuromoji，其余语言走各自词库分词（按语言建索引）
@@ -2376,7 +2376,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function importPlaylistById(pid, name, limit, onStep) {
     let pl = null;
     try { const j = await gdJson(`types=playlist&source=netease&id=${pid}`); pl = j && j.playlist; }
-    catch { return { error: '拉取歌单失败（接口超时或暂时不可用）' }; }
+    catch { return { error: '歌单读取失败，稍后再试' }; }
     if (!pl) return { error: '歌单不存在或读不到' };
     const all = (pl.tracks || []).filter((x) => x && x.id);
     if (!all.length) return { error: '这张歌单里没有歌' };
@@ -2435,7 +2435,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const matched = [], miss = [], used = new Set();
     for (let i = 0; i < list.length; i++) {
       const tr = list[i];
-      if (onStep) onStep(i + 1, list.length, tr.name, '找音源…', 'match');
+      if (onStep) onStep(i + 1, list.length, tr.name, '匹配中…', 'match');
       const hit = await findMirrorSource(tr.name, tr.artist, used);
       if (hit) used.add(String(hit.id));
       if (hit) {
@@ -2471,7 +2471,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const text = String(input || '').trim();
     if (!text) return { error: '粘分享链接 / 文案 / ID（网易云 / QQ / Spotify / Apple Music）' };
     let meta = null, why = '';
-    try { meta = await apiResolve(text); } catch (e) { why = (e && e.message) || '解析失败'; }
+    try { meta = await apiResolve(text); } catch (e) { why = (e && e.message) || '读取失败'; }
     if (!meta) {
       const pid = plIdOf(text);                     // 解析接口不可用时，至少还能粘歌单链接 / 数字 ID
       if (!pid) return { error: why };
@@ -2741,7 +2741,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       applying = true; S.syncAt = res.at || new Date().toISOString(); S.syncErr = ''; S.syncHash = sig; save(); applying = false;
       syncDirty = false;
       syncErr = '';
-      if (opts.auto && gained > 0) toast(`已从账号取回 ${gained} 首导入的歌`);
+      if (opts.auto && gained > 0) toast(`已取回 ${gained} 首`);
       return true;
     } catch (e) {
       syncErr = e.message || '同步失败';
@@ -2757,7 +2757,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function refreshSyncMsg() { const el = $('syncmsg'); if (el) el.textContent = syncMsgHtml(); }
   function syncMsgHtml() {
     const logged = isLoggedIn();
-    if (!logged) return '本机模式 · 数据只保存在本机';
+    if (!logged) return '未登录';
     const who = '账号 ' + esc(ACC.name);
     if (syncBusy) return '同步中… · ' + who;
     if (syncErr) return '同步失败：' + esc(syncErr) + ' · ' + who;
@@ -2786,8 +2786,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         <div class="row" style="margin-top:8px"><button class="toolbtn" id="acc-pw">改密码</button></div>`;
     }
     return `<div class="accbox">
-      <div class="l1">本机模式</div>
-      <div class="l2">数据只保存在本机</div>
+      <div class="l1">未登录</div>
       <div class="row" style="margin-top:10px">
         <button class="toolbtn on" id="acc-login">登录</button>
         <button class="toolbtn" id="acc-reg">注册</button>
@@ -2800,7 +2799,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function loadAdminFiles(prefix) {
     if (prefix) adminPrefix = prefix;
     try {
-      setLoad(true, '读取 OSS 文件…');
+      setLoad(true, '读取中…');
       const r = await apiCall('/admin/files?prefix=' + encodeURIComponent(adminPrefix));
       adminFiles = r.files || [];
       setLoad(false);
@@ -2864,7 +2863,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     g.innerHTML = `<div class="gatecard" style="position:relative">
       <button class="gclose" id="g-close" aria-label="关闭">×</button>
       <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">登录 / 注册</div>
-      <div class="gsub">登录后云同步</div>
+      
       <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选）</span></label>
       <input type="file" id="g-av" accept="image/*" hidden>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
@@ -2872,7 +2871,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="row"><button class="btn-primary" id="g-login">登录</button><button class="toolbtn" id="g-reg">注册新账号</button></div>
       <div class="gmsg" id="g-msg">${esc(msg || '')}</div>
       <button class="toolbtn" id="g-forgot">忘记密码</button>
-      <button class="toolbtn" id="g-guest">继续本机使用</button>
+      <button class="toolbtn" id="g-guest">暂不登录</button>
     </div>`;
     gateAvatar = '';
     if ($('g-close')) $('g-close').onclick = closeGate;
@@ -2988,25 +2987,25 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     try {
       const res = await apiCall('/password', { method: 'POST', body: { old: oldp, new: newp } });
       ACC.token = res.token; saveAcc();
-      toast('密码改好了（其它设备需要重新登录）');
+      toast('密码已修改');
       renderMine();
     } catch (e) { toast('改密码失败：' + e.message); }
   }
 
   async function pushCloud() {
     if (importing) return;
-    if (!needLogin('登录后可云同步')) return;
+    if (!needLogin('')) return;
     if (syncBusy) { toast('同步中'); return; }
     setLoad(true, '同步到云端…');
     const ok = await syncNow({ manual: true, force: true });
     setLoad(false);
-    if (ok) toast(`已同步：导入的歌 ${Object.keys(S.imp || {}).length} 首 · 已掌握 ${knownCount()} 词`);
+    if (ok) toast('已同步');
     else toast('同步失败：' + syncErr);
     renderMine();
   }
   async function pullCloud() {
     if (importing) return;
-    if (!needLogin('登录后可云同步')) return;
+    if (!needLogin('')) return;
     if (syncBusy) { toast('同步中'); return; }
     if (!confirm('从云端恢复？')) return;
     const impB = Object.keys(S.imp || {}).length, kB = knownCount();
@@ -3015,7 +3014,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     setLoad(false);
     if (!ok) { toast('恢复失败：' + syncErr); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); return; }
     const d1 = Object.keys(S.imp || {}).length - impB, d2 = knownCount() - kB;
-    toast(d1 || d2 ? `已恢复：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '云端和本机一样');
+    toast(d1 || d2 ? `已恢复：导入的歌 +${d1} 首 · 已掌握 +${d2} 词` : '已是最新');
     if (location.hash.startsWith('#/me')) renderMe(); else renderMine();
   }
 
@@ -3053,7 +3052,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
             const data = await gdJson('?types=playlist&id=' + pl.id);
             tracks = (data && data.playlist && data.playlist.tracks) || [];
           }
-        } catch { bad++; lines.push(`《${pl.name}》：接口没读到，跳过`); continue; }
+        } catch { bad++; lines.push(`《${pl.name}》：读取失败，已跳过`); continue; }
         tracks = tracks || [];
         if (!tracks.length) { bad++; lines.push(`《${pl.name}》：读不到曲目，跳过`); continue; }
         const haveNid = new Set(Object.values(S.imp || {}).map((r) => String(r.nid)));
@@ -3154,7 +3153,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (importing) return;
     const input = $('plinput') ? $('plinput').value : '';
     if (!String(input || '').trim()) { impState.msg = '先粘链接'; renderSongs(); return; }
-    const st0 = $('plstat'); if (st0) st0.textContent = '解析中…';
+    const st0 = $('plstat'); if (st0) st0.textContent = '读取中…';
     let meta = null;
     try { meta = await apiResolve(input); } catch { meta = null; }
     if (meta && meta.type) {
@@ -3180,7 +3179,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     importing = true;
     if ($('plgo')) $('plgo').disabled = true;      // 先锁住按钮：中间还有可能要等读音表
     if ($('pllist')) $('pllist').innerHTML = '';
-    if (stat) stat.textContent = '解析中…';
+    if (stat) stat.textContent = '读取中…';
     await ensureReadings();
     const res = await importInto(input, 0, (n, total, title, mark, kind, raw) => {
       if (kind === 'skip') impState.skips.push({ title, mark });
@@ -3194,13 +3193,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const bits = [];
     if (res.via === 'spotify') bits.push('曲目信息来自 Spotify');
     else if (res.via === 'apple') bits.push('曲目信息来自 Apple Music');
-    if (res.via) bits.push('歌词与音源取自网易云');
-    bits.push(`入库 ${res.ok.length} 首`);
-    if (res.miss) bits.push(`${res.miss} 首没找到音源`);
+    if (res.via) 
+    bits.push(`导入 ${res.ok.length} 首`);
+    if (res.miss) bits.push(`${res.miss} 首没找到`);
     if (res.noAudio) bits.push(`${res.noAudio} 首暂无音源`);
     if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
-    impState.msg = `${res.plName || ''} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（本机存储满了，先导到这里）' : '');
+    impState.msg = `${res.plName || ''} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（存储空间不足）' : '');
     impState.ctx = res.fail && res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: res.plName, pid: res.pid, src: res.src || 'netease' } : null;
     impState.rest = res.rest || [];
     renderSongs();
@@ -3358,7 +3357,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (!v) { impState.msg = '先粘分享码'; renderSongs(); return; }
       impState.msg = '导入中…'; if ($('plstat')) $('plstat').textContent = impState.msg;
       const r = await importShareCode(v, null);
-      impState.msg = r.error || `分享码：入库 ${r.ok} 首 · 跳过 ${r.skip} 首 · 失败 ${r.fail} 首`;
+      impState.msg = r.error || `导入 ${r.ok} 首 · 跳过 ${r.skip} 首 · 失败 ${r.fail} 首`;
       toast(r.error || `导入完成：${r.ok} 首`);
       renderSongs();
     };
@@ -3385,11 +3384,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const chip = (v, sup) => `<span class="chip" data-w="${v.id}">${esc(v.word)}${sup ? `<i class="sup">${sup}</i>` : ''}</span>`;
     $('view-mine').innerHTML = `
       <div class="sec-head">
-        <div><div class="sec-title">我的词</div><div class="sec-sub">${esc(T('星标 {n} 词', { n: starred.length }))} · ${esc(T('错词 {n} 词', { n: errs.length }))} · ${esc(T('改过释义 {n} 词', { n: noted.length }))}</div>
+        <div><div class="sec-title">学习记录</div><div class="sec-sub">${esc(T('星标 {n} 词', { n: starred.length }))} · ${esc(T('错词 {n} 词', { n: errs.length }))} · ${esc(T('改过释义 {n} 词', { n: noted.length }))}</div>
         ${errs.length ? `<button class="toolbtn" id="m-errgo" style="margin-top:8px">练错词 ${errs.length}</button>` : ''}</div>
         <button class="toolbtn" id="m-review">开始复习</button>
       </div>
-      ${(!starred.length && !errs.length) ? emptyBox('还没有星标词', '点歌词里的 ★ 收词 · 复习先出现', [['e-mlearn', '去学词'], ['e-mreview', '看复习']]) : ''}
+      ${(!starred.length && !errs.length) ? emptyBox('还没有星标词', '点歌词里的 ★ 收藏', [['e-mlearn', '去学词'], ['e-mreview', '看复习']]) : ''}
       ${starred.length ? `<div class="sec-sub" style="margin:4px 0 6px">星标</div><div class="chips" data-group="star">${starred.slice(0, 300).map((v) => chip(v)).join('')}</div>` : ''}
       ${errs.length ? `<div class="sec-sub" style="margin:16px 0 6px">错词</div><div class="chips" data-group="err">${errs.slice(0, 300).map((v) => chip(v, errOf(v))).join('')}</div>` : ''}
       ${noted.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">改过释义</div>${noted.slice(0, 100).map((v) => `<div class="item" data-w="${v.id}"><div class="col"><div class="l1">${esc(v.word)}</div><div class="l2">${esc(S.notes[v.id].meaning)}</div></div></div>`).join('')}` : ''}
@@ -3475,7 +3474,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   // ── 内容包热更新（原生壳）：换的只是 docs/，不用装 APK ──
   let otaState = { version: '', checkedAt: 0, busy: false };
   async function checkOta(manual) {
-    if (!otaAvailable()) { if (manual) toast('网页版刷新即最新'); return; }
+    if (!otaAvailable()) { if (manual) toast('已是最新版本'); return; }
     if (otaState.busy) { if (manual) toast('正在检查…'); return; }
     otaState.busy = true;
     if (manual) toast('检查内容更新…');
@@ -3496,7 +3495,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   if (typeof window !== 'undefined') window.__tlOta = (manual) => checkOta(manual !== false);
 
   async function checkApk(manual) {
-    if (!appUpdater.available) { if (manual) toast('网页版请到「我的 → 安卓 App → 下载 APK」'); return; }
+    if (!appUpdater.available) { if (manual) toast('网页版没有安装包'); return; }
     try { apkRemote = await appUpdater.check(); apkCheckedAt = Date.now(); }
     catch (e) { if (manual) toast('检查更新失败：' + ((e && e.message) || e)); return; }
     if (apkNewer()) {
@@ -3539,13 +3538,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="setrow"><div class="k">曲目排序</div>
         <select class="sel" id="me-tsort">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
       <div class="setrow"><div class="k">逐词罗马音</div><button class="toolbtn swbtn ${S.ruby !== false ? 'on' : ''}" id="me-ruby" aria-pressed="${S.ruby !== false}">${S.ruby !== false ? '开' : '关'}</button></div>
-      <div class="setrow"><div class="k">整句翻译（源提供）</div><button class="toolbtn swbtn ${S.zh !== false ? 'on' : ''}" id="me-zh" aria-pressed="${S.zh !== false}">${S.zh !== false ? '开' : '关'}</button></div>
+      <div class="setrow"><div class="k">整句翻译</div><button class="toolbtn swbtn ${S.zh !== false ? 'on' : ''}" id="me-zh" aria-pressed="${S.zh !== false}">${S.zh !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">逐词中文</div><button class="toolbtn swbtn ${S.gloss !== false ? 'on' : ''}" id="me-gloss" aria-pressed="${S.gloss !== false}">${S.gloss !== false ? '开' : '关'}</button></div>
       ${IS_NATIVE ? `<div class="sect">发音</div>
       <div class="setrow"><div class="k">离线语音包</div><button class="toolbtn" id="tts-packs">语音包</button></div>
       <div class="setrow"><div class="k">试听</div><button class="toolbtn" id="tts-test">发音</button></div>` : ''}
       <div class="sect">复习方式</div>
-      <div class="meta" style="margin:-4px 0 4px">复习按勾选的方式出题（至少留一种）</div>
+      <div class="meta" style="margin:-4px 0 4px">按勾选的方式出题</div>
       ${REV_MODES.filter(([k]) => S.learnLang === 'ja' || (k !== 'pick' && k !== 'type')).map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
         <button class="toolbtn swbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}" aria-pressed="${revModeOn(k)}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
       <div class="sect">云同步</div>
@@ -3553,7 +3552,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         <button class="toolbtn" id="m-push">同步</button>
         <button class="toolbtn" id="m-pull">云端恢复…</button>
         <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">${esc(T(S.autoSync !== false ? '自动同步：开' : '自动同步：关'))}</button>
-      </div>` : `<div class="setrow"><div class="k">登录后可用</div><button class="toolbtn on" id="m-login">登录 / 注册</button></div>`}
+      </div>` : `<div class="setrow"><div class="k">账号</div><button class="toolbtn on" id="m-login">登录 / 注册</button></div>`}
       ${IS_NATIVE ? `<div class="sect">更新</div>
       <div class="updrow"><div class="k"><b>当前版本</b><small>${V}${apkCheckedAt ? ' · ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
         <button class="toolbtn" id="me-upd">检查更新</button></div>
@@ -3567,7 +3566,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="sect">数据</div>
       <div class="setrow"><div class="k">导出 / 导入</div>
         <div class="row"><button class="toolbtn" id="m-export">导出</button><button class="toolbtn" id="m-import">导入</button></div></div>
-      <div class="setrow"><div class="k">${isLoggedIn() ? '清空进度' : '清空本机数据'}</div><button class="btn-danger" id="m-clear">清空</button></div>
+      <div class="setrow"><div class="k">${isLoggedIn() ? '清空进度' : '清空数据'}</div><button class="btn-danger" id="m-clear">清空</button></div>
       <div class="sect">分享歌单</div>
       <textarea class="code" id="sh-code" placeholder="分享码">${esc(shCode)}</textarea>
       <div class="row" style="margin-top:8px">
@@ -3576,7 +3575,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         <button class="toolbtn" id="sh-copy">复制</button>
       </div>
       <div class="meta" id="sh-stat" style="margin-top:8px">${esc(shMsg)}</div>
-      ${ACC && ACC.admin ? `<div class="sect">管理员</div><div class="row" style="margin-top:8px"><button class="toolbtn" id="me-admin">OSS 文件管理</button></div>` : ''}`;
+      ${ACC && ACC.admin ? `<div class="sect">管理员</div><div class="row" style="margin-top:8px"><button class="toolbtn" id="me-admin">云文件管理</button></div>` : ''}`;
 
     if ($('me-upd')) $('me-upd').onclick = () => checkApk(true);
     if ($('me-ota')) $('me-ota').onclick = () => checkOta(true);
@@ -3636,7 +3635,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       inp.click();
     };
     if ($('m-clear')) $('m-clear').onclick = () => {
-      const q = isLoggedIn() ? '清空进度？云端也会一起清' : '清空本机数据？';
+      const q = isLoggedIn() ? '清空进度？云端也会一起清' : '清空数据？';
       if (!confirm(q)) return;
       S.known = {}; S.notes = {}; S.fav = {}; S.sing = {}; S.star = {}; S.rev = {}; S.clearedAt = Date.now(); save(); renderMe();
     };
@@ -3659,7 +3658,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       shMsg = '正在导入…'; if (shStat) shStat.textContent = shMsg;
       const r = await importShareCode(v, null);
       if (r.error) { shMsg = r.error; if (shStat) shStat.textContent = shMsg; return; }
-      shMsg = `导入完成：入库 ${r.ok} 首 · 跳过 ${r.skip} 首 · 失败 ${r.fail} 首`;
+      shMsg = `导入 ${r.ok} 首 · 跳过 ${r.skip} 首 · 失败 ${r.fail} 首`;
       toast(`导入完成：${r.ok} 首`);
       renderMe();
     };
@@ -3670,14 +3669,14 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function renderVoicepack() {
     const host = $('view-voicepack'); if (!host) return;
     host.innerHTML = `<div class="row" style="margin-bottom:12px"><button class="toolbtn" id="vp-back">${icon('chevron-left','in')}返回</button></div>
-      <div class="sec-head"><div><div class="sec-title">语音包</div><div class="sec-sub">按语言装，装了哪个读哪个</div></div></div>
+      <div class="sec-head"><div><div class="sec-title">语音包</div></div></div>
       <div id="vp-langs"><div class="meta">加载中…</div></div>
       <div class="hair"></div>
       <div id="vp-list"><div class="meta">加载中…</div></div>`;
     $('vp-back').onclick = () => goBack('#/me');
     const box = $('vp-list');
     renderVoiceLangs();
-    if (!voicePack.available) { box.innerHTML = '<div class="empty">仅 App 内可用</div>'; return; }
+    if (!voicePack.available) { box.innerHTML = '<div class="empty">仅 App 支持</div>'; return; }
     let packs = [];
     try { const j = await getJson(dataUrl('voice-packs.json')); packs = (j && j.packs) || []; } catch { packs = []; }
     if (!packs.length) { box.innerHTML = '<div class="empty">暂无</div>'; return; }
@@ -3804,15 +3803,15 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     $('view-admin').innerHTML = `
       <div class="sec-head">
         <div><div class="sec-title">管理员</div>
-          <div class="sec-sub">${adminFiles ? `${adminFiles.length} 个文件 · ${fmtSize(total)}` : 'OSS 存储'}</div></div>
+          <div class="sec-sub">${adminFiles ? `${adminFiles.length} 个文件 · ${fmtSize(total)}` : '云存储'}</div></div>
         <button class="toolbtn" id="adm-list">${adminFiles ? '刷新' : '读取'}</button>
       </div>
       <div class="row" style="margin-top:8px">
         <button class="toolbtn ${adminPrefix === 'sync/' ? 'on' : ''}" id="adm-sync">账号数据</button>
         <button class="toolbtn ${adminPrefix === 'audio/' ? 'on' : ''}" id="adm-audio">音频</button>
-        <button class="toolbtn ${adminPrefix === 'kuromoji/' ? 'on' : ''}" id="adm-kuro">分词词典</button>
+        <button class="toolbtn ${adminPrefix === 'kuromoji/' ? 'on' : ''}" id="adm-kuro">日语词典</button>
       </div>
-      ${adminFiles ? (adminFiles.length ? `<div class="list" style="margin-top:8px">${adminFiles.map((f) => `<div class="item"><div class="col"><div class="l1" style="font-size:12px;word-break:break-all;font-weight:400">${esc(f.key)}</div><div class="l2">${fmtSize(f.size)} · ${esc(String(f.at || '').slice(0, 16).replace('T', ' '))}</div></div><button class="toolbtn" data-admdel="${esc(f.key)}">删除</button></div>`).join('')}</div>` : '<div class="meta" style="margin-top:8px">这个前缀下没有文件</div>') : ''}`;
+      ${adminFiles ? (adminFiles.length ? `<div class="list" style="margin-top:8px">${adminFiles.map((f) => `<div class="item"><div class="col"><div class="l1" style="font-size:12px;word-break:break-all;font-weight:400">${esc(f.key)}</div><div class="l2">${fmtSize(f.size)} · ${esc(String(f.at || '').slice(0, 16).replace('T', ' '))}</div></div><button class="toolbtn" data-admdel="${esc(f.key)}">删除</button></div>`).join('')}</div>` : '<div class="meta" style="margin-top:8px">没有文件</div>') : ''}`;
     if ($('adm-list')) $('adm-list').onclick = () => loadAdminFiles();
     if ($('adm-sync')) $('adm-sync').onclick = () => loadAdminFiles('sync/');
     if ($('adm-audio')) $('adm-audio').onclick = () => loadAdminFiles('audio/');
@@ -3861,7 +3860,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       ${forms.length ? `<div class="hair"></div><div class="sec-sub" style="margin-bottom:6px">词形</div><div class="chips">${forms.map(([f, o]) => `<span class="chip">${esc(f)}${o.readingHira ? '（' + esc(o.readingHira) + '）' : ''}</span>`).join('')}</div>` : ''}
       <div class="hair"></div>
       <div class="sec-sub" style="margin-bottom:6px">它出现在这些句子里</div>
-      <div class="list">${exs.length ? exs.map(exRowHtml).join('') : '<div class="meta">曲库里还没有这个词的例句</div>'}</div>`;
+      <div class="list">${exs.length ? exs.map(exRowHtml).join('') : '<div class="meta">暂无例句</div>'}</div>`;
     $('w-back').onclick = () => leaveWord();                       // 回「来源页」，不是 history.back()（那是上一个词）
     $('view-word').querySelectorAll('[data-go-word]').forEach((el) => (el.onclick = () => {
       if (el.disabled || !el.dataset.goWord) return;
@@ -3875,7 +3874,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       b.classList.toggle('on', on);
       b.innerHTML = icon(isStar(v) ? 'star-fill' : 'star', 'in');
       b.title = isStar(v) ? '取消星标' : '星标';
-      if (on) toast('已收进星标 · 复习时它会出现');
+      if (on) toast('已加入星标');
     };
     // 原地改，不重渲染 —— 重渲染就是上面那个 bug 的来源
     $('w-known').onclick = () => {
@@ -4073,7 +4072,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           playFrom(li, false);                 // 切句 + 播放；forceLoop=false 不动模式
           wEl.classList.add('w-flash');
           setTimeout(() => wEl.classList.remove('w-flash'), 900);
-          toast('已切到这一句 · 再点词看释义');
+          toast('已跳到这句');
           return;                              // ← 关键：直接结束，不开抽屉
         }
         // 当前句的词 → 开词条；showPop 里会暂停播放（续播交给收起抽屉）
@@ -4228,9 +4227,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     markCurRows();
   }
   function describeSource(t) {
-    if (t.audioOss) return `音频：阿里云 OSS`;
+    if (t.audioOss) return `音频：云端`;
     const s = S.audio[t.id] || t.audio;
-    if (s && s.type === 'local') return `音频：本机文件${s.name ? ' · ' + s.name : ''}`;
+    if (s && s.type === 'local') return `音频：本地${s.name ? ' · ' + s.name : ''}`;
     if (s && s.nid) return `音频：${s.type === 'tencent' ? 'QQ音乐' : '网易云'}${s.trial ? ' · 试听片段（约 30 秒）' : ''}`;
     return '没有音频';
   }
@@ -4246,7 +4245,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (!isLoggedIn()) {
       b.classList.remove('on', 'pend');
       b.classList.add('off');
-      b.title = '登录后可用';
+      b.title = '需要登录';
       const lab = $('p-sep-t');
       if (lab) lab.textContent = '伴奏 · 登录';
       return;
@@ -4258,7 +4257,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     b.classList.toggle('on', on);
     b.classList.toggle('pend', waiting);
     b.classList.toggle('off', exhausted);        // 置灰但**不 disable**：还要能点出提示
-    b.title = exhausted ? '每人每天生成的伴奏数量已达上限' : (on ? '伴奏：点一下切回原曲' : waiting ? '伴奏：点一下取消' : '伴奏：点一下切到伴奏');
+    b.title = exhausted ? '今日伴奏次数已用完' : (on ? '伴奏：点一下切回原曲' : waiting ? '伴奏：点一下取消' : '伴奏：点一下切到伴奏');
     const lab = $('p-sep-t');
     if (lab) lab.textContent = exhausted ? '伴奏 · 上限' : (waiting ? '生成中' : '伴奏');
   }
@@ -4324,7 +4323,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function onSepClick() {
     const t = curTrack;
     if (!t) return;
-    if (!needLogin('登录后可用')) return;
+    if (!needLogin('需要登录')) return;
     if (sepOn(t)) {                                    // 关：回原曲；生成中也取消切换
       setSepOn(t, false); applySepBtn(); reloadAudioHere(); return;
     }
@@ -4383,7 +4382,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if ($('p-star')) $('p-star').style.display = 'none';          // 自补的词没有 id，挂不上星标
       const sp = $('p-speak'); if (sp) sp.style.display = 'none';   // 没收录的词没有标准读音可发
       if ($('p-edit')) $('p-edit').textContent = (mine && mine.m) ? '改释义' : '补一条释义';
-      $('p-exlist').innerHTML = '<div class="mt">这个词是自补的，暂时没有例句</div>';
+      $('p-exlist').innerHTML = '<div class="mt">暂无例句</div>';
       bindPreviewRows($('pop'));
       $('pop').classList.add('on');
       return;
@@ -4425,7 +4424,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     box.innerHTML =
       (here.length ? head('正在听的这首里') + `<div class="list">${here.map((x) => exRowHtml({ jp: x.l.text, zh: x.l.zh, track: '', tid: curTrack.id, li: x.i, now: true })).join('')}</div>` : '')
       + (others.length ? head('其它曲目里') + `<div class="list">${others.map(exRowHtml).join('')}</div>` : '')
-      + ((!here.length && !others.length) ? '<div class="mt">曲库里还没有这个词的例句</div>' : '');
+      + ((!here.length && !others.length) ? '<div class="mt">暂无例句</div>' : '');
   }
   /** 关弹层：顺手收起罗马音编辑器；抽屉弹出时暂停的播放，在这里续上 */
   const hidePop = (keepPaused) => {
@@ -4817,7 +4816,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       b.classList.toggle('on', on);
       b.innerHTML = icon(isStar(popWord) ? 'star-fill' : 'star', 'in');
       b.title = isStar(popWord) ? '取消星标' : '星标';
-      if (on) toast('已收进星标 · 复习时它会出现');
+      if (on) toast('已加入星标');
     };
     // ── 罗马音纠正：打开时暂停播放，保存/关闭后继续 ──
     const romaTarget = () => {
@@ -4836,7 +4835,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       $('p-romacands').dataset.hint = (t.seg && t.seg.s) || t.surface;
       const cands = romaVariants(t.reading);
       $('p-romacands').innerHTML = cands.map((v) => `<button class="chip" data-r="${esc(v)}">${esc(v)}</button>`).join('')
-        + (cands.length ? '' : '<span class="meta">这个词没有读音可推，直接手写吧</span>');
+        + (cands.length ? '' : '<span class="meta">没有读音，请手写</span>');
       $('p-romacands').querySelectorAll('[data-r]').forEach((el) => (el.onclick = () => { $('p-romainput').value = el.dataset.r; }));
       $('p-romainput').focus();
     };
@@ -4956,7 +4955,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       $('srcinfo').textContent = describeSource(curTrack);
       if ($('localfile')) $('localfile').textContent = f.name ? `${f.name} · ${(f.size / 1048576).toFixed(1)}MB` : '';
       audio.removeAttribute('src');
-      toast('已绑定本机音频，正在起播…');
+      toast('已绑定音频');
       playTrack(curTrack);
       if (bindReturnToPlayer) { bindReturnToPlayer = false; openPlayer(); }
     };

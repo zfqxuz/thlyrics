@@ -2,7 +2,7 @@
   "packs": [
     {
       "id": "kokoro-ja",
-      "name": "日语词音（阿里云）",
+      "name": "日语词音",
       "version": "2.1",
       "kind": "audio",
       "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/kokoro-ja-2.1.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107588701&Signature=LWgIgi9ToGFATZBCL%2BZRMaVZSt0%3D",
@@ -14,7 +14,7 @@
     },
     {
       "id": "openjtalk-ja",
-      "name": "Open JTalk 兜底",
+      "name": "日语合成语音",
       "version": "1.12",
       "kind": "ojt",
       "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/openjtalk-ja-1.12.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107488173&Signature=f0e8FblAn77JDKCPDbLMIlU9VKE%3D",
@@ -26,7 +26,7 @@
     },
     {
       "id": "aliyun-en",
-      "name": "英语词音（有道/百度）",
+      "name": "英语词音",
       "lang": "en-US",
       "version": "20261018",
       "kind": "audio",
@@ -39,7 +39,7 @@
     },
     {
       "id": "aliyun-fr",
-      "name": "法语词音（有道）",
+      "name": "法语词音",
       "lang": "fr-FR",
       "version": "20261018",
       "kind": "audio",
@@ -52,7 +52,7 @@
     },
     {
       "id": "aliyun-de",
-      "name": "德语词音（有道）",
+      "name": "德语词音",
       "lang": "de-DE",
       "version": "20261018",
       "kind": "audio",
@@ -65,7 +65,7 @@
     },
     {
       "id": "aliyun-es",
-      "name": "西语词音（有道）",
+      "name": "西语词音",
       "lang": "es-ES",
       "version": "20261018",
       "kind": "audio",
@@ -78,7 +78,7 @@
     },
     {
       "id": "aliyun-pt",
-      "name": "葡语词音（有道）",
+      "name": "葡语词音",
       "lang": "pt-BR",
       "version": "20261018",
       "kind": "audio",
@@ -91,7 +91,7 @@
     },
     {
       "id": "aliyun-ru",
-      "name": "俄语词音（有道）",
+      "name": "俄语词音",
       "lang": "ru-RU",
       "version": "20261018",
       "kind": "audio",
@@ -104,7 +104,7 @@
     },
     {
       "id": "aliyun-ko",
-      "name": "韩语词音（有道）",
+      "name": "韩语词音",
       "lang": "ko-KR",
       "version": "20261018",
       "kind": "audio",
