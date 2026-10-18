@@ -1,6 +1,6 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
 import { V } from './version.js?v=20261018zm';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zm';
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zm';
 import { icon } from './icons.js?v=20261018zm';
 import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zm';
 
@@ -718,6 +718,15 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const source = src || 'netease';
     const extra = source === 'tencent' ? '&source=tencent' : '';
     lastAudioMeta = null;
+    // 原生壳：本机直连（cookie 不出设备）
+    if (musicNative) {
+      try {
+        const j = source === 'tencent'
+          ? await qqAudioUrl(nid, S.qqCookie || '')
+          : await neteaseAudioUrl(nid, br || 320, S.netCookie || '');
+        if (j && j.url) { lastAudioMeta = { size: Number(j.size) || 0, br: Number(j.br) || 0 }; return j.url; }
+      } catch { /* 本机失败再走云端兜底 */ }
+    }
     const hdr = {};
     if (S.netCookie) hdr['X-Net-Cookie'] = S.netCookie;
     if (S.qqCookie) hdr['X-QQ-Cookie'] = S.qqCookie;
@@ -2849,8 +2858,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('qr-close')) $('qr-close').onclick = closeQrPanel;
     const setMsg = (t) => { const el = $('qrmsg'); if (el) el.textContent = t; };
     let link = '';
+    const useLocal = musicNative;
     try {
-      const j = await fcJson(api);
+      const j = useLocal
+        ? (api === '/qq/qr' ? await qqQrStart() : await neteaseQrStart())
+        : await fcJson(api);
       if (!j.img) throw new Error('no qr');
       qrKey = j.key;
       const img = $('qrimg'); if (img) img.src = j.img;
@@ -2879,7 +2891,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     qrTimer = setInterval(async () => {
       if (!qrKey) return;
       try {
-        const st = await fcJson(api + '?key=' + encodeURIComponent(qrKey));
+        const st = useLocal
+          ? (api === '/qq/qr' ? await qqQrPoll() : await neteaseQrPoll(qrKey))
+          : await fcJson(api + '?key=' + encodeURIComponent(qrKey));
         if (st.code === 801) setMsg('已扫码，请在手机上确认');
         else if (st.code === 802) { setMsg('二维码过期，关掉重开'); clearInterval(qrTimer); qrTimer = null; }
         else if (st.code === 803 && st.cookie) {
