@@ -7,6 +7,7 @@
 const cap = (typeof window !== 'undefined') ? window.Capacitor : null;
 const native = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
 const http = (native && cap.Plugins && cap.Plugins.CapacitorHttp) ? cap.Plugins.CapacitorHttp : null;
+const rawHttp = (native && cap.Plugins && cap.Plugins.NativeHttp) ? cap.Plugins.NativeHttp : null;
 
 export const musicNative = !!http;
 
@@ -56,6 +57,16 @@ async function req(url, opt = {}) {
 
 /** CapacitorHttp 有时直接给对象，有时给字符串，统一一下 */
 const asJson = (d) => (typeof d === 'string' ? JSON.parse(d || '{}') : (d || {}));
+/** 单跳请求（不跟随重定向），返回 status / headers / body */
+async function hop(url, headers) {
+  if (!rawHttp) {
+    // 没有原生插件时退回 CapacitorHttp（会跟随重定向，拿不全中间 cookie）
+    const r = await req(url, { headers });
+    return { status: r.status, headers: r.headers || {}, body: typeof r.data === 'string' ? r.data : JSON.stringify(r.data) };
+  }
+  const r = await rawHttp.raw({ url, headers: Object.assign({ 'User-Agent': UA }, headers || {}) });
+  return { status: r.status, headers: r.headers || {}, body: String(r.body || '') };
+}
 const hash33 = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h += (h << 5) + s.charCodeAt(i); return h & 0x7fffffff; };
 
 // ── 网易云 ──
@@ -102,22 +113,40 @@ export async function qqQrPoll() {
   const hit = String(r.data || '').match(/ptuiCB\('(\d+)','\d+','([^']*)','\d+','([^']*)'/);
   const code = hit ? Number(hit[1]) : -1;
   if (code !== 0) return { state: code === 65 ? 'expired' : code === 67 ? 'scanned' : 'wait', code };
+  // 手动串重定向：每一步的 Set-Cookie 都要收（qm_keyst 在中间某跳下发）
   let next = hit[2];
-  for (let i = 0; i < 4 && next; i++) {
-    const rr = await req(next, { headers: { Referer: 'https://y.qq.com/' } });
-    next = (rr.headers && (rr.headers.Location || rr.headers.location)) || '';
+  const bag = new Map();
+  const hops = [];
+  const absorbLine = (line) => {
+    const m = String(line).match(/^\s*([^=;\s]+)=([^;]*)/);
+    if (m) bag.set(m[1], m[2]);
+  };
+  const takeCookies = (hdr) => {
+    const sc = hdr['set-cookie'] || hdr['Set-Cookie'] || '';
+    String(sc).split('\n').forEach(absorbLine);
+  };
+  for (let i = 0; i < 6 && next; i++) {
+    const ck = [...bag].map(([k, v]) => k + '=' + v).join('; ');
+    const rr = await hop(next, { Referer: 'https://y.qq.com/', ...(ck ? { Cookie: ck } : {}) });
+    takeCookies(rr.headers);
+    const loc = rr.headers.location || rr.headers.Location || '';
+    hops.push({ status: rr.status, loc: String(loc).slice(0, 120), setCookie: Object.keys(rr.headers).filter((k) => /set-cookie/i.test(k)).length, bag: [...bag.keys()] });
+    if (!loc) break;
+    next = loc.startsWith('http') ? loc : new URL(loc, next).toString();
   }
-  await req('https://y.qq.com/', { headers: { Referer: 'https://y.qq.com/' } }).catch(() => {});
+  // 最后再打一次音乐站，确保 qm_keyst 落地
+  try {
+    const ck2 = [...bag].map(([k, v]) => k + '=' + v).join('; ');
+    const rr2 = await hop('https://y.qq.com/', { Referer: 'https://y.qq.com/', ...(ck2 ? { Cookie: ck2 } : {}) });
+    takeCookies(rr2.headers);
+  } catch { /* 忽略 */ }
   const keep = [];
-  for (const host of ['y.qq.com', 'u.y.qq.com', 'qq.com', 'ptlogin2.qq.com']) {
-    const mm = jarFor(host);
-    for (const n of ['qm_keyst', 'qqmusic_key', 'uin', 'p_skey', 'skey']) {
-      const v = mm.get(n);
-      if (v && !keep.some((x) => x.startsWith(n + '='))) keep.push(n + '=' + v);
-    }
+  for (const n of ['qm_keyst', 'qqmusic_key', 'uin', 'p_skey', 'skey']) {
+    const v = bag.get(n);
+    if (v) keep.push(n + '=' + v);
   }
   const cookie = keep.join('; ');
-  if (!/qm_keyst|qqmusic_key/.test(cookie)) return { state: 'ok', code: 0, error: '没拿到音乐凭证' };
+  if (!/qm_keyst|qqmusic_key/.test(cookie)) return { state: 'ok', code: 0, error: '没拿到音乐凭证', debug: { hops, cookies: [...bag.keys()], start: String(hit[2]).slice(0, 120) } };
   return { state: 'ok', code: 0, cookie };
 }
 

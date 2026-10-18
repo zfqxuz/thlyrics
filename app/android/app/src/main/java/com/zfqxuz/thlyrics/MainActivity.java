@@ -37,6 +37,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BackPlugin.class);
         registerPlugin(TtsPlugin.class);
         registerPlugin(ImageSavePlugin.class);
+        registerPlugin(NativeHttpPlugin.class);
         super.onCreate(savedInstanceState);
         debugHooks();
     }

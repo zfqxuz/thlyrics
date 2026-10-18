@@ -1374,6 +1374,17 @@ exports.handler = async (event) => {
       } catch (e) { return reply(req, 502, { error: '查询登录状态失败' }); }
     }
 
+    // QQ 搜索（换源用，匿名可用）
+    if (action === '/qq/search') {
+      const kw = String(q.name || q.q || '').trim().slice(0, 80);
+      if (!kw) return reply(req, 400, { error: '缺关键词' });
+      try {
+        const j = await qqJson('https://c.y.qq.com/soso/fcgi-bin/client_search_cp?format=json&n=8&w=' + encodeURIComponent(kw));
+        const list = ((j.data || {}).song || {}).list || [];
+        return reply(req, 200, { ok: true, list: list.map((x) => ({ id: x.songmid, name: x.songname, artist: (x.singer || []).map((a) => a.name).join(' / ') })) });
+      } catch (e) { return reply(req, 502, { error: '搜索失败' }); }
+    }
+
     if (action === '/audio') {
       const src = String(q.source || 'netease');
       // 网易云是纯数字 id，QQ 是 songmid（字母数字混合），别用同一套校验

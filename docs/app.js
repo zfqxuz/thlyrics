@@ -2342,7 +2342,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     let done = 0, quota = false, noAudioN = 0, stopped = null;
     const report = (title, mark, kind, raw) => { done++; if (onStep) onStep(done, list.length, title, mark, kind, raw); };
     const one = async (tr) => {
-      const nid = String(tr.id);
+      let nid = String(tr.id);
       const title = String(tr.name || '').trim() || ('歌曲 ' + nid);
       const artist = ((tr.ar || tr.artists || []).map((a) => a && a.name).filter(Boolean)).join(' / ');
       const album = (tr.al && tr.al.name) || '';
@@ -2350,19 +2350,46 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (S.imp['i' + nid]) { skip.push({ nid, title }); report(title, '已在库里', 'skip', tr); return; }
       const builtin = IDX.tracks.find((t) => !t.imp && ((t.audio && String(t.audio.nid) === nid) || norm(t.title) === norm(title)));
       if (builtin) { skip.push({ nid, title }); report(title, '曲库已有', 'skip', tr); return; }
-      let lines = [], why = '', noAudio = false;
+      let lines = [], why = '', noAudio = false, sourceAlt = '';
       try {
         // 歌词和音频地址并行取，快一点
-        const [ly, url] = await Promise.all([resolveLyric(nid, source), resolveAudioUrl(nid, 320, source)]);
-        const am = lastAudioMeta || {};
-        const secs = (am.size && am.br) ? am.size / (am.br / 8) : 0;
-        if (!url) {                    // QQ 会员曲 / 已下架：拿不到音源就不入库
-          skip.push({ nid, title });
+        let ly = await resolveLyric(nid, source);
+        let url = await resolveAudioUrl(nid, 320, source);
+        let am = lastAudioMeta || {};
+        const needAlt = !url || ((am.size && am.br ? am.size / (am.br / 8) : 0) > 0 && (am.size / (am.br / 8)) < 60 && !(source === 'netease' ? S.netCookie : S.qqCookie));
+        if (needAlt) {
+          // 这家放不了（会员曲 / 没地址）→ 按歌名+歌手去另一家找同一首
+          report(title, '换源中…', 'match', tr);
+          const srcName = title;
+          let alt = null;
+          if (source === 'tencent') alt = await findMirrorSource(srcName, artist, new Set());
+          else {
+            const q = await findAltOnQQ(srcName, artist);
+            if (q) alt = { id: q.id, src: 'tencent' };
+          }
+          if (alt) {
+            const ly2 = await resolveLyric(alt.id, alt.src || 'netease');
+            const url2 = await resolveAudioUrl(alt.id, 320, alt.src || 'netease');
+            const am2 = lastAudioMeta || {};
+            const secs2 = (am2.size && am2.br) ? am2.size / (am2.br / 8) : 0;
+            if (url2 && !(secs2 > 0 && secs2 < 60)) {
+              const oldNid = nid;
+              nid = String(alt.id);
+              sourceAlt = alt.src || 'netease';
+              if (ly2 && ly2.lyric) ly = ly2;
+              url = url2;
+            } else { nid = oldNid; }
+          }
+        }
+        if (!url) {                    // 两家都拿不到音源：跳过
+          skip.push({ nid: tr.id, title });
           report(title, '无音源', 'skip', tr);
           return;
         }
-        if (secs > 0 && secs < 60 && !S.netCookie) {   // 网易云会员曲只给 30 秒试听：没绑账号就跳过
-          skip.push({ nid, title });
+        const am3 = lastAudioMeta || {};
+        const secs3 = (am3.size && am3.br) ? am3.size / (am3.br / 8) : 0;
+        if (secs3 > 0 && secs3 < 60 && !((sourceAlt || source) === 'netease' ? S.netCookie : S.qqCookie)) {
+          skip.push({ nid: tr.id, title });
           report(title, '会员曲', 'skip', tr);
           return;
         }
@@ -2399,7 +2426,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         jaAt.forEach((i, k) => { out[i] = segsCompact(jaTokens[k]); });
         segs = out.map((x) => x || [['', '', 'sym', '']]);
       } catch { segs = lines.map((l) => [[l.text, '', 'sym', '']]); }
-      S.imp['i' + nid] = { id: 'i' + nid, nid, src: source, title, artist, album, cover, lines, segs, segV: SEG_V,
+      S.imp['i' + nid] = { id: 'i' + nid, nid, src: sourceAlt || source, title, artist, album, cover, lines, segs, segV: SEG_V,
         langs: detectedLangs, lineLangs, primaryLang: detectedLangs[0] || 'unknown',
         noAudio: noAudio ? 1 : 0, plId: pid, plName: plName || '', at: Date.now() };
       if (noAudio) noAudioN++;
@@ -2429,6 +2456,26 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     .replace(/[(（\[【].*?[)）\]】]/g, ' ')
     .replace(/feat\..*$/, '')
     .replace(/[^\p{L}\p{N}]+/gu, '');
+  /** 在 QQ 音乐按「歌名+歌手」找一条（换源用） */
+  async function findAltOnQQ(name, artist) {
+    const q = `${name || ''} ${artist || ''}`.trim();
+    if (!q) return null;
+    let list = [];
+    try { const j = await fcJson('/qq/search?name=' + encodeURIComponent(q)); list = (j && j.list) || []; } catch { return null; }
+    const nName = MX_NORM(name), nArtist = MX_NORM(artist);
+    let best = null, bestScore = 0;
+    for (const x of list) {
+      const t = MX_NORM(x.name);
+      let score = 0;
+      if (t && t === nName) score += 70;
+      else if (t && nName && (t.indexOf(nName) >= 0 || nName.indexOf(t) >= 0)) score += 45;
+      const ar = MX_NORM(x.artist);
+      if (nArtist && ar && (ar.indexOf(nArtist) >= 0 || nArtist.indexOf(ar) >= 0)) score += 30;
+      if (score > bestScore) { bestScore = score; best = x; }
+    }
+    return best && bestScore >= 60 ? best : null;
+  }
+
   /** 跨平台（Spotify / Apple Music）镜像：按「歌名 + 歌手」去网易云找一条能拿到歌词和音源的 */
   async function findMirrorCandidates(name, artist, used) {
     const q = `${name || ''} ${artist || ''}`.trim();
