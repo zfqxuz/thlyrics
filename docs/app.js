@@ -2343,7 +2343,19 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       try {
         // 歌词和音频地址并行取，快一点
         const [ly, url] = await Promise.all([resolveLyric(nid, source), resolveAudioUrl(nid, 320, source)]);
-        noAudio = !url;                 // 拿不到音源（QQ 会员曲等）也入库：歌词照学，音源可在单曲页绑
+        const am = lastAudioMeta || {};
+        const secs = (am.size && am.br) ? am.size / (am.br / 8) : 0;
+        if (!url) {                    // QQ 会员曲 / 已下架：拿不到音源就不入库
+          skip.push({ nid, title });
+          report(title, '无音源', 'skip', tr);
+          return;
+        }
+        if (secs > 0 && secs < 60 && !S.netCookie) {   // 网易云会员曲只给 30 秒试听：没绑账号就跳过
+          skip.push({ nid, title });
+          report(title, '会员曲', 'skip', tr);
+          return;
+        }
+        noAudio = false;
         if (!ly) why = '取不到歌词';
         else {
           lines = parseLrc(ly.lyric, ly.tlyric);
@@ -2822,7 +2834,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const d = $('dlg'); if (!d) return;
     d.hidden = false;
     d.innerHTML = `<div class="dlgcard">
-      <div class="dlgt">网易云登录</div>
+      <div class="dlgt">绑定网易云</div>
       <div class="gdesc">会员曲要登录后才能放完整版。</div>
       <textarea class="sel" id="net-cookie" rows="3" placeholder="MUSIC_U=...; __csrf=..." style="width:100%;height:78px;padding:10px;margin-top:10px;resize:none;font-family:var(--mono);font-size:12px"></textarea>
       <div class="gdesc">电脑浏览器登录 music.163.com → F12 → Application → Cookies → 复制 MUSIC_U 那一行。</div>
@@ -2845,7 +2857,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       S.netCookie = v.indexOf('MUSIC_U=') === 0 ? v : m[0];
       save();
       closeQrPanel();
-      toast('已登录网易云');
+      toast('已绑定');
       renderMe();
     };
     // 二维码：只在「另一台设备扫码」时展开
@@ -2873,7 +2885,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
             else if (st.code === 803 && st.cookie) {
               clearInterval(qrTimer); qrTimer = null;
               S.netCookie = st.cookie; save();
-              toast('网易云已登录');
+              toast('已绑定');
               closeQrPanel();
               renderMe();
             }
@@ -3648,11 +3660,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="meta" style="margin:-4px 0 4px">按勾选的方式出题</div>
       ${REV_MODES.filter(([k]) => S.learnLang === 'ja' || (k !== 'pick' && k !== 'type')).map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
         <button class="toolbtn swbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}" aria-pressed="${revModeOn(k)}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
-      <div class="sect">网易云</div>
-      <div class="setrow"><div class="k">${S.netCookie ? '已登录' : '未登录'}</div>
+      ${isLoggedIn() ? `<div class="sect">网易云</div>
+      <div class="setrow"><div class="k">${S.netCookie ? '已绑定' : '未绑定'}</div>
         ${S.netCookie
-          ? `<button class="toolbtn" id="m-net-out">退出</button>`
-          : `<button class="toolbtn on" id="m-net-in">扫码登录</button>`}</div>
+          ? `<button class="toolbtn" id="m-net-out">解绑</button>`
+          : `<button class="toolbtn on" id="m-net-in">绑定</button>`}</div>` : ''}
       <div class="sect">云同步</div>
       ${isLoggedIn() ? `<div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">同步</button>
@@ -3722,7 +3734,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
     if ($('m-login')) $('m-login').onclick = () => showGate('');
     if ($('m-net-in')) $('m-net-in').onclick = () => neteaseLogin();
-    if ($('m-net-out')) $('m-net-out').onclick = () => { S.netCookie = ''; save(); renderMe(); toast('已退出网易云'); };
+    if ($('m-net-out')) $('m-net-out').onclick = () => { S.netCookie = ''; save(); renderMe(); toast('已解绑'); };
     if ($('m-push')) $('m-push').onclick = () => pushCloud();
     if ($('m-pull')) $('m-pull').onclick = () => pullCloud();
     if ($('m-auto')) $('m-auto').onclick = () => {
