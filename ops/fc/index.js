@@ -1119,10 +1119,17 @@ const toHira = (s) => String(s || '').replace(/[\u30a1-\u30f6]/g, (c) => String.
 
 // ─────────── QQ 音乐 ───────────
 const QQ_HEADERS = { 'User-Agent': NET_UA, Referer: 'https://y.qq.com/' };
+/** QQ 扫码登录的会话缓存（key → qrsig） */
+const QQ_QR = new Map();
+function hash33(s) { let h = 0; for (let i = 0; i < s.length; i++) h += (h << 5) + s.charCodeAt(i); return h & 0x7fffffff; }
+let REQ_QQ_COOKIE = '';
+const qqCookie = () => REQ_QQ_COOKIE || String(ENV.QQ_COOKIE || '').trim();
 const QQ_LYRIC_HEADERS = { 'User-Agent': NET_UA, Referer: 'https://y.qq.com/portal/player.html' };
 
 async function qqJson(url, headers) {
-  const r = await httpGet(url, headers || QQ_HEADERS, 12000);
+  const ck = qqCookie();
+  const h = headers || (ck ? Object.assign({}, QQ_HEADERS, { Cookie: ck }) : QQ_HEADERS);
+  const r = await httpGet(url, h, 12000);
   if (r.status !== 200) throw new Error('HTTP ' + r.status);
   try { return JSON.parse(r.body); } catch { throw new Error('返回不是 JSON'); }
 }
@@ -1269,6 +1276,7 @@ exports.handler = async (event) => {
     const action = q.action ? '/' + q.action.replace(/^\/+/, '') : path.replace(/^\/api/, '');
     // 用户自己的网易云 cookie（只作用于本次请求，不落库）；没带就用服务端兜底的那份
     REQ_COOKIE = String((req.headers && (req.headers['x-net-cookie'] || req.headers['X-Net-Cookie'])) || '').slice(0, 2000);
+    REQ_QQ_COOKIE = String((req.headers && (req.headers['x-qq-cookie'] || req.headers['X-Qq-Cookie'])) || '').slice(0, 2000);
 
     if (action === '/health' || path === '/' || path === '/health') {
       return reply(req, 200, { ok: true, service: 'thlyrics-auth', version: 1, time: new Date().toISOString() });
@@ -1292,6 +1300,52 @@ exports.handler = async (event) => {
     }
 
     // 音频直链 / 歌词：走自己的函数，前端不吃第三方限流和跨域（公开接口，不要求登录）
+    // ── QQ 扫码登录（拿 qm_keyst，绿钻曲要它） ──
+    if (action === '/qq/qr') {
+      const key = String(q.key || '').trim();
+      if (!key) {
+        try {
+          const r = await httpGetBuf('https://ssl.ptlogin2.qq.com/ptqrshow?appid=716027609&e=2&l=M&s=3&d=72&v=4&t=' + Math.random() + '&daid=383&pt_3rd_aid=100497308',
+            { 'User-Agent': NET_UA, Referer: 'https://xui.ptlogin2.qq.com/' }, 12000);
+          const qrsig = ((r.headers['set-cookie'] || []).join('; ').match(/qrsig=([^;\s]+)/) || [])[1] || '';
+          if (!qrsig) return reply(req, 502, { error: '取二维码失败' });
+          const id = rid(10);
+          QQ_QR.set(id, { qrsig, at: Date.now() });
+          if (QQ_QR.size > 50) QQ_QR.clear();
+          return reply(req, 200, { ok: true, key: id, img: 'data:image/png;base64,' + r.body.toString('base64'),
+            link: 'https://xui.ptlogin2.qq.com/cgi-bin/xlogin?appid=716027609&daid=383&style=33&hide_title_bar=1&hide_border=1&target=self&s_url=https%3A%2F%2Fy.qq.com%2F' });
+        } catch (e) { return reply(req, 502, { error: '二维码生成失败' }); }
+      }
+      const rec = QQ_QR.get(key);
+      if (!rec) return reply(req, 200, { ok: true, code: 802 });
+      const ptqrtoken = hash33(rec.qrsig);
+      try {
+        const u = 'https://ssl.ptlogin2.qq.com/ptqrlogin?u1=' + encodeURIComponent('https://graph.qq.com/oauth2.0/login_jump')
+          + '&ptqrtoken=' + ptqrtoken + '&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052&action=0-0-' + Date.now()
+          + '&js_ver=20102616&js_type=1&login_sig=&pt_uistyle=40&aid=716027609&daid=383&pt_3d_aid=100497308&has_onekey=1&pt_3rd_aid=100497308';
+        const r = await httpGet(u, { 'User-Agent': NET_UA, Referer: 'https://xui.ptlogin2.qq.com/', Cookie: 'qrsig=' + rec.qrsig }, 12000);
+        const m = r.body.match(/ptuiCB\('(\d+)','\d+','([^']*)','\d+','([^']*)'/);
+        const code = m ? Number(m[1]) : -1;
+        if (code !== 0) return reply(req, 200, { ok: true, code: code === 66 ? 800 : code === 67 ? 801 : code === 65 ? 802 : 800 });
+        // 登录成功：跟着回调把 cookie 收齐（qm_keyst 在跳转链路上）
+        let url = m[2];
+        let cookies = 'qrsig=' + rec.qrsig;
+        for (let i = 0; i < 4 && url; i++) {
+          const rr = await httpGet(url, { 'User-Agent': NET_UA, Referer: 'https://y.qq.com/', Cookie: cookies }, 12000);
+          const sc = (rr.headers['set-cookie'] || []).join('; ');
+          if (sc) cookies += '; ' + sc.replace(/;\s*(path|domain|expires|httponly|secure|samesite)=[^;]*/gi, '');
+          url = rr.location || '';
+        }
+        QQ_QR.delete(key);
+        const keep = ['qm_keyst', 'uin', 'qqmusic_key', 'p_skey', 'skey', 'qzone_uin'].map((n) => {
+          const v = (cookies.match(new RegExp('(?:^|;\\s*)' + n + '=([^;]+)')) || [])[1];
+          return v ? n + '=' + v : '';
+        }).filter(Boolean).join('; ');
+        if (!/qm_keyst/.test(keep)) return reply(req, 200, { ok: true, code: 803, error: '没拿到音乐凭证' });
+        return reply(req, 200, { ok: true, code: 803, cookie: keep });
+      } catch (e) { return reply(req, 502, { error: '查询登录状态失败' }); }
+    }
+
     // ── 网易云扫码登录：拿到用户自己的 cookie（只在用户设备上保存） ──
     if (action === '/netease/qr') {
       const key = String(q.key || '').trim();
@@ -1303,7 +1357,7 @@ exports.handler = async (event) => {
           const target = 'https://music.163.com/login?codekey=' + encodeURIComponent(j.unikey);
           const img = await httpGetBuf('https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=' + encodeURIComponent(target), {}, 12000);
           const b64 = img.status === 200 ? 'data:image/png;base64,' + img.body.toString('base64') : '';
-          return reply(req, 200, { ok: true, key: j.unikey, img: b64 });
+          return reply(req, 200, { ok: true, key: j.unikey, img: b64, link: target });
         } catch (e) { return reply(req, 502, { error: '二维码生成失败：' + String((e && e.message) || e) }); }
       }
       try {

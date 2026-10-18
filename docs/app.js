@@ -718,8 +718,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const source = src || 'netease';
     const extra = source === 'tencent' ? '&source=tencent' : '';
     lastAudioMeta = null;
-    const hdr = S.netCookie ? { 'X-Net-Cookie': S.netCookie } : undefined;
-    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`, { headers: hdr }); if (j && j.url) { lastAudioMeta = { size: Number(j.size) || 0, br: Number(j.br) || 0 }; return j.url; } } catch {}
+    const hdr = {};
+    if (S.netCookie) hdr['X-Net-Cookie'] = S.netCookie;
+    if (S.qqCookie) hdr['X-QQ-Cookie'] = S.qqCookie;
+    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`, { headers: Object.keys(hdr).length ? hdr : undefined }); if (j && j.url) { lastAudioMeta = { size: Number(j.size) || 0, br: Number(j.br) || 0 }; return j.url; } } catch {}
     if (source !== 'netease') return null;
     try { const j = await gdJson(`types=url&source=netease&id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
     return null;
@@ -2830,90 +2832,68 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     qrKey = '';
     const d = $('dlg'); if (d) d.hidden = true;
   }
-  async function neteaseLogin() {
+  /** 通用扫码绑定：二维码 + 保存到相册 + 轮询（网易云 / QQ 共用一套） */
+  async function bindQrPanel(title, api, onCookie) {
     const d = $('dlg'); if (!d) return;
     d.hidden = false;
     d.innerHTML = `<div class="dlgcard">
-      <div class="dlgt">绑定网易云</div>
-      <div class="gdesc">会员曲要登录后才能放完整版。</div>
-      <textarea class="sel" id="net-cookie" rows="3" placeholder="MUSIC_U=...; __csrf=..." style="width:100%;height:78px;padding:10px;margin-top:10px;resize:none;font-family:var(--mono);font-size:12px"></textarea>
-      <div class="gdesc">电脑浏览器登录 music.163.com → F12 → Application → Cookies → 复制 MUSIC_U 那一行。</div>
-      <div class="row" style="margin-top:10px"><button class="btn-main" id="net-save" style="flex:1">保存</button></div>
-      <div class="row" style="margin-top:10px;justify-content:center"><button class="toolbtn" id="net-qr">另一台设备扫码</button></div>
-      <div id="qrwrap" hidden>
-        <div id="qrbox" style="margin-top:12px;text-align:center"><img id="qrimg" alt="" style="width:220px;height:220px;border-radius:12px;background:var(--field)"></div>
-        <div class="gdesc" id="qrmsg"></div>
-        <div class="row" style="margin-top:8px;justify-content:center">
-          <button class="btn-main" id="qr-save">保存二维码</button>
-          <button class="toolbtn" id="qr-copy">复制登录链接</button>
-        </div>
+      <div class="dlgt">${esc(title)}</div>
+      <div id="qrbox" style="margin-top:10px;text-align:center"><img id="qrimg" alt="" style="width:220px;height:220px;border-radius:12px;background:var(--field)"></div>
+      <div class="gdesc" id="qrmsg">加载中…</div>
+      <div class="row" style="margin-top:8px;justify-content:center">
+        <button class="btn-main" id="qr-save">保存二维码</button>
+        <button class="toolbtn" id="qr-copy">复制链接</button>
       </div>
       <div class="dlga"><button class="toolbtn" id="qr-close">关闭</button></div>
     </div>`;
     if ($('qr-close')) $('qr-close').onclick = closeQrPanel;
-    const ta = $('net-cookie');
-    if (ta) { ta.value = S.netCookie || ''; setTimeout(() => ta.focus(), 50); }
-    if ($('net-save')) $('net-save').onclick = async () => {
-      const v = String(($('net-cookie') && $('net-cookie').value) || '').trim();
-      const m = v.match(/MUSIC_U=[^;\s]+/);
-      if (!m) { toast('要带 MUSIC_U'); return; }
-      S.netCookie = v.indexOf('MUSIC_U=') === 0 ? v : m[0];
-      save();
-      closeQrPanel();
-      toast('已绑定');
-      renderMe();
+    const setMsg = (t) => { const el = $('qrmsg'); if (el) el.textContent = t; };
+    let link = '';
+    try {
+      const j = await fcJson(api);
+      if (!j.img) throw new Error('no qr');
+      qrKey = j.key;
+      const img = $('qrimg'); if (img) img.src = j.img;
+      link = j.link || '';
+      setMsg('保存二维码 → 扫一扫 → 相册');
+    } catch { setMsg('二维码加载失败'); return; }
+    if ($('qr-copy') && link) $('qr-copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(link); toast('已复制'); } catch { toast('复制失败'); }
     };
-    // 二维码：只在「另一台设备扫码」时展开
-    if ($('net-qr')) $('net-qr').onclick = async () => {
-      const wrap = $('qrwrap'); if (wrap) wrap.hidden = false;
-      const setMsg = (t) => { const el = $('qrmsg'); if (el) el.textContent = t; };
-      setMsg('加载中…');
+    if ($('qr-save')) $('qr-save').onclick = async () => {
+      const img = $('qrimg');
+      const data = (img && img.src) || '';
+      const plugin = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ImageSave) || null;
       try {
-        const j = await fcJson('/netease/qr');
-        if (!j.img) throw new Error('no qr');
-        qrKey = j.key;
-        const img = $('qrimg'); if (img) img.src = j.img;
-        const link = 'https://music.163.com/login?codekey=' + encodeURIComponent(qrKey);
-        if ($('qr-copy')) $('qr-copy').onclick = async () => {
-          try { await navigator.clipboard.writeText(link); toast('已复制'); } catch { toast('复制失败'); }
-        };
-        if ($('qr-save')) $('qr-save').onclick = async () => {
-          const img = $('qrimg');
-          const data = img && img.src ? img.src : '';
-          const plugin = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ImageSave) || null;
-          try {
-            if (plugin) {
-              await plugin.save({ data, name: 'netease-login' });
-              setMsg('已存到相册 · 去网易云「扫一扫 → 相册」');
-              toast('已存到相册');
-            } else {
-              const a = document.createElement('a');
-              a.href = data; a.download = 'netease-login.png';
-              document.body.appendChild(a); a.click(); a.remove();
-              toast('已保存');
-            }
-          } catch { toast('保存失败'); }
-        };
-        setMsg('等待扫码');
-        if (qrTimer) clearInterval(qrTimer);
-        qrTimer = setInterval(async () => {
-          if (!qrKey) return;
-          try {
-            const st = await fcJson('/netease/qr?key=' + encodeURIComponent(qrKey));
-            if (st.code === 801) setMsg('已扫码，请在手机上确认');
-            else if (st.code === 802) { setMsg('二维码过期'); clearInterval(qrTimer); qrTimer = null; }
-            else if (st.code === 803 && st.cookie) {
-              clearInterval(qrTimer); qrTimer = null;
-              S.netCookie = st.cookie; save();
-              toast('已绑定');
-              closeQrPanel();
-              renderMe();
-            }
-          } catch { /* 下一轮再试 */ }
-        }, 2000);
-      } catch { setMsg('二维码加载失败'); }
+        if (plugin) { await plugin.save({ data, name: 'login-qr' }); toast('已存到相册'); }
+        else {
+          const a = document.createElement('a');
+          a.href = data; a.download = 'login-qr.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          toast('已保存');
+        }
+        setMsg('已存到相册 → 扫一扫 → 相册');
+      } catch { toast('保存失败'); }
     };
+    if (qrTimer) clearInterval(qrTimer);
+    qrTimer = setInterval(async () => {
+      if (!qrKey) return;
+      try {
+        const st = await fcJson(api + '?key=' + encodeURIComponent(qrKey));
+        if (st.code === 801) setMsg('已扫码，请在手机上确认');
+        else if (st.code === 802) { setMsg('二维码过期，关掉重开'); clearInterval(qrTimer); qrTimer = null; }
+        else if (st.code === 803 && st.cookie) {
+          clearInterval(qrTimer); qrTimer = null;
+          onCookie(st.cookie);
+          closeQrPanel();
+          toast('已绑定');
+          renderMe();
+        }
+      } catch { /* 下一轮再试 */ }
+    }, 2000);
   }
+  const neteaseLogin = () => bindQrPanel('绑定网易云', '/netease/qr', (c) => { S.netCookie = c; save(); });
+  const qqLogin = () => bindQrPanel('绑定 QQ 音乐', '/qq/qr', (c) => { S.qqCookie = c; save(); });
 
   // ────────────── 管理员模式：看/删 OSS 上的文件 ──────────────
   let adminFiles = null, adminPrefix = 'sync/';
@@ -3680,11 +3660,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="meta" style="margin:-4px 0 4px">按勾选的方式出题</div>
       ${REV_MODES.filter(([k]) => S.learnLang === 'ja' || (k !== 'pick' && k !== 'type')).map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
         <button class="toolbtn swbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}" aria-pressed="${revModeOn(k)}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
-      ${isLoggedIn() ? `<div class="sect">网易云</div>
-      <div class="setrow"><div class="k">${S.netCookie ? '已绑定' : '未绑定'}</div>
-        ${S.netCookie
-          ? `<button class="toolbtn" id="m-net-out">解绑</button>`
-          : `<button class="toolbtn on" id="m-net-in">绑定</button>`}</div>` : ''}
+      ${isLoggedIn() ? `<div class="sect">音乐平台</div>
+      <div class="setrow"><div class="k">网易云</div>${S.netCookie
+        ? `<button class="toolbtn" id="m-net-out">解绑</button>`
+        : `<button class="toolbtn on" id="m-net-in">绑定</button>`}</div>
+      <div class="setrow"><div class="k">QQ 音乐</div>${S.qqCookie
+        ? `<button class="toolbtn" id="m-qq-out">解绑</button>`
+        : `<button class="toolbtn on" id="m-qq-in">绑定</button>`}</div>` : ''}
       <div class="sect">云同步</div>
       ${isLoggedIn() ? `<div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">同步</button>
@@ -3754,6 +3736,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
     if ($('m-login')) $('m-login').onclick = () => showGate('');
     if ($('m-net-in')) $('m-net-in').onclick = () => neteaseLogin();
+    if ($('m-qq-in')) $('m-qq-in').onclick = () => qqLogin();
+    if ($('m-qq-out')) $('m-qq-out').onclick = () => { S.qqCookie = ''; save(); renderMe(); toast('已解绑'); };
     if ($('m-net-out')) $('m-net-out').onclick = () => { S.netCookie = ''; save(); renderMe(); toast('已解绑'); };
     if ($('m-push')) $('m-push').onclick = () => pushCloud();
     if ($('m-pull')) $('m-pull').onclick = () => pullCloud();
