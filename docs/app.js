@@ -2823,49 +2823,64 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     d.hidden = false;
     d.innerHTML = `<div class="dlgcard">
       <div class="dlgt">网易云登录</div>
-      <div id="qrbox" style="margin-top:12px;text-align:center"><img id="qrimg" alt="" style="width:240px;height:240px;border-radius:12px;background:var(--field)"></div>
-      <div class="gdesc" id="qrmsg">加载中…</div>
-      <div class="row" style="margin-top:10px;justify-content:center">
-        <button class="toolbtn" id="qr-copy">复制登录链接</button>
-        <button class="toolbtn" id="qr-open">打开网易云</button>
+      <div class="gdesc">会员曲要登录后才能放完整版。</div>
+      <textarea class="sel" id="net-cookie" rows="3" placeholder="MUSIC_U=...; __csrf=..." style="width:100%;height:78px;padding:10px;margin-top:10px;resize:none;font-family:var(--mono);font-size:12px"></textarea>
+      <div class="gdesc">电脑浏览器登录 music.163.com → F12 → Application → Cookies → 复制 MUSIC_U 那一行。</div>
+      <div class="row" style="margin-top:10px"><button class="btn-main" id="net-save" style="flex:1">保存</button></div>
+      <div class="row" style="margin-top:10px;justify-content:center"><button class="toolbtn" id="net-qr">另一台设备扫码</button></div>
+      <div id="qrwrap" hidden>
+        <div id="qrbox" style="margin-top:12px;text-align:center"><img id="qrimg" alt="" style="width:220px;height:220px;border-radius:12px;background:var(--field)"></div>
+        <div class="gdesc" id="qrmsg"></div>
+        <div class="row" style="margin-top:8px;justify-content:center"><button class="toolbtn" id="qr-copy">复制登录链接</button></div>
       </div>
       <div class="dlga"><button class="toolbtn" id="qr-close">关闭</button></div>
     </div>`;
     if ($('qr-close')) $('qr-close').onclick = closeQrPanel;
-    const setMsg = (t) => { const el = $('qrmsg'); if (el) el.textContent = t; };
-    try {
-      const j = await fcJson('/netease/qr');
-      if (!j.img) throw new Error('没有二维码');
-      qrKey = j.key;
-      const img = $('qrimg'); if (img) img.src = j.img;
-      const link = 'https://music.163.com/login?codekey=' + encodeURIComponent(qrKey);
-      // 手机上不能自己扫自己：优先「跳去网易云确认」，扫码留给另一台设备
-      if ($('qr-copy')) $('qr-copy').onclick = async () => {
-        try { await navigator.clipboard.writeText(link); toast('已复制'); } catch { toast('复制失败'); }
-      };
-      if ($('qr-open')) $('qr-open').onclick = () => {
-        // 网易云没有开放「确认登录」的深链，只能唤起 App；扫码走「扫一扫 → 相册」
-        try { window.open('orpheus://', '_system'); } catch { /* 忽略 */ }
-        setMsg('扫一扫 → 相册');
-      };
-      setMsg('长按保存二维码');
-      if (qrTimer) clearInterval(qrTimer);
-      qrTimer = setInterval(async () => {
-        if (!qrKey) return;
-        try {
-          const st = await fcJson('/netease/qr?key=' + encodeURIComponent(qrKey));
-          if (st.code === 801) setMsg('已扫码，请在手机上确认');
-          else if (st.code === 802) { setMsg('二维码过期，请重新打开'); clearInterval(qrTimer); qrTimer = null; }
-          else if (st.code === 803 && st.cookie) {
-            clearInterval(qrTimer); qrTimer = null;
-            S.netCookie = st.cookie; save();
-            setMsg('已登录');
-            toast('网易云已登录');
-            setTimeout(() => { closeQrPanel(); renderMe(); }, 600);
-          }
-        } catch { /* 网络抖动，下一轮再试 */ }
-      }, 2000);
-    } catch (e) { setMsg('二维码加载失败'); }
+    const ta = $('net-cookie');
+    if (ta) { ta.value = S.netCookie || ''; setTimeout(() => ta.focus(), 50); }
+    if ($('net-save')) $('net-save').onclick = async () => {
+      const v = String(($('net-cookie') && $('net-cookie').value) || '').trim();
+      const m = v.match(/MUSIC_U=[^;\s]+/);
+      if (!m) { toast('要带 MUSIC_U'); return; }
+      S.netCookie = v.indexOf('MUSIC_U=') === 0 ? v : m[0];
+      save();
+      closeQrPanel();
+      toast('已登录网易云');
+      renderMe();
+    };
+    // 二维码：只在「另一台设备扫码」时展开
+    if ($('net-qr')) $('net-qr').onclick = async () => {
+      const wrap = $('qrwrap'); if (wrap) wrap.hidden = false;
+      const setMsg = (t) => { const el = $('qrmsg'); if (el) el.textContent = t; };
+      setMsg('加载中…');
+      try {
+        const j = await fcJson('/netease/qr');
+        if (!j.img) throw new Error('no qr');
+        qrKey = j.key;
+        const img = $('qrimg'); if (img) img.src = j.img;
+        const link = 'https://music.163.com/login?codekey=' + encodeURIComponent(qrKey);
+        if ($('qr-copy')) $('qr-copy').onclick = async () => {
+          try { await navigator.clipboard.writeText(link); toast('已复制'); } catch { toast('复制失败'); }
+        };
+        setMsg('等待扫码');
+        if (qrTimer) clearInterval(qrTimer);
+        qrTimer = setInterval(async () => {
+          if (!qrKey) return;
+          try {
+            const st = await fcJson('/netease/qr?key=' + encodeURIComponent(qrKey));
+            if (st.code === 801) setMsg('已扫码，请在手机上确认');
+            else if (st.code === 802) { setMsg('二维码过期'); clearInterval(qrTimer); qrTimer = null; }
+            else if (st.code === 803 && st.cookie) {
+              clearInterval(qrTimer); qrTimer = null;
+              S.netCookie = st.cookie; save();
+              toast('网易云已登录');
+              closeQrPanel();
+              renderMe();
+            }
+          } catch { /* 下一轮再试 */ }
+        }, 2000);
+      } catch { setMsg('二维码加载失败'); }
+    };
   }
 
   // ────────────── 管理员模式：看/删 OSS 上的文件 ──────────────
