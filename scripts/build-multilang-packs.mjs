@@ -256,6 +256,33 @@ function buildLang(L, store) {
     const cur = String((e.forms || {}).exchange || '');
     e.forms = { exchange: [cur, ...forms.map((f) => 'f:' + f)].filter(Boolean).join('/') };
   }
+  // OMW（WordNet 同义词集）补词：只补词库里还没有的词，不动已有词典释义
+  const omw = readJson(path.join(ROOT, 'data', 'omw', `gloss-${L.id}.json`), null);
+  const omwGloss = (omw && omw.glosses) || {};
+  let omwAdded = 0;
+  for (const [w, g] of Object.entries(omwGloss)) {
+    if (seenWord.has(w)) continue;
+    const zhList = (g && g.zh) || [];
+    const enList = (g && g.en) || [];
+    const jaList = (g && g.ja) || [];
+    const meaning = zhList.length ? zhList.join('；') : (enList[0] || jaList[0] || '');
+    if (!meaning) continue;
+    seenWord.add(w);
+    const rank = (freqGet(L.id) || new Map()).get(w) || 0;
+    // 同形词只加一次；ID 用语言前缀，避免和别的语言撞
+    const id = `${L.id}:${w}`;
+    const levels = [];
+    if (rank) levels.push({ system: 'freq', level: bandOf(rank), list: `${L.id}-${bandOf(rank)}` });
+    else levels.push({ system: 'omw', level: 'extra', list: `${L.id}-extra` });
+    entries.push({
+      id, lang: L.id, word: w, lemma: w, pos: '',
+      meaning, meanings: zhList.length ? { zh: zhList.join('；') } : {},
+      levels, freq: rank || 999997, forms: {}, src: 'omw',
+    });
+    pairs[id] = meaning;
+    if (rank) bandIds.get(bandOf(rank)).push(id);
+    omwAdded++;
+  }
   entries.sort((a, b) => (a.freq - b.freq) || a.word.localeCompare(b.word));
   const byId = new Map(entries.map((x) => [x.id, x]));
   const sortIds = (ids) => ids.sort((a, b) => (byId.get(a).freq - byId.get(b).freq) || a.localeCompare(b));
@@ -296,16 +323,31 @@ function buildLang(L, store) {
     source: '中文维基词典（CC BY-SA 3.0）+ FrequencyWords（MIT）',
     count: entries.length, entries,
   });
+  // 语言对释义层：-zh 用词典释义；-en / -ja 来自 OMW 同义词集（没有就只在 -zh 里）
+  const pairEn = {}, pairJa = {};
+  for (const [w, g] of Object.entries(omwGloss)) {
+    if (g && g.en && g.en.length) pairEn[w] = g.en.join('；');
+    if (g && g.ja && g.ja.length) pairJa[w] = g.ja.join('；');
+    if (g && g.zh && g.zh.length && !pairs[`${L.id}:${w}`]) pairs[`${L.id}:${w}`] = g.zh.join('；');
+  }
   writeJson(path.join(OUT, L.id, 'pairs', `${L.id}-zh.json`), {
     id: `${L.id}-zh`, learnLang: L.id, explainLang: 'zh',
     count: Object.keys(pairs).length, glosses: pairs,
+  });
+  if (Object.keys(pairEn).length) writeJson(path.join(OUT, L.id, 'pairs', `${L.id}-en.json`), {
+    id: `${L.id}-en`, learnLang: L.id, explainLang: 'en', source: 'Open Multilingual WordNet',
+    count: Object.keys(pairEn).length, glosses: pairEn,
+  });
+  if (Object.keys(pairJa).length) writeJson(path.join(OUT, L.id, 'pairs', `${L.id}-ja.json`), {
+    id: `${L.id}-ja`, learnLang: L.id, explainLang: 'ja', source: 'Open Multilingual WordNet',
+    count: Object.keys(pairJa).length, glosses: pairJa,
   });
   const notes = ['释义来自中文维基词典，不是机器翻译。'];
   notes.push('分档用 OpenSubtitles 语料词频（最高频 1000 / 3000 / 6000 / 10000 / 20000），是覆盖率档位，不是官方 CEFR/TRKI 词表。');
   if (L.id === 'ko') notes.push('韩语另有 NIKL(A/B/C) 与 TOPIK(초급/중급) 官方等级标签。');
   writeJson(path.join(OUT, L.id, 'manifest.json'), {
     id: L.id, lang: L.id, version: new Date().toISOString().slice(0, 10),
-    lexicon: `${L.id}/lexicon.json`, pairs: [`${L.id}-zh`],
+    lexicon: `${L.id}/lexicon.json`, pairs: [`${L.id}-zh`].concat(Object.keys(pairEn).length ? [`${L.id}-en`] : [], Object.keys(pairJa).length ? [`${L.id}-ja`] : []),
     lists, source: '中文维基词典（CC BY-SA 3.0）+ FrequencyWords（MIT）', notes,
   });
   // 覆盖率：语料前 N 高频词里，多少能在词包里查到（含活用形别名）
@@ -321,7 +363,7 @@ function buildLang(L, store) {
     const hit = words.filter((w) => known.has(w)).length;
     cover['top' + n] = words.length ? Math.round((hit / words.length) * 1000) / 10 : 0;
   }
-  return { entries: entries.length, func: funcIds.length, coverage: cover, lists: Object.fromEntries(lists.map((x) => [x.label, x.count])), bands: Object.fromEntries(BANDS.map((b) => [b.id, bandIds.get(b.id).length])) };
+  return { entries: entries.length, func: funcIds.length, omw: omwAdded, coverage: cover, lists: Object.fromEntries(lists.map((x) => [x.label, x.count])), bands: Object.fromEntries(BANDS.map((b) => [b.id, bandIds.get(b.id).length])) };
 }
 
 function loadCurated(lang) {

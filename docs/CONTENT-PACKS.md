@@ -16,23 +16,23 @@ docs/data/content-report.json     覆盖率报告（每种语言 top1000/3000/10
 | --- | --- | --- | --- |
 | 日语 | 6,604 | 标日初级上/下、中级上/下、JLPT N5–N1 | 现有 THBWiki/标日/JLPT 词库 + ja-zh 释义层 |
 | 英语 | 14,936 | 中考、高考、CET-4/6、考研、IELTS、TOEFL、GRE | ECDICT（MIT） |
-| 法语 | 10,674 | 核心虚词、最高频 1k/3k/6k/10k/20k | 中文维基词典（CC BY-SA 3.0） |
-| 德语 | 19,399 | 同上 | 中文维基词典 |
-| 西班牙语 | 12,782 | 同上 | 中文维基词典 |
-| 葡萄牙语 | 8,482 | 同上 | 中文维基词典 |
-| 俄语 | 10,831 | 同上 | 中文维基词典 |
-| 韩语 | 9,604 | NIKL A/B/C、TOPIK 초급/중급、频率档 | 中文维基词典 + NIKL/TOPIK 词表 |
+| 法语 | 12,703 | 核心虚词、最高频 1k/3k/6k/10k/20k | 中文维基词典 + OMW 同义词集 |
+| 德语 | 20,050 | 同上 | 中文维基词典 + OMW |
+| 西班牙语 | 14,672 | 同上 | 中文维基词典 + OMW（MCR） |
+| 葡萄牙语 | 11,522 | 同上 | 中文维基词典 + OpenWN-PT + OMW |
+| 俄语 | 11,241 | 同上 | 中文维基词典 + OMW |
+| 韩语 | 9,827 | NIKL A/B/C、TOPIK 초급/중급、频率档 | 中文维基词典 + OMW + NIKL/TOPIK 词表 |
 
 覆盖率（`content-report.json`，语料前 N 高频词能在词库里查到的比例，含活用形）：
 
 | 语言 | top1000 | top3000 | top10000 |
 | --- | --- | --- | --- |
-| 法语 | 80.1% | 72.3% | 62.2% |
-| 德语 | 89.1% | 86.9% | 78.8% |
-| 西班牙语 | 78.5% | 73.0% | 64.9% |
-| 葡萄牙语 | 61.8% | 50.7% | 41.4% |
-| 俄语 | 73.6% | 65.7% | 58.6% |
-| 韩语 | 45.8% | 32.3% | 26.1% |
+| 法语 | 88.5% | 81.9% | 71.7% |
+| 德语 | 91.6% | 89.3% | 81.1% |
+| 西班牙语 | 83.5% | 78.5% | 71.5% |
+| 葡萄牙语 | 76.4% | 67.3% | 57.0% |
+| 俄语 | 75.6% | 68.0% | 60.6% |
+| 韩语 | 52.4% | 36.1% | 28.1% |
 
 > 频率档 = OpenSubtitles 语料词频分档（最高频 1000 / 3000 / 6000 / 10000 / 20000）；
 > 它是「覆盖率档位」，**不是官方 CEFR / TRKI 词表**，manifest 里也是这么写的。
@@ -46,6 +46,7 @@ docs/data/content-report.json     覆盖率报告（每种语言 top1000/3000/10
 | [kaikki.org 中文维基词典导出](https://kaikki.org/dictionary/downloads/zh/zh-extract.jsonl.gz) | 法/德/西/葡/俄/韩词条的中文释义 | CC BY-SA 3.0 |
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) | 语料词频（分档、覆盖率） | MIT |
 | [NIKL + TOPIK 合并词表](https://github.com/julienshim/combined_korean_vocabulary_list) | 韩语等级标签 | MIT |
+| [Open Multilingual WordNet](https://github.com/omwn/omw-data)（COW / MCR / OpenWN-PT / wikt-*） | 词条释义补充 + `<lang>-en`、`<lang>-ja` 语言对 | WordNet 许可 / CC BY-SA |
 | `data/function-words/<lang>.json` | 高频虚词人工核对表（der/und/de/para 这类词典里常缺的词） | 本项目 |
 
 ## 重建
@@ -77,5 +78,6 @@ node scripts/build-multilang-packs.mjs   # 法/德/西/葡/俄/韩 + content-rep
 
 - 中文维基词典对葡萄牙语、韩语覆盖偏薄（见上表），补法要换词源，不是调参数能解决的。
 - 不规则变位（être→suis、ir→voy、идти→шёл）没有规则可推，只靠词典自带的活用条目。
-- 「语言对释义层」目前只有 `<lang>-zh`；`learnLang ≠ zh` 且 `explainLang ≠ zh` 的语言对还没预生成。
+- 语言对释义层现有 `<lang>-zh`、`<lang>-en`、`<lang>-ja`；其它解释语言仍回退中文。
+- OMW 给的是「同义词集」，释义是一组近义词（`maison → abode；home`），不是词典定义句。
 - 学习语言为「中文」时还没有 HSK 词表与 zh→外语释义层。

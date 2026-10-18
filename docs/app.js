@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018x';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018x';
-import { icon } from './icons.js?v=20261018x';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018x';
+import { V } from './version.js?v=20261018y';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018y';
+import { icon } from './icons.js?v=20261018y';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018y';
 
 (() => {
   'use strict';
@@ -264,7 +264,22 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   };
   // 已掌握记的是时间戳：正数=标了，负数=明确取消（云端合并时按时间戳取胜，不会被旧数据顶回来）
   const isKnown = (w) => !!(w && Number(S.known[w.id]) > 0);
-  const meaningOf = (w) => (w && ((S.notes[w.id] && S.notes[w.id].meaning) || w.meaning)) || '';
+  // 语言对释义层：data/<lang>/pairs/<lang>-<用户语言>.json（没有这一对就退回中文释义）
+  const PAIRS = new Map();            // lang → Map(word → 释义)
+  const PAIR_TRIED = new Set();
+  function pairGloss(w) {
+    if (!w) return '';
+    const lg = w.lang || 'ja';
+    const m = PAIRS.get(lg);
+    if (!m) return '';
+    return m.get(String(w.word).toLowerCase()) || m.get(w.id) || '';
+  }
+  const meaningOf = (w) => {
+    if (!w) return '';
+    const noted = S.notes[w.id] && S.notes[w.id].meaning;
+    if (noted) return noted;
+    return pairGloss(w) || w.meaning || '';
+  };
 
   // ── 逐词中文（词级对照）──
   // 踩过的坑：助词/助动词不能用词表兜底。词表里为「汉字词」都建了假名活用形索引，
@@ -2051,6 +2066,20 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         }
       }
       LEX_PACKS.set(lang, { entries });
+      // 语言对释义层（用户语言不是中文时）
+      const exp = (typeof userLang === 'function') ? userLang() : 'zh';
+      if (exp && exp !== 'zh') {
+        const key = lang + ':' + exp;
+        if (!PAIR_TRIED.has(key)) {
+          PAIR_TRIED.add(key);
+          try {
+            const pj = await getJson(dataUrl(`${lang}/pairs/${lang}-${exp}.json`), { cache: 'force-cache' });
+            const g = (pj && pj.glosses) || {};
+            const m = new Map(Object.entries(g).map(([k, x]) => [k.toLowerCase(), x]));
+            if (m.size) PAIRS.set(lang, m);
+          } catch { /* 没有这一对就退回中文 */ }
+        }
+      }
       // 档位清单（学习范围 chips）来自内容包自己的 manifest，不在前端硬编码
       try {
         const m = await getJson(dataUrl(`${lang}/manifest.json`), { cache: 'no-cache' });
