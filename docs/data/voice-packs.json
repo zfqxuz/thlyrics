@@ -36,6 +36,84 @@
       "source": "有道/百度 TTS（一次性生成）",
       "license": "生成语音，随包分发",
       "count": 3000
+    },
+    {
+      "id": "aliyun-fr",
+      "name": "法语词音（有道）",
+      "lang": "fr-FR",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 6014673,
+      "sha256": "f21a30982536684f610ce3ca1aff4eeb69946a227ad474a0beb35f7988692d7e",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-fr-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107664511&Signature=eCT6tW7jjDP5pTPMlZ3LmAN8GMg%3D",
+      "source": "有道 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 846
+    },
+    {
+      "id": "aliyun-de",
+      "name": "德语词音（有道）",
+      "lang": "de-DE",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 4795649,
+      "sha256": "a67b2674426ca63ca234126767e7b11ed9a77aa6960ccb67a5965e9aec865e25",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-de-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107664504&Signature=cPMm19u6CVNTQ%2BRX3ZZS1SfooXI%3D",
+      "source": "有道 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 601
+    },
+    {
+      "id": "aliyun-es",
+      "name": "西语词音（有道）",
+      "lang": "es-ES",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 5002491,
+      "sha256": "3276205ddc1d092052ca94c2847d0f1eb935267a126179234162de4f7b07e91b",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-es-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107664505&Signature=qstaX2HPjHtEnyuvK79Mah1fxvE%3D",
+      "source": "有道 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 657
+    },
+    {
+      "id": "aliyun-pt",
+      "name": "葡语词音（有道）",
+      "lang": "pt-BR",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 2969726,
+      "sha256": "f85fe70cf66061c6b8eabcfb4eed3ae7cd7ee833add01b2a8ec3281c19101999",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-pt-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107664505&Signature=b32r%2FPR3%2BTr8S7yf5OewiRiUaPk%3D",
+      "source": "有道 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 408
+    },
+    {
+      "id": "aliyun-ru",
+      "name": "俄语词音（有道）",
+      "lang": "ru-RU",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 4585848,
+      "sha256": "215d4ab4e1467385f6f0299ef891a9c865169749a16f2e27d0a016d3e055f983",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-ru-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107664506&Signature=yPJahVc4SileeYUiaQssXOJRT30%3D",
+      "source": "有道 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 543
+    },
+    {
+      "id": "aliyun-ko",
+      "name": "韩语词音（有道）",
+      "lang": "ko-KR",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 1562205,
+      "sha256": "b5289fd1436cdb9380e45c195abc729543ecbc809e05b68be8f324fcc20d21e5",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-ko-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107664507&Signature=B9eTEM%2F6NGaIHcLinCvulSzxJ8Y%3D",
+      "source": "有道 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 700
     }
   ]
 }

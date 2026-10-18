@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018zf';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zf';
-import { icon } from './icons.js?v=20261018zf';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zf';
+import { V } from './version.js?v=20261018zi';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zi';
+import { icon } from './icons.js?v=20261018zi';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zi';
 
 (() => {
   'use strict';
@@ -3637,7 +3637,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     box.querySelectorAll('[data-rm]').forEach((el) => (el.onclick = async () => {
       try { await voicePack.remove(el.dataset.rm); vpCheckedAt = 0; toast('已删除'); renderVoicepack(); } catch { toast('删除失败'); }
     }));
-    box.querySelectorAll('[data-test]').forEach((el) => (el.onclick = () => speak('こんにちは')));
+    const SAMPLE = { ja: 'こんにちは', en: 'hello', fr: 'bonjour', de: 'hallo', es: 'hola', pt: 'olá', ru: 'привет', ko: '안녕하세요' };
+    box.querySelectorAll('[data-test]').forEach((el) => (el.onclick = () => {
+      const p = byId.get(el.dataset.test);
+      const lb = String((p && p.lang) || 'ja').toLowerCase().split('-')[0];
+      speak(SAMPLE[lb] || 'hello', false, (p && p.lang) || 'ja-JP');
+    }));
   }
 
   /** 语音语言清单：默认 ja-JP / en-US，其余给“去装系统语音”的入口（App 不能静默装引擎数据） */
