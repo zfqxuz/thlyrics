@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018zk';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zk';
-import { icon } from './icons.js?v=20261018zk';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zk';
+import { V } from './version.js?v=20261018zm';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zm';
+import { icon } from './icons.js?v=20261018zm';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zm';
 
 (() => {
   'use strict';
@@ -2217,6 +2217,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       langs: rec.langs || detectTrackLangs(lines, rec.primaryLang),
       base: '', coverUrl: rec.cover || '', plName: rec.plName || '', plId: rec.plId || '',
       audio: rec.noAudio ? null : { type: rec.src || 'netease', nid: rec.nid }, timing: rec.src || 'netease',
+      via: rec.via || '',
       lineCount: lines.filter((l) => l.text.trim()).length,
       vocabIds: [...ids].map((w) => VBY.get(w)).filter(Boolean).map((v) => v.id), lines,
     };
@@ -2370,35 +2371,55 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     .replace(/feat\..*$/, '')
     .replace(/[^\p{L}\p{N}]+/gu, '');
   /** 跨平台（Spotify / Apple Music）镜像：按「歌名 + 歌手」去网易云找一条能拿到歌词和音源的 */
-  async function findMirrorSource(name, artist) {
+  async function findMirrorCandidates(name, artist, used) {
     const q = `${name || ''} ${artist || ''}`.trim();
-    if (!q) return null;
+    if (!q) return [];
     let arr = [];
-    try { arr = await gdJson(`types=search&source=netease&name=${encodeURIComponent(q)}&count=8`); } catch { return null; }
-    if (!Array.isArray(arr)) return null;
+    try { arr = await gdJson(`types=search&source=netease&name=${encodeURIComponent(q)}&count=8`); } catch { return []; }
+    if (!Array.isArray(arr)) return [];
     const nName = MX_NORM(name), nArtist = MX_NORM(artist);
-    let best = null, bestScore = 0;
+    const out = [];
     for (const x of arr) {
+      if (used && used.has(String(x.id))) continue;      // 同一批里已经用过的音源不重复用
       const t = MX_NORM(x.name);
       let score = 0;
       if (t && t === nName) score += 70;
       else if (t && nName && (t.indexOf(nName) >= 0 || nName.indexOf(t) >= 0)) score += 45;
       const ar = (x.artist || []).map(MX_NORM).join(' ');
       if (nArtist && ar && (ar.indexOf(nArtist) >= 0 || nArtist.indexOf(ar) >= 0)) score += 30;
-      if (score > bestScore) { bestScore = score; best = x; }
+      if (score >= 60) out.push({ x, score });
     }
-    return best && bestScore >= 60 ? best : null;
+    out.sort((a, b) => b.score - a.score);
+    return out.map((o) => o.x).slice(0, 3);
+  }
+  /** 这条音源有没有能用的歌词（纯音乐 / 只有元信息就跳过，换下一个候选） */
+  async function hasUsableLyric(nid) {
+    try {
+      const ly = await resolveLyric(nid, 'netease');
+      if (!ly || !ly.lyric) return false;
+      const rows = parseLrc(ly.lyric, '').filter((l) => l.text && l.t > 0);
+      return rows.length >= 3 && !/纯音乐/.test(ly.lyric);
+    } catch { return false; }
+  }
+  /** 按「歌名+歌手」找音源：优先取歌词可用的那一条 */
+  async function findMirrorSource(name, artist, used) {
+    const cands = await findMirrorCandidates(name, artist, used);
+    for (const c of cands) {
+      if (await hasUsableLyric(c.id)) return c;
+    }
+    return cands[0] || null;
   }
   /** Spotify / Apple Music 导入：元数据用原平台，歌词与音源走网易云镜像 */
   async function importMirror(meta, limit, onStep) {
     const srcName = meta.src === 'spotify' ? 'Spotify' : 'Apple Music';
     const all = meta.tracks || [];
     const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all.slice(0, 300);
-    const matched = [], miss = [];
+    const matched = [], miss = [], used = new Set();
     for (let i = 0; i < list.length; i++) {
       const tr = list[i];
       if (onStep) onStep(i + 1, list.length, tr.name, '找音源…', 'match');
-      const hit = await findMirrorSource(tr.name, tr.artist);
+      const hit = await findMirrorSource(tr.name, tr.artist, used);
+      if (hit) used.add(String(hit.id));
       if (hit) {
         matched.push({ id: String(hit.id), name: hit.name, ar: [{ name: (hit.artist || []).join(' / ') }],
           al: { name: hit.album || tr.album || '', picUrl: tr.cover || '' }, orig: tr });
@@ -2423,6 +2444,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     return Object.assign(res, {
       via: meta.src, srcName, mirrored: matched.length, miss: miss.length, missList: miss.slice(0, 20),
       plName: res.plName || meta.name || '', total: list.length, pid: 'mx' + meta.src + ':' + meta.id, src: 'netease',
+
     });
   }
 
@@ -2542,6 +2564,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   window.__tlVid = (w, lang) => ((lang ? VBYL.get(lang + ':' + String(w).toLowerCase()) : null) || VBY.get(w) || {}).id;
   window.__tlLookup = (w, lang) => { const v = lookupWord(w, lang); return v ? { id: v.id, word: v.word, meaning: v.meaning } : null; };
   window.__tlScope = () => ({ learnLang: S.learnLang, options: scopeOptions() });
+  window.__tlMirrorOne = (n, a) => findMirrorSource(n, a, new Set());
   window.__tlDbg = () => ({ tracks: IDX ? IDX.tracks.length : -1, imp: Object.keys(S.imp || {}), vocab: VOCAB.length, libw: LIBW.size, deck: deckList().length });
   window.__tlLine = (text, lang) => wordsCompactLine(text, lang);
   window.__tlPack = (lang) => ensureLangPack(lang).then(() => ({ ready: langPackReady(lang), n: (VOCAB.filter((v) => v.lang === lang) || []).length, lists: PACK_LISTS.get(lang) || null }));
