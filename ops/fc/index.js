@@ -870,6 +870,20 @@ function shareHit(text) {
     for (const [re, type] of qq) { const m = scan.match(re); if (m) return { src: 'tencent', type, id: m[1] }; }
     return { src: 'tencent', type: '', id: '', url };
   }
+  // Spotify：open.spotify.com/track|album|playlist/<22 位 id> 或 spotify:track:<id>
+  const sp = scan.match(/(?:open\.spotify\.com\/(track|album|playlist)\/|spotify:(track|album|playlist):)([A-Za-z0-9]{22})/i);
+  if (sp) return { src: 'spotify', type: String(sp[1] || sp[2]).toLowerCase(), id: sp[3] };
+  // Apple Music：music.apple.com/<cc>/<album|playlist|song>/<slug>/<id>?i=<trackId>
+  if (/music\.apple\.com/i.test(scan)) {
+    const song = scan.match(/[?&]i=(\d{5,})/);
+    const kind = (scan.match(/music\.apple\.com\/[a-z]{2}\/?(album|playlist|song)?/i) || [])[1] || 'album';
+    const cc = (scan.match(/music\.apple\.com\/([a-z]{2})\//i) || [])[1] || 'us';
+    const pl = scan.match(/pl\.[0-9a-f]{16,}/i);
+    const idm = scan.match(/\/(\d{5,})(?:\?|$|&)/) || scan.match(/[?&]i=(\d{5,})/);
+    if (pl && !song) return { src: 'apple', type: 'playlist', id: pl[0], cc };
+    if (idm) return { src: 'apple', type: song ? 'song' : String(kind).toLowerCase(), id: song ? song[1] : idm[1], cc };
+    return { src: 'apple', type: '', id: '', url, cc };
+  }
   const pats = [
     [/playlist[^\d]{0,24}(\d{5,})/i, 'playlist'],
     [/album[^\d]{0,24}(\d{5,})/i, 'album'],
@@ -882,6 +896,167 @@ function shareHit(text) {
   const bareQq = s.trim().match(/^([A-Za-z0-9]{12,16})$/);
   if (bareQq) return { src: 'tencent', type: 'song', id: bareQq[1] };
   return url ? { src: '', type: '', id: '', url } : null;
+}
+
+/** 跟着 302 走几跳再取页面（Apple Music 会按地区重定向到 /cn、/us） */
+async function httpGetFollow(url, headers, timeout = 15000, hops = 3) {
+  let cur = url;
+  for (let i = 0; i <= hops; i++) {
+    const r = await httpGetBuf(cur, headers, timeout);
+    if (r.status >= 300 && r.status < 400 && r.headers.location) {
+      cur = new URL(r.headers.location, cur).toString();
+      continue;
+    }
+    return r;
+  }
+  throw new Error('重定向太多');
+}
+
+/** Spotify：Client Credentials 换 token（需要在函数环境变量里配 SPOTIFY_ID / SPOTIFY_SECRET） */
+const SPOTIFY_TOKEN = { v: '', at: 0 };
+function httpPostForm(url, body, headers, timeout = 12000) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({
+      host: u.hostname, path: u.pathname + u.search, method: 'POST',
+      headers: Object.assign({ 'Content-Length': Buffer.byteLength(body) }, headers || {}),
+    }, (res) => {
+      let buf = '';
+      res.on('data', (d) => { buf += d; });
+      res.on('end', () => resolve({ status: res.statusCode, body: buf }));
+    });
+    req.on('error', reject);
+    req.setTimeout(timeout, () => { req.destroy(new Error('超时')); });
+    req.write(body);
+    req.end();
+  });
+}
+async function spotifyToken() {
+  const id = process.env.SPOTIFY_ID, sec = process.env.SPOTIFY_SECRET;
+  if (!id || !sec) throw new Error('服务端没配 Spotify 凭据（SPOTIFY_ID / SPOTIFY_SECRET）');
+  if (SPOTIFY_TOKEN.v && Date.now() - SPOTIFY_TOKEN.at < 3000e3) return SPOTIFY_TOKEN.v;
+  const basic = Buffer.from(id + ':' + sec).toString('base64');
+  const r = await httpPostForm('https://accounts.spotify.com/api/token', 'grant_type=client_credentials',
+    { Authorization: 'Basic ' + basic, 'Content-Type': 'application/x-www-form-urlencoded' });
+  if (r.status !== 200) throw new Error('Spotify 取 token 失败 HTTP ' + r.status);
+  const j = JSON.parse(r.body);
+  SPOTIFY_TOKEN.v = j.access_token;
+  SPOTIFY_TOKEN.at = Date.now();
+  return SPOTIFY_TOKEN.v;
+}
+async function spotifyGet(path) {
+  const r = await httpGet('https://api.spotify.com' + path, { Authorization: 'Bearer ' + await spotifyToken() }, 15000);
+  if (r.status !== 200) throw new Error('Spotify 读不到 HTTP ' + r.status);
+  return JSON.parse(r.body);
+}
+const spTrack = (t) => ({
+  name: t.name || '',
+  artist: (t.artists || []).map((a) => a.name).join(' / '),
+  album: (t.album && t.album.name) || '',
+  cover: (t.album && t.album.images && t.album.images[0] && t.album.images[0].url) || '',
+  duration: Math.round((t.duration_ms || 0) / 1000),
+  src: 'spotify', mirror: true,
+});
+async function spotifyMeta(hit) {
+  if (hit.type === 'track') {
+    const t = await spotifyGet('/v1/tracks/' + hit.id);
+    return { type: 'song', id: hit.id, name: t.name, cover: (t.album.images[0] || {}).url || '', mirror: true, tracks: [spTrack(t)] };
+  }
+  if (hit.type === 'album') {
+    const a = await spotifyGet('/v1/albums/' + hit.id);
+    let tracks = (a.tracks && a.tracks.items) || [];
+    let next = a.tracks && a.tracks.next;
+    while (next && tracks.length < 300) {
+      const p = await spotifyGet(next.replace('https://api.spotify.com', ''));
+      tracks = tracks.concat(p.items || []); next = p.next;
+    }
+    const full = tracks.map((t) => Object.assign({}, t, { album: { name: a.name, images: a.images } }));
+    return { type: 'album', id: hit.id, name: a.name, cover: (a.images[0] || {}).url || '', mirror: true, tracks: full.map(spTrack) };
+  }
+  const pl = await spotifyGet('/v1/playlists/' + hit.id);
+  let items = (pl.tracks && pl.tracks.items) || [];
+  let next = pl.tracks && pl.tracks.next;
+  while (next && items.length < 500) {
+    const p = await spotifyGet(next.replace('https://api.spotify.com', ''));
+    items = items.concat(p.items || []); next = p.next;
+  }
+  const tracks = items.map((x) => x && x.track).filter((t) => t && t.name);
+  return { type: 'playlist', id: hit.id, name: pl.name, cover: (pl.images[0] || {}).url || '', mirror: true, tracks: tracks.map(spTrack) };
+}
+
+/** Apple Music：单曲/专辑走公开的 iTunes API；歌单走页面里的 serialized-server-data */
+const appleTrack = (t) => ({
+  name: t.trackName || '', artist: t.artistName || '', album: t.collectionName || '',
+  cover: (t.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+  duration: Math.round((t.trackTimeMillis || 0) / 1000), src: 'apple', mirror: true, preview: t.previewUrl || '',
+});
+/** iTunes 是按国家/地区分店的：链接给的书店没有这首就换 us / jp / cn 再试 */
+async function itunesLookup(id, entity, cc) {
+  const order = [...new Set([cc || 'us', 'us', 'jp', 'cn', 'hk', 'tw'].map((x) => String(x).toLowerCase()))];
+  let last = null;
+  for (const c of order) {
+    try {
+      const j = JSON.parse((await httpGet(`https://itunes.apple.com/lookup?id=${id}&entity=${entity}&country=${c}&limit=200`, {}, 15000)).body);
+      const rows = j.results || [];
+      const songs = rows.filter((x) => x.kind === 'song' || x.wrapperType === 'track');
+      if (songs.length) return { rows, songs, cc: c };
+      last = rows;
+    } catch { /* 换下一个书店 */ }
+  }
+  return { rows: last || [], songs: [], cc: '' };
+}
+async function appleMeta(hit) {
+  if (hit.type === 'song') {
+    const r = await itunesLookup(hit.id, 'song', hit.cc);
+    const t = r.songs[0] || (r.rows || [])[0];
+    if (!t) throw new Error('这首歌读不到');
+    return { type: 'song', id: hit.id, name: t.trackName, cover: appleTrack(t).cover, mirror: true, tracks: [appleTrack(t)] };
+  }
+  if (hit.type === 'album') {
+    const r = await itunesLookup(hit.id, 'song', hit.cc);
+    if (!r.songs.length) throw new Error('这张专辑读不到');
+    const album = (r.rows || []).find((x) => x.collectionId) || {};
+    return { type: 'album', id: hit.id, name: album.collectionName || '', cover: appleTrack(album).cover, mirror: true, tracks: r.songs.map(appleTrack) };
+  }
+  // 歌单：抓页面里的 serialized-server-data
+  const page = await httpGetFollow('https://music.apple.com/' + (hit.cc || 'us') + '/playlist/' + hit.id,
+    { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9' }, 15000);
+  const html = String(page.body || '');
+  const m = html.match(/<script[^>]*id="serialized-server-data"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) throw new Error('这个歌单读不到（页面结构变了）');
+  let data;
+  try { data = JSON.parse(m[1]); } catch { throw new Error('歌单数据解析失败'); }
+  const out = [];
+  const name = (() => {
+    const head = (data && data.data && data.data[0] && data.data[0].data && data.data[0].data.header) || {};
+    if (head.title) return String(head.title);
+    const t = html.match(/<title>([^<]{1,120})<\/title>/);
+    return t ? t[1].replace(/^\u200e?Apple\s*Music\s*[-–]\s*/i, '').trim() : '';
+  })();
+  const seen = new Set();
+  const walk = (o) => {
+    if (!o || typeof o !== 'object') return;
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    const cd = o.contentDescriptor;
+    if (cd && cd.kind === 'song' && o.title) {
+      const sid = String((cd.identifiers && cd.identifiers.storeAdamID) || '');
+      if (sid && !seen.has(sid)) {
+        seen.add(sid);
+        const art = (o.artwork && o.artwork.dictionary && o.artwork.dictionary.url) || '';
+        out.push({
+          name: o.title,
+          artist: (o.subtitleLinks && o.subtitleLinks[0] && o.subtitleLinks[0].title) || o.artistName || '',
+          album: name, cover: art ? art.replace(/\{w\}x\{h\}\{c\}\.\{f\}/, '600x600bb') : '',
+          duration: o.duration ? Math.round(o.duration / 1000) : 0, src: 'apple', mirror: true,
+        });
+      }
+    }
+    Object.values(o).forEach(walk);
+  };
+  walk(data);
+  if (!out.length) throw new Error('歌单里没有歌');
+  return { type: 'playlist', id: hit.id, name, cover: '', mirror: true, tracks: out };
 }
 
 /** 跟进 302（163cn.tv 这类手机短链），最多 6 跳；顺便在响应体里兜底找链接 */
@@ -1159,8 +1334,15 @@ exports.handler = async (event) => {
       if (!hit || !hit.type) return reply(req, 400, { error: '链接里没有歌曲 / 专辑 / 歌单 ID' });
       if (hit.type === 'program') return reply(req, 400, { error: '电台节目暂不支持' });
       const src = hit.src || 'netease';
-      try { return reply(req, 200, Object.assign({ ok: true, src }, await (src === 'tencent' ? qqMeta : neteaseMeta)(hit))); }
-      catch (e) { return reply(req, 502, { error: (src === 'tencent' ? 'QQ音乐' : '网易云') + '读不到：' + String((e && e.message) || e) }); }
+      try {
+        const meta = src === 'spotify' ? await spotifyMeta(hit)
+          : src === 'apple' ? await appleMeta(hit)
+          : await (src === 'tencent' ? qqMeta : neteaseMeta)(hit);
+        return reply(req, 200, Object.assign({ ok: true, src, mirror: !!meta.mirror }, meta));
+      } catch (e) {
+        const who = src === 'spotify' ? 'Spotify' : src === 'apple' ? 'Apple Music' : src === 'tencent' ? 'QQ音乐' : '网易云';
+        return reply(req, 502, { error: who + '读不到：' + String((e && e.message) || e) });
+      }
     }
 
     if (action === '/register' && method === 'POST') {

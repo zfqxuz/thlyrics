@@ -98,6 +98,17 @@ def main():
         'ROLE': 'auth',
         'SEP_FUNCTION': 'thlyrics-sep',
     }
+    # Spotify 凭据（可选）：~/.dsh/spotify.credentials.json = {"id": "...", "secret": "..."}
+    sp = os.path.expanduser('~/.dsh/spotify.credentials.json')
+    if os.path.exists(sp):
+        try:
+            j = json.load(open(sp, encoding='utf-8'))
+            if j.get('id') and j.get('secret'):
+                env['SPOTIFY_ID'] = str(j['id'])
+                env['SPOTIFY_SECRET'] = str(j['secret'])
+                print('· 已带上 Spotify 凭据')
+        except Exception as e:
+            print('· Spotify 凭据读取失败：', e)
     body = {
         'runtime': 'nodejs20', 'handler': 'index.handler', 'timeout': 300, 'memorySize': 1024, 'cpu': 1, 'diskSize': 512,
         'code': {'zipFile': build_zip()}, 'environmentVariables': env,

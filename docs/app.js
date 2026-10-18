@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018zj';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zj';
-import { icon } from './icons.js?v=20261018zj';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zj';
+import { V } from './version.js?v=20261018zk';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zk';
+import { icon } from './icons.js?v=20261018zk';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zk';
 
 (() => {
   'use strict';
@@ -1774,6 +1774,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const isCur = !!(curTrack && String(curTrack.id) === String(t.id));
     const tags = [];
     if (t.imp) tags.push(T('导入'));
+    if (t.via === 'spotify') tags.push('Spotify');
+    else if (t.via === 'apple') tags.push('Apple Music');
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push(T('有声')); else tags.push(T('无音源'));
     if (isFav(t.id)) tags.push(icon('heart', 'in') + T('收藏'));
     if (isSing(t.id)) tags.push(T('会唱'));
@@ -2363,10 +2365,71 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const res = await importTracks(list, name || pl.name || '', pid, onStep, 'netease');
     return Object.assign(res, { plName: name || pl.name || '', total: all.length, done: list.length, pid, kind: 'playlist', src: 'netease' });
   }
+  const MX_NORM = (x) => String(x || '').toLowerCase()
+    .replace(/[(（\[【].*?[)）\]】]/g, ' ')
+    .replace(/feat\..*$/, '')
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+  /** 跨平台（Spotify / Apple Music）镜像：按「歌名 + 歌手」去网易云找一条能拿到歌词和音源的 */
+  async function findMirrorSource(name, artist) {
+    const q = `${name || ''} ${artist || ''}`.trim();
+    if (!q) return null;
+    let arr = [];
+    try { arr = await gdJson(`types=search&source=netease&name=${encodeURIComponent(q)}&count=8`); } catch { return null; }
+    if (!Array.isArray(arr)) return null;
+    const nName = MX_NORM(name), nArtist = MX_NORM(artist);
+    let best = null, bestScore = 0;
+    for (const x of arr) {
+      const t = MX_NORM(x.name);
+      let score = 0;
+      if (t && t === nName) score += 70;
+      else if (t && nName && (t.indexOf(nName) >= 0 || nName.indexOf(t) >= 0)) score += 45;
+      const ar = (x.artist || []).map(MX_NORM).join(' ');
+      if (nArtist && ar && (ar.indexOf(nArtist) >= 0 || nArtist.indexOf(ar) >= 0)) score += 30;
+      if (score > bestScore) { bestScore = score; best = x; }
+    }
+    return best && bestScore >= 60 ? best : null;
+  }
+  /** Spotify / Apple Music 导入：元数据用原平台，歌词与音源走网易云镜像 */
+  async function importMirror(meta, limit, onStep) {
+    const srcName = meta.src === 'spotify' ? 'Spotify' : 'Apple Music';
+    const all = meta.tracks || [];
+    const list = Number(limit) > 0 ? all.slice(0, Number(limit)) : all.slice(0, 300);
+    const matched = [], miss = [];
+    for (let i = 0; i < list.length; i++) {
+      const tr = list[i];
+      if (onStep) onStep(i + 1, list.length, tr.name, '找音源…', 'match');
+      const hit = await findMirrorSource(tr.name, tr.artist);
+      if (hit) {
+        matched.push({ id: String(hit.id), name: hit.name, ar: [{ name: (hit.artist || []).join(' / ') }],
+          al: { name: hit.album || tr.album || '', picUrl: tr.cover || '' }, orig: tr });
+      } else miss.push(tr);
+    }
+    let res = { ok: [], fail: [], skip: [] };
+    if (matched.length) {
+      res = await importTracks(matched, meta.name || '', 'mx' + meta.src + ':' + meta.id, onStep, 'netease');
+      for (const m of matched) {
+        const rec = S.imp['i' + m.id];
+        if (!rec) continue;
+        if (m.orig.name) rec.title = m.orig.name;
+        if (m.orig.artist) rec.artist = m.orig.artist;
+        if (m.orig.album) rec.album = m.orig.album;
+        if (m.orig.cover) rec.cover = m.orig.cover;
+        rec.via = meta.src;
+      }
+      save();
+      for (const [id, rec] of Object.entries(S.imp)) if (!TRACK.has(id)) { const tt = impTrack(rec); IDX.tracks.push(tt); TRACK.set(id, tt); }
+      indexLibrary();
+    }
+    return Object.assign(res, {
+      via: meta.src, srcName, mirrored: matched.length, miss: miss.length, missList: miss.slice(0, 20),
+      plName: res.plName || meta.name || '', total: list.length, pid: 'mx' + meta.src + ':' + meta.id, src: 'netease',
+    });
+  }
+
   /** 统一入口：歌单 / 专辑 / 单曲（含手机 163cn.tv 短链、分享文案、裸 ID） */
   async function importFrom(input, limit, onStep) {
     const text = String(input || '').trim();
-    if (!text) return { error: '粘分享链接 / 文案 / ID（网易云或 QQ音乐）' };
+    if (!text) return { error: '粘分享链接 / 文案 / ID（网易云 / QQ / Spotify / Apple Music）' };
     let meta = null, why = '';
     try { meta = await apiResolve(text); } catch (e) { why = (e && e.message) || '解析失败'; }
     if (!meta) {
@@ -2375,6 +2438,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       meta = { type: 'playlist', id: pid, name: '' };
     }
     const source = meta.src || 'netease';
+    // Spotify / Apple Music：没有可播音频和歌词授权，走「网易云镜像」（元数据用原平台）
+    if (meta.mirror || source === 'spotify' || source === 'apple') return importMirror(meta, limit, onStep);
     if (meta.type === 'playlist' && source === 'netease') return importPlaylistById(meta.id, meta.name, limit, onStep);
     const tracks = (meta.tracks || []).filter((x) => x && x.id);
     const kind = meta.type === 'playlist' ? '歌单' : meta.type === 'album' ? '专辑' : '单曲';
@@ -3056,7 +3121,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       const n = (meta.tracks || []).length || Number(meta.total) || 0;
       showDialog({
         title: '导入确认',
-        body: `${esc(kind)} · ${esc(meta.name || '未命名')}${n ? ' · ' + n + ' 首' : ''}`,
+        body: `${esc(kind)} · ${esc(meta.name || '未命名')}${n ? ' · ' + n + ' 首' : ''}`
+          + (meta.mirror ? `<div class="meta" style="margin-top:8px">曲目：${esc(meta.src === 'spotify' ? 'Spotify' : 'Apple Music')} · 歌词与音源：网易云</div>` : ''),
         actions: [
           { label: '导入', kind: 'main', onClick: () => doImport(input) },
           { label: '取消' },
@@ -3084,7 +3150,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     importing = false;
     if ($('plgo')) $('plgo').disabled = false;
     if (res.error) { impState.msg = res.error; if (stat) stat.textContent = res.error; return; }
-    const bits = [`入库 ${res.ok.length} 首`];
+    const bits = [];
+    if (res.via === 'spotify') bits.push('曲目信息来自 Spotify');
+    else if (res.via === 'apple') bits.push('曲目信息来自 Apple Music');
+    if (res.via) bits.push('歌词与音源取自网易云');
+    bits.push(`入库 ${res.ok.length} 首`);
+    if (res.miss) bits.push(`${res.miss} 首没找到音源`);
     if (res.noAudio) bits.push(`${res.noAudio} 首暂无音源`);
     if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
@@ -3205,7 +3276,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <details class="impbox" ${impState.fails.length || impState.msg || impState.open || !IDX.tracks.length ? 'open' : ''}>
         <summary>导入歌单</summary>
         <div class="row" style="margin-top:10px">
-          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单 / 专辑 / 单曲链接（网易云 / QQ音乐）">
+          <input id="plinput" class="sel" style="flex:1;min-width:180px;height:36px" placeholder="歌单 / 专辑 / 单曲链接（网易云 / QQ音乐 / Spotify / Apple Music）">
           <button class="toolbtn on" id="plgo">${importing ? '导入中…' : '导入'}</button>
         </div>
         <div class="row" style="margin-top:8px">

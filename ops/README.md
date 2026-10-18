@@ -76,3 +76,29 @@ python3 ops/deploy-fc.py        # 把 ops/fc/ 打包上传，并设置环境变�
   所以先用 OSS 当存储（每个账号两个小 JSON）。真要 SQL，等有规格时换 `dataKey/ossGetJson` 这一层即可。
 - 邮件找回密码：没做；改用注册/登录时下发的一次性恢复码。
 - 账号注销、多设备会话列表：没做。
+
+## 跨平台导入（Spotify / Apple Music）
+
+`/api/resolve` 额外认这两类链接：
+
+| 平台 | 链接形态 | 拿得到什么 |
+| --- | --- | --- |
+| Apple Music | `music.apple.com/<cc>/album|playlist|song/...` | 曲目名/歌手/封面（iTunes 公开接口 + 歌单页里的 serialized-server-data） |
+| Spotify | `open.spotify.com/track|album|playlist/<id>` | 曲目名/歌手/封面（Web API，需凭据） |
+
+两者都**不提供可播音频与歌词授权**，所以客户端导入时按「歌名 + 歌手」去网易云找对应版本，
+歌词和音源取自网易云（返回里 `mirror: true`）。
+
+Spotify 需要 Client Credentials：
+
+```bash
+# 1. developer.spotify.com 建一个 app（免费），拿 Client ID / Secret
+# 2. 写进本机文件（不进仓库）
+cat > ~/.dsh/spotify.credentials.json <<'EOF'
+{"id": "xxxx", "secret": "yyyy"}
+EOF
+# 3. 重新部署，会带进函数环境变量
+python3 ops/deploy-fc.py
+```
+
+没配凭据时 `/api/resolve` 会返回「服务端没配 Spotify 凭据」，其它平台不受影响。
