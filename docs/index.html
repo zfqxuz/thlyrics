@@ -372,20 +372,6 @@ main{padding:8px 18px 140px}
 .chip.on{color:var(--ink);font-weight:600}
 .chip.on::after{content:"";position:absolute;left:2px;right:2px;bottom:-2px;height:1px;background:var(--accent)}
 .sel{height:34px;padding:0 10px;border-radius:11px;border:0;background:var(--field);color:var(--ink-2);font-size:var(--fs-sub)}
-/* 统一的下拉控件：一个 pill 按钮，点开是底部选择面板（曲库/学词/我的 都用这一个样式） */
-.fbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 2px}
-.fpill{
-  height:32px;padding:0 12px;border-radius:11px;border:0;
-  background:var(--field);color:var(--ink-2);font-size:var(--fs-sub);
-  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-  transition:background-color .15s,color .15s;
-}
-.fpill:active{background:var(--hov)}
-.fpill.on{background:var(--accent-soft);color:var(--accent-ink)}
-.fpill .fv{color:var(--ink);font-weight:600}
-.fpill .fc{opacity:.45;font-size:11px;transform:translateY(1px)}
-.fpill.ghost{background:transparent;color:var(--ink-3)}
-.learn-filters.compact{margin:6px 0 2px}
 .toolbtn{
   height:34px;padding:0 14px;border-radius:11px;border:0;
   background:var(--surface);color:var(--ink-2);font-size:var(--fs-sub);
@@ -1895,6 +1881,6 @@ body.ui-ios .langbadge{background:var(--accent-soft);color:var(--accent);border:
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261018zo"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261018zm"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
