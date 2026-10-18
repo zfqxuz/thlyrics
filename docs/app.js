@@ -1,6 +1,6 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
 import { V } from './version.js?v=20261018zm';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zm';
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zm';
 import { icon } from './icons.js?v=20261018zm';
 import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zm';
 
@@ -1119,6 +1119,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     d.hidden = false;
     d.querySelectorAll('[data-di]').forEach((el) => (el.onclick = () => { const a = acts[Number(el.dataset.di)]; d.hidden = true; if (a && a.onClick) a.onClick(); }));
   }
+  /** 外观和原来的 .sel 一样（同高同圆角同底色），点开是我们自己画的选择面板，不用系统下拉 */
+  const selBtnHtml = (id, text, extra) => `<button class="sel selbtn" id="${id}"${extra || ''}><span>${esc(text)}</span><span class="schev">▾</span></button>`;
+  function wireSelPicker(id, title, items, current, onPick) {
+    const el = $(id); if (!el) return;
+    el.onclick = () => showPicker(title, items, current, (k) => onPick(k));
+  }
+
   function showPicker(title, items, current, onPick) {
     const d = $('dlg'); if (!d) return;
     d.innerHTML = `<div class="dlgcard">
@@ -1673,6 +1680,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (tag) parts.push(tag);
     return parts.join(' · ');
   }
+  function pickLearnLang(k) {
+    S.learnLang = k; S.scope = 'all'; save();
+    if (k !== 'ja' && !langPackReady(k) && !LEX_ERRORS.has(k)) ensureLangPack(k).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
+    renderLearn();
+    if (location.hash.startsWith('#/songs')) renderSongs();
+  }
+
   function renderLearn() {
     if (!IDX.tracks.length) {
       $('view-learn').innerHTML = emptyBox('曲库是空的', '', [['e-limp', '导入歌曲']]);
@@ -1685,13 +1699,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (!loading && !failed) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); if (location.hash.startsWith('#/home')) renderHome(); }).catch(() => renderLearn());
       $('view-learn').innerHTML = `
         <div class="sec-head"><div><div class="sec-title">学词</div><div class="sec-sub">当前学习：${esc(learnLangLabel())}</div></div>
-        <select class="sel" id="learn-lang" style="height:34px">${learnLangOptionsHtml(S.learnLang)}</select></div>
+        ${selBtnHtml('learn-lang', learnLangLabel())}</div>
         ${emptyBox(loading ? '加载中…' : (failed ? learnLangLabel() + ' 词库未安装' : '加载中…'), '', [['e-learn-back', '换回日语']])}`;
-      if ($('learn-lang')) $('learn-lang').onchange = (e) => {
-        S.learnLang = e.target.value; S.scope = 'all'; save();
-        if (S.learnLang !== 'ja' && !langPackReady(S.learnLang) && !LEX_ERRORS.has(S.learnLang)) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
-        renderLearn();
-      };
+      wireSelPicker('learn-lang', '学习语言', LEARN_LANG_ITEMS(), S.learnLang, (k) => pickLearnLang(k));
       if ($('e-learn-back')) $('e-learn-back').onclick = () => { S.learnLang = 'ja'; save(); renderLearn(); };
       return;
     }
@@ -1703,7 +1713,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     $('view-learn').innerHTML = `
       <div class="sec-head learn-head">
         <div class="serif learn-title">${T('今日から、')}<span class="accent">${list.length}</span> ${T('つの言葉。')}</div>
-        <select class="sel" id="learn-lang" style="height:34px;flex:0 0 auto">${learnLangOptionsHtml(S.learnLang)}</select>
+        ${selBtnHtml('learn-lang', learnLangLabel())}
         <div class="learn-sub">已掌握 ${known} / ${libN} 词 · 进度 ${pct}%</div>
       </div>
       <div class="bar learn-bar"><i style="width:${pct}%"></i></div>
@@ -1766,12 +1776,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         el.onclick = () => { S.dTag = el.dataset.v; save(); deckCount = 30; forgetScroll('#/learn'); renderLearn(); };
       });
     }
-    if ($('learn-lang')) $('learn-lang').onchange = (e) => {
-      S.learnLang = e.target.value; S.scope = 'all'; save();
-      if (S.learnLang !== 'ja' && !langPackReady(S.learnLang) && !LEX_ERRORS.has(S.learnLang)) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
-      renderLearn();
-      if (location.hash.startsWith('#/songs')) renderSongs();
-    };
+    wireSelPicker('learn-lang', '学习语言', LEARN_LANG_ITEMS(), S.learnLang, (k) => pickLearnLang(k));
     if ($('d-ftoggle')) $('d-ftoggle').onclick = () => { filtersOpen = !filtersOpen; renderLearn(); };
     if ($('d-clear')) $('d-clear').onclick = () => { S.scope = 'all'; S.dPos = 'all'; S.dSort = 'easy'; S.dTag = 'undone'; deckCount = 30; save(); renderLearn(); };
     if ($('d-duego')) $('d-duego').onclick = () => { revFrom = '#/learn'; startReview(revCount()); go('#/review'); };
@@ -3264,6 +3269,14 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       .map(([k, arr]) => `<details class="grp"><summary>${esc(k)}<span class="meta">${arr.length} 首</span></summary>
         <div class="list">${sortTracks(arr).map(trackRow).join('')}</div></details>`).join('');
   }
+  const LEARN_LANG_ITEMS = () => learnLangList().map((x) => [x.id, langLabel(x.id, userLocale().id) || x.native]);
+  const SONG_LANG_ITEMS = () => [['learn', T('学习语言 · {x}', { x: learnLangLabel() })], ['all', T('全部语言')]]
+    .concat(SONG_LANGS.filter((x) => x.id !== 'other' && x.id !== 'unknown').map((x) => [x.id, langLabel(x.id, userLocale().id)]));
+
+  /** 曲库「语言」下拉按钮上显示的文字 */
+  const langViewLabel = (v) => (v === 'learn' ? T('学习语言 · {x}', { x: learnLangLabel() })
+    : v === 'all' ? T('全部语言') : (langLabel(v, userLocale().id) || v));
+
   function renderSongs() {
     const nq = norm(songQ.trim());
     const langView = S.songLangView || 'learn';
@@ -3296,12 +3309,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       </div>
       <div class="row" style="margin:2px 0 0">
         ${curTrack ? `<button class="toolbtn on" id="jump-cur">${icon('play','in')}正在播放</button>` : ''}
-        <select id="langview" class="sel" style="height:34px;margin-left:auto">
-          <option value="learn"${langView === 'learn' ? ' selected' : ''}>${esc(T('学习语言 · {x}', { x: learnLangLabel() }))}</option>
-          <option value="all"${langView === 'all' ? ' selected' : ''}>全部语言</option>
-          ${SONG_LANGS.filter((x) => x.id !== 'other' && x.id !== 'unknown').map((x) => `<option value="${x.id}"${langView === x.id ? ' selected' : ''}>${esc(langLabel(x.id, userLocale().id))}</option>`).join('')}
-        </select>
-        <select id="tsort" class="sel" style="height:34px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        ${selBtnHtml('langview', langViewLabel(langView), ' style="margin-left:auto"')}
+        ${selBtnHtml('tsort', (TRACK_SORTS.find(([k]) => k === (S.tSort || 'new')) || [, ''])[1])}
       </div>
       <div class="chips">
         ${songQ ? `<button class="chip on" id="qs-clear">${esc(songQ)} ${icon('x','in')}</button>` : ''}
@@ -3365,8 +3374,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       renderSongs();
     };
     if ($('plchk')) $('plchk').onclick = () => checkPlaylists({ manual: true });
-    if ($('langview')) $('langview').onchange = (e) => { S.songLangView = e.target.value; save(); renderSongs(); };
-    if ($('tsort')) $('tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderSongs(); };
+    wireSelPicker('langview', '语言', SONG_LANG_ITEMS(), langView, (k) => { S.songLangView = k; save(); renderSongs(); });
+    wireSelPicker('tsort', '排序', TRACK_SORTS, S.tSort || 'new', (k) => { S.tSort = k; save(); renderSongs(); });
     $('view-songs').querySelectorAll('.albumcard').forEach((el) => (el.onclick = () => {
       songQ = el.dataset.album; songView = 'list'; filter = 'all'; S.songQ = songQ; S.sView = songView; S.sFilter = filter; save(); renderSongs();
     }));
@@ -3518,6 +3527,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     } catch (e) { toast('更新失败：' + ((e && e.message) || e)); }
   }
 
+  const localeLabel = () => {
+    const id = S.userLocale || 'auto';
+    if (id === 'auto') return '跟随系统';
+    const hit = UI_LOCALES.find((x) => x.id === id);
+    return hit ? hit.native : id;
+  };
+
   function renderMe() {
     const favN = Object.keys(S.fav || {}).filter((k) => Number(S.fav[k]) > 0).length;
     const singN = Object.keys(S.sing || {}).filter((k) => Number(S.sing[k]) > 0).length;
@@ -3532,14 +3548,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
       <div class="sect">外观</div>
       <div class="setrow"><div class="k">用户区域</div>
-        <select class="sel" id="me-locale">
-          <option value="auto"${(S.userLocale || 'auto') === 'auto' ? ' selected' : ''}>跟随系统</option>
-          ${UI_LOCALES.map((x) => `<option value="${x.id}"${S.userLocale === x.id ? ' selected' : ''}>${x.native}</option>`).join('')}
-        </select></div>
+        ${selBtnHtml('me-locale', localeLabel())}</div>
       <div class="setrow"><div class="k">界面风格</div>${seg('me-ui', ui, UI_STYLES)}</div>
       <div class="setrow"><div class="k">主题</div>${seg('me-theme', theme, THEMES)}</div>
       <div class="setrow"><div class="k">曲目排序</div>
-        <select class="sel" id="me-tsort">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+        ${selBtnHtml('me-tsort', (TRACK_SORTS.find(([k]) => k === (S.tSort || 'new')) || [, ''])[1])}</div>
       <div class="setrow"><div class="k">逐词罗马音</div><button class="toolbtn swbtn ${S.ruby !== false ? 'on' : ''}" id="me-ruby" aria-pressed="${S.ruby !== false}">${S.ruby !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">整句翻译</div><button class="toolbtn swbtn ${S.zh !== false ? 'on' : ''}" id="me-zh" aria-pressed="${S.zh !== false}">${S.zh !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">逐词中文</div><button class="toolbtn swbtn ${S.gloss !== false ? 'on' : ''}" id="me-gloss" aria-pressed="${S.gloss !== false}">${S.gloss !== false ? '开' : '关'}</button></div>
@@ -3595,13 +3608,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const accPw = $('acc-pw'), accPwDo = $('acc-pwdo');
     if (accPw) accPw.onclick = () => { const r = $('acc-pwrow'); r.style.display = r.style.display === 'none' ? 'flex' : 'none'; };
     if (accPwDo) accPwDo.onclick = () => changePass();
-    if ($('me-locale')) $('me-locale').onchange = (e) => {
-      S.userLocale = e.target.value;
+    wireSelPicker('me-locale', '用户区域', [['auto', '跟随系统']].concat(UI_LOCALES.map((x) => [x.id, x.native])), S.userLocale || 'auto', (k) => {
+      S.userLocale = k;
       if (S.learnLang === userLang()) { const alt = LEARN_LANGS.find((x) => x.id !== userLang()); S.learnLang = alt ? alt.id : 'ja'; S.scope = 'all'; }
       save();
       // 文案替换是原地改 DOM：切语言只能整页重来一次，否则 tab 之类还是旧语言
       location.reload();
-    };
+    });
     $('view-me').querySelectorAll('#me-ui button').forEach((el) => (el.onclick = () => { S.ui = el.dataset.v; save(); applyUI(); renderMe(); }));
     $('view-me').querySelectorAll('#me-theme button').forEach((el) => (el.onclick = () => { S.theme = el.dataset.v; save(); applyTheme(); renderMe(); }));
     $('view-me').querySelectorAll('[data-revmode]').forEach((el) => (el.onclick = () => {
@@ -3611,7 +3624,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (!REV_MODES.some(([x]) => m[x])) { toast('至少留一种复习方式'); return; }
       S.revModes = m; save(); renderMe();
     }));
-    if ($('me-tsort')) $('me-tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderMe(); };
+    wireSelPicker('me-tsort', '曲目排序', TRACK_SORTS, S.tSort || 'new', (k) => { S.tSort = k; save(); renderMe(); });
     const disp = (key, id) => { const el = $(id); if (el) el.onclick = () => { S[key] = S[key] === false; save(); applyDisplay(); renderMe(); }; };
     disp('ruby', 'me-ruby'); disp('zh', 'me-zh'); disp('gloss', 'me-gloss');
     if ($('me-admin')) $('me-admin').onclick = () => go('#/admin');
@@ -3921,7 +3934,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     $('view-search').innerHTML = `
       <div class="sec-head">
         <div><div class="sec-title">搜索「${esc(q)}」</div><div class="sec-sub">词 ${r.words.length} · 曲目 ${r.tracks.length} · 原曲 ${r.originals.length}</div></div>
-        ${r.tracks.length ? `<select class="sel" id="ssort" style="height:32px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>` : ''}
+        ${r.tracks.length ? selBtnHtml('ssort', (TRACK_SORTS.find(([k]) => k === (S.tSort || 'new')) || [, ''])[1]) : ''}
       </div>
       ${r.tracks.length ? `<div class="srhead">曲目 <b>${r.tracks.length}</b></div><div class="list">${r.tracks.map(trackRow).join('')}</div>` : ''}
       ${r.words.length ? `<div class="srhead">词 <b>${r.words.length}</b></div><div class="list">${r.words.map(wordRow).join('')}</div>` : ''}
@@ -3932,7 +3945,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           `<div class="sec-sub" style="margin-top:18px">社团</div><div class="chips">${hot.map((a) => `<span class="chip" data-artist="${esc(a)}">${esc(a)}</span>`).join('')}</div>` +
           ((S.searchHist || []).length ? `<div class="sec-sub" style="margin-top:18px">最近搜索</div><div class="chips">${S.searchHist.map((x) => `<span class="chip" data-hist="${esc(x)}">${esc(x)}</span>`).join('')}</div>` : '');
       })() : ''}`;
-    if ($('ssort')) $('ssort').onchange = (e) => { S.tSort = e.target.value; save(); showSearch(q); };
+    wireSelPicker('ssort', '排序', TRACK_SORTS, S.tSort || 'new', (k) => { S.tSort = k; save(); showSearch(q); });
     wireWords($('view-search'));
     $('view-search').querySelectorAll('.track').forEach((el) => (el.onclick = (e) => {
       if (e.target.closest('[data-del]') || e.target.closest('[data-cur]') || e.target.closest('[data-fav]') || e.target.closest('[data-sing]')) return;
@@ -4649,8 +4662,20 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   }
 
   // ────────────── 启动 ──────────────
+  /** 老版本只有一个空间（游客键）。登录状态下把它搬进账号空间，免得退出后游客还能看到别人的曲库 */
+  function migrateGuestToAccount() {
+    const guest = kvGetJson(LS_KEY_BASE, null);
+    if (!guest || !Object.keys(guest).length) return;
+    // 旧版本只有一个空间：带同步标记的说明是「登录态」写进去的账号数据，本就不该留在游客空间
+    const legacy = !!(guest.syncAt || guest.syncHash);
+    let acctKeys = kvKeys().filter((k) => k.indexOf(LS_KEY_BASE + ':') === 0);
+    const owner = (ACC && ACC.uid) ? LS_KEY_BASE + ':' + ACC.uid : (acctKeys.length === 1 ? acctKeys[0] : '');
+    if (owner && !kvGetJson(owner, null)) kvSetJson(owner, guest);   // 账号空间还空着 → 认领这份旧数据
+    if (legacy && (owner || acctKeys.length)) kvSet(LS_KEY_BASE, '{}');   // 清掉游客空间里的账号残留
+  }
   async function boot() {
     loadAcc();
+    migrateGuestToAccount();
     loadLS();
     filter = S.sFilter || 'all';
     songView = S.sView || 'list';

@@ -6,6 +6,8 @@
 export function kvGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
 export function kvSet(key, val) { try { localStorage.setItem(key, val); return true; } catch { return false; } }
 export function kvDel(key) { try { localStorage.removeItem(key); } catch { /* 隐私模式 / 配额满，忽略 */ } }
+/** 列出所有键（迁移/清理旧数据用） */
+export function kvKeys() { try { return Object.keys(localStorage); } catch { return []; } }
 export function kvGetJson(key, fallback = null) {
   const s = kvGet(key);
   if (!s) return fallback;
