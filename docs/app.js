@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018zm';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zm';
-import { icon } from './icons.js?v=20261018zm';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zm';
+import { V } from './version.js?v=20261018zo';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zo';
+import { icon } from './icons.js?v=20261018zo';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zo';
 
 (() => {
   'use strict';
@@ -1119,6 +1119,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     d.hidden = false;
     d.querySelectorAll('[data-di]').forEach((el) => (el.onclick = () => { const a = acts[Number(el.dataset.di)]; d.hidden = true; if (a && a.onClick) a.onClick(); }));
   }
+  /** 统一下拉控件：一个 pill 按钮 → 点开底部选择面板（各处都用它，别再混用原生 select / chips） */
+  const fpillHtml = (id, label, value, cls) => `<button class="fpill${cls ? ' ' + cls : ''}" id="${id}"><span>${esc(label)}</span><span class="fv">${esc(value)}</span><span class="fc">▾</span></button>`;
+  function wireFpill(id, title, items, current, onPick) {
+    const el = $(id); if (!el) return;
+    el.onclick = () => showPicker(title, items.map(([k, t]) => [k, T(t)]), current, (k) => onPick(k));
+  }
+
   function showPicker(title, items, current, onPick) {
     const d = $('dlg'); if (!d) return;
     d.innerHTML = `<div class="dlgcard">
@@ -1659,6 +1666,25 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     // 语言名统一用「用户区域」的说法：英文界面里就该是 Japanese / French，而不是 日本語 / Français
     return learnLangList().map((x) => `<option value="${x.id}"${x.id === selected ? ' selected' : ''}>${esc(langLabel(x.id, userLocale().id) || x.native)}</option>`).join('');
   }
+  /** 筛选 pill 上显示的文字（找不到就退回 key 本身） */
+  function scopeLabelOf(k) {
+    const hit = scopeOptions().find(([x]) => x === k);
+    return hit ? `${hit[1]} · ${scopeTotal(k)}` : '全部';
+  }
+  const POS_OPTS = [['all', '全部'], ['名詞', '名词'], ['動詞', '动词'], ['形容詞', '形容词'], ['副詞', '副词']];
+  const SORT_OPTS = () => [['easy', '从易到难'], ['freq', '最常见'],
+    ['az', S.learnLang === 'ja' ? '五十音 ↑' : 'A–Z'], ['azd', S.learnLang === 'ja' ? '五十音 ↓' : 'Z–A']];
+  const posLabelOf = (k) => (POS_OPTS.find(([x]) => x === k) || [, '全部'])[1];
+  const sortLabelOf = (k) => (SORT_OPTS().find(([x]) => x === k) || [, '从易到难'])[1];
+  const dirtyFilter = () => (S.scope && S.scope !== 'all') || (S.dPos && S.dPos !== 'all') || (S.dSort && S.dSort !== 'easy') || (S.dTag && S.dTag !== 'undone');
+
+  function pickLearnLang(k) {
+    S.learnLang = k; S.scope = 'all'; save();
+    if (k !== 'ja' && !langPackReady(k) && !LEX_ERRORS.has(k)) ensureLangPack(k).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
+    renderLearn();
+    if (location.hash.startsWith('#/songs')) renderSongs();
+  }
+
   function renderLearn() {
     if (!IDX.tracks.length) {
       $('view-learn').innerHTML = emptyBox('曲库是空的', '', [['e-limp', '导入歌曲']]);
@@ -1671,13 +1697,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (!loading && !failed) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); if (location.hash.startsWith('#/home')) renderHome(); }).catch(() => renderLearn());
       $('view-learn').innerHTML = `
         <div class="sec-head"><div><div class="sec-title">学词</div><div class="sec-sub">当前学习：${esc(learnLangLabel())}</div></div>
-        <select class="sel" id="learn-lang" style="height:34px">${learnLangOptionsHtml(S.learnLang)}</select></div>
+        ${fpillHtml('f-learnlang', '学习语言', learnLangLabel())}</div>
         ${emptyBox(loading ? '词库加载中…' : (failed ? learnLangLabel() + '词库未安装' : '准备词库…'), '', [['e-learn-back', '换回日语']])}`;
-      if ($('learn-lang')) $('learn-lang').onchange = (e) => {
-        S.learnLang = e.target.value; S.scope = 'all'; save();
-        if (S.learnLang !== 'ja' && !langPackReady(S.learnLang) && !LEX_ERRORS.has(S.learnLang)) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
-        renderLearn();
-      };
+      wireFpill('f-learnlang', '学习语言', learnLangList().map((x) => [x.id, langLabel(x.id, userLocale().id) || x.native]), S.learnLang, (k) => pickLearnLang(k));
       if ($('e-learn-back')) $('e-learn-back').onclick = () => { S.learnLang = 'ja'; save(); renderLearn(); };
       return;
     }
@@ -1689,58 +1711,35 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     $('view-learn').innerHTML = `
       <div class="sec-head learn-head">
         <div class="serif learn-title">${T('今日から、')}<span class="accent">${list.length}</span> ${T('つの言葉。')}</div>
-        <select class="sel" id="learn-lang" style="height:34px;flex:0 0 auto">${learnLangOptionsHtml(S.learnLang)}</select>
+        ${fpillHtml('f-learnlang', '学习语言', learnLangLabel())}
         <div class="learn-sub">已掌握 ${known} / ${libN} 词 · 进度 ${pct}%</div>
       </div>
       <div class="bar learn-bar"><i style="width:${pct}%"></i></div>
       ${dueWords().length
         ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">${T('今天 {n} 个', { n: dueWords().length })}</span><button class="go" id="d-duego">${T('开始 ›')}</button></div>`
         : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收词 · 答错的重练</span></div>`}
-      <div class="learn-filters">
-        <div class="learn-filter-row">
-          <span class="filter-label">范围</span>
-          <div class="chips" id="d-range">
-            ${scopeOptions().map(([k, t]) => `<button class="chip" data-v="${k}">${t}<span class="n">${scopeTotal(k)}</span></button>`).join('')}
-          </div>
+      <div class="learn-filters compact">
+        <div class="chips" id="d-tag">
+          <button class="chip" data-v="undone">未掌握</button><button class="chip" data-v="known">已掌握</button>
+          <button class="chip" data-v="star">${icon('star','in')}星标</button><button class="chip" data-v="err">错词</button>
         </div>
-        <div class="learn-filter-row">
-          <span class="filter-label">词性</span>
-          <div class="chips" id="d-pos">
-            <button class="chip" data-v="all">全部</button><button class="chip" data-v="名詞">名词</button>
-            <button class="chip" data-v="動詞">动词</button><button class="chip" data-v="形容詞">形容词</button>
-            <button class="chip" data-v="副詞">副词</button>
-          </div>
+        <div class="fbar">
+          ${fpillHtml('f-scope', '范围', scopeLabelOf(S.scope || 'all'))}
+          ${fpillHtml('f-pos', '词性', posLabelOf(S.dPos || 'all'))}
+          ${fpillHtml('f-sort', '排序', sortLabelOf(S.dSort || 'easy'))}
+          ${dirtyFilter() ? `<button class="fpill ghost" id="d-clear">重置</button>` : ''}
         </div>
-        <div class="learn-filter-row">
-          <span class="filter-label">排序</span>
-          <div class="chips" id="d-sort">
-            <button class="chip" data-v="easy">从易到难</button><button class="chip" data-v="freq">最常见</button>
-            <button class="chip" data-v="az">${S.learnLang === 'ja' ? '五十音 ↑' : 'A–Z'}</button>
-            <button class="chip" data-v="azd">${S.learnLang === 'ja' ? '五十音 ↓' : 'Z–A'}</button>
-          </div>
-        </div>
-        <div class="learn-filter-row">
-          <span class="filter-label">标签</span>
-          <div class="chips" id="d-tag">
-            <button class="chip" data-v="undone">未掌握</button><button class="chip" data-v="known">已掌握</button>
-            <button class="chip" data-v="star">${icon('star','in')}星标</button><button class="chip" data-v="err">错词</button>
-          </div>
-        </div>
-        <div class="row" style="margin-top:6px"><button class="toolbtn" id="d-clear">清除筛选</button></div>
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
       ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里没有可学的词'}</div>` : ''}
       ${list.length > deckCount ? `<div class="row" style="justify-content:center;margin-top:16px"><button class="toolbtn" id="d-more">再看 30 个</button></div>` : ''}
 `;
-    [['d-range','scope'], ['d-pos','dPos'], ['d-sort','dSort']].forEach(([id, key]) => {
-      const host = $(id); if (!host) return;
-      const cur = S[key] || host.querySelector('.chip')?.dataset.v;
-      host.querySelectorAll('.chip').forEach((el) => {
-        const on = el.dataset.v === cur;
-        el.classList.toggle('on', on);
-        el.onclick = () => { S[key] = el.dataset.v; save(); if (key === 'scope' || key === 'dPos') deckCount = 30; renderLearn(); };
-      });
-    });
+    wireFpill('f-scope', '范围', scopeOptions().map(([k, t]) => [k, `${t} · ${scopeTotal(k)}`]), S.scope || 'all',
+      (k) => { S.scope = k; deckCount = 30; save(); renderLearn(); });
+    wireFpill('f-pos', '词性', POS_OPTS, S.dPos || 'all',
+      (k) => { S.dPos = k; deckCount = 30; save(); renderLearn(); });
+    wireFpill('f-sort', '排序', SORT_OPTS(), S.dSort || 'easy',
+      (k) => { S.dSort = k; save(); renderLearn(); });
     const tagHost = $('d-tag');
     if (tagHost) {
       const curTag = S.dTag || 'undone';
@@ -1749,12 +1748,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         el.onclick = () => { S.dTag = el.dataset.v; save(); deckCount = 30; forgetScroll('#/learn'); renderLearn(); };
       });
     }
-    if ($('learn-lang')) $('learn-lang').onchange = (e) => {
-      S.learnLang = e.target.value; S.scope = 'all'; save();
-      if (S.learnLang !== 'ja' && !langPackReady(S.learnLang) && !LEX_ERRORS.has(S.learnLang)) ensureLangPack(S.learnLang).then(() => { indexLibrary(); renderLearn(); }).catch(() => renderLearn());
-      renderLearn();
-      if (location.hash.startsWith('#/songs')) renderSongs();
-    };
+    wireFpill('f-learnlang', '学习语言', learnLangList().map((x) => [x.id, langLabel(x.id, userLocale().id) || x.native]), S.learnLang, (k) => pickLearnLang(k));
     if ($('d-clear')) $('d-clear').onclick = () => { S.scope = 'all'; S.dPos = 'all'; S.dSort = 'easy'; S.dTag = 'undone'; deckCount = 30; save(); renderLearn(); };
     if ($('d-duego')) $('d-duego').onclick = () => { revFrom = '#/learn'; startReview(revCount()); go('#/review'); };
     if ($('d-more')) $('d-more').onclick = () => { deckCount += 30; renderLearn(); };
@@ -3244,6 +3238,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       .map(([k, arr]) => `<details class="grp"><summary>${esc(k)}<span class="meta">${arr.length} 首</span></summary>
         <div class="list">${sortTracks(arr).map(trackRow).join('')}</div></details>`).join('');
   }
+  const songLangLabel = (v) => (v === 'learn' ? T('学习语言 · {x}', { x: learnLangLabel() }) : v === 'all' ? T('全部语言') : (langLabel(v, userLocale().id) || v));
+  const trackSortLabel = (k) => (TRACK_SORTS.find(([x]) => x === k) || [, ''])[1] || k;
+
   function renderSongs() {
     const nq = norm(songQ.trim());
     const langView = S.songLangView || 'learn';
@@ -3276,12 +3273,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       </div>
       <div class="row" style="margin:2px 0 0">
         ${curTrack ? `<button class="toolbtn on" id="jump-cur">${icon('play','in')}正在播放</button>` : ''}
-        <select id="langview" class="sel" style="height:34px;margin-left:auto">
-          <option value="learn"${langView === 'learn' ? ' selected' : ''}>${esc(T('学习语言 · {x}', { x: learnLangLabel() }))}</option>
-          <option value="all"${langView === 'all' ? ' selected' : ''}>全部语言</option>
-          ${SONG_LANGS.filter((x) => x.id !== 'other' && x.id !== 'unknown').map((x) => `<option value="${x.id}"${langView === x.id ? ' selected' : ''}>${esc(langLabel(x.id, userLocale().id))}</option>`).join('')}
-        </select>
-        <select id="tsort" class="sel" style="height:34px">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        <span style="margin-left:auto"></span>
+        ${fpillHtml('f-langview', '语言', songLangLabel(langView))}
+        ${fpillHtml('f-tsort', '排序', trackSortLabel(S.tSort || 'new'))}
       </div>
       <div class="chips">
         ${songQ ? `<button class="chip on" id="qs-clear">${esc(songQ)} ${icon('x','in')}</button>` : ''}
@@ -3345,8 +3339,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       renderSongs();
     };
     if ($('plchk')) $('plchk').onclick = () => checkPlaylists({ manual: true });
-    if ($('langview')) $('langview').onchange = (e) => { S.songLangView = e.target.value; save(); renderSongs(); };
-    if ($('tsort')) $('tsort').onchange = (e) => { S.tSort = e.target.value; save(); renderSongs(); };
+    wireFpill('f-langview', '语言', [['learn', T('学习语言 · {x}', { x: learnLangLabel() })], ['all', '全部语言']]
+      .concat(SONG_LANGS.filter((x) => x.id !== 'other' && x.id !== 'unknown').map((x) => [x.id, langLabel(x.id, userLocale().id)])),
+      langView, (k) => { S.songLangView = k; save(); renderSongs(); });
+    wireFpill('f-tsort', '排序', TRACK_SORTS, S.tSort || 'new', (k) => { S.tSort = k; save(); renderSongs(); });
     $('view-songs').querySelectorAll('.albumcard').forEach((el) => (el.onclick = () => {
       songQ = el.dataset.album; songView = 'list'; filter = 'all'; S.songQ = songQ; S.sView = songView; S.sFilter = filter; save(); renderSongs();
     }));
@@ -3578,7 +3574,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('me-locale')) $('me-locale').onchange = (e) => {
       S.userLocale = e.target.value;
       if (S.learnLang === userLang()) { const alt = LEARN_LANGS.find((x) => x.id !== userLang()); S.learnLang = alt ? alt.id : 'ja'; S.scope = 'all'; }
-      save(); applyUserLocale(); renderMe(); renderAv();
+      save();
+      // 文案替换是原地改 DOM：切语言必须整页重来一次，不然 tab 之类还是旧语言
+      location.reload();
     };
     $('view-me').querySelectorAll('#me-ui button').forEach((el) => (el.onclick = () => { S.ui = el.dataset.v; save(); applyUI(); renderMe(); }));
     $('view-me').querySelectorAll('#me-theme button').forEach((el) => (el.onclick = () => { S.theme = el.dataset.v; save(); applyTheme(); renderMe(); }));
