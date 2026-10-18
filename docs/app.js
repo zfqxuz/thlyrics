@@ -7,7 +7,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const LS_KEY = 'thlyrics.tool.v1';
+  const LS_KEY_BASE = 'thlyrics.tool.v1';        // 游客空间；登录后每个账号一个独立空间（:uid）
+  const lsKey = () => (ACC && ACC.uid ? LS_KEY_BASE + ':' + ACC.uid : LS_KEY_BASE);
   const ACC_KEY = 'thlyrics.account.v1';
 
   // ────────────── 工具 ──────────────
@@ -60,11 +61,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   const dotsHtml = (v) => { const l = level(v); return `<span class="dots">${'<b>●</b>'.repeat(l)}${'●'.repeat(5 - l)}</span>`; };
 
   // ────────────── 本地状态 ──────────────
-  let S = { known: {}, notes: {}, audio: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {},
-    revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false },
-    rate: 1, ruby: true, gloss: false, zh: true,
-    mode: 'all', del: {}, autoSync: true, theme: 'dark', ui: 'classic', tSort: 'new',
-    userLocale: 'auto', learnLang: 'ja', songLangView: 'learn', scope: 'all' };
+  /** 默认状态（游客/新账号的起点）。登录、切账号时用它把内存重置干净 */
+  const defaultState = () => ({ known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {},
+    rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false },
+    rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true,
+    theme: 'dark', ui: 'classic', tSort: 'new', userLocale: 'auto', learnLang: 'ja', songLangView: 'learn', scope: 'all' });
+  let S = defaultState();
   let ACC = null;                                  // {token, name, uid, admin}
   const loadAcc = () => { ACC = kvGetJson(ACC_KEY, null); };
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
@@ -74,26 +76,29 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     showDialog({
       title: '退出登录？',
       actions: [
-        { label: '仅退出', kind: 'main', onClick: () => { ACC = null; saveAcc(); save(); renderAv(); if (location.hash.startsWith('#/me')) renderMe(); } },
-        { label: '退出并清空数据', onClick: () => { ACC = null; saveAcc(); S = { known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {}, rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false }, rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true, theme: S.theme || 'dark', ui: S.ui || 'classic', userLocale: S.userLocale || 'auto', learnLang: S.learnLang || 'ja', songLangView: S.songLangView || 'learn', scope: S.scope || 'all', tSort: S.tSort || 'new' }; save(); location.hash = '#/home'; location.reload(); } },
+        // 「仅退出」：回到游客空间，本账号缓存留着，下次登录还能秒开
+        { label: '仅退出', kind: 'main', onClick: () => { ACC = null; saveAcc(); location.hash = '#/home'; location.reload(); } },
+        // 「退出并清空」：只清这个账号在本机的缓存（云端不动，下次登录会重新拉）
+        { label: '退出并清空数据', onClick: () => { kvSet(lsKey(), '{}'); ACC = null; saveAcc(); location.hash = '#/home'; location.reload(); } },
       ],
     });
   }
-  function loadLS() { const v = kvGetJson(LS_KEY, null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.sep = S.sep || {}; S.sepOn = S.sepOn || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
+  function loadLS() { const v = kvGetJson(lsKey(), null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.sep = S.sep || {}; S.sepOn = S.sepOn || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (S.ui !== 'ios') S.ui = 'classic'; if (!S.tSort) S.tSort = 'new';
     if (S.userLocale == null) S.userLocale = 'auto'; if (!LEARN_LANGS.some((x) => x.id === S.learnLang)) S.learnLang = 'ja'; if (!S.songLangView) S.songLangView = 'learn'; if (!S.scope) S.scope = 'all';
     if (S.learnLang === userLang()) { const alt = LEARN_LANGS.find((x) => x.id !== userLang()); S.learnLang = alt ? alt.id : 'ja'; }
     if (!scopeOptions().some(([k]) => k === S.scope)) S.scope = 'all';
-    if (Object.prototype.hasOwnProperty.call(S, 'sepPref')) { delete S.sepPref; kvSetJson(LS_KEY, S); }
+    if (Object.prototype.hasOwnProperty.call(S, 'sepPref')) { delete S.sepPref; kvSetJson(lsKey(), S); }
     S.searchHist = Array.isArray(S.searchHist) ? S.searchHist : [];
     }
   // 每次落盘都顺手排一次云端同步（改释义、标词、导入、删除都会走到这里）
   let saveN = 0;
-  const save = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('存储空间不足'); queueSync(); };
+  const save = () => { saveN++; if (!kvSetJson(lsKey(), S)) toast('存储空间不足'); queueSync(); };
   /** 只落本机、不排云同步（高频写入用，比如播放位置） */
-  const saveLocal = () => { saveN++; if (!kvSetJson(LS_KEY, S)) toast('存储空间不足'); };
+  const saveLocal = () => { saveN++; if (!kvSetJson(lsKey(), S)) toast('存储空间不足'); };
   // 真机排错用的小钩子（不改状态，只读）：浏览器控制台里 __th() 看当前关键状态
-  if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, tracks: (typeof IDX !== 'undefined' && IDX) ? IDX.tracks.length : -1, lsBytes: (kvGet(LS_KEY) || '').length });
+  if (typeof window !== 'undefined') window.__state = () => JSON.stringify({ uid: (ACC && ACC.uid) || '', star: Object.keys(S.star || {}), known: Object.keys(S.known || {}), imp: Object.keys(S.imp || {}), key: lsKey() });
+  if (typeof window !== 'undefined') window.__th = () => ({ v: V, saves: saveN, words: Object.keys(S.words || {}).length, wordKeys: Object.keys(S.words || {}).slice(0, 5), notes: Object.keys(S.notes || {}).length, imp: Object.keys(S.imp || {}).length, tracks: (typeof IDX !== 'undefined' && IDX) ? IDX.tracks.length : -1, lsBytes: (kvGet(lsKey()) || '').length });
 
   // ── 主题：深色 / 暖白（白天）/ 跟随系统 ──
   const THEMES = [['dark', '深色'], ['warm', '暖白'], ['auto', '跟随系统']];
@@ -2864,8 +2869,6 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <button class="gclose" id="g-close" aria-label="关闭">×</button>
       <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">登录 / 注册</div>
       
-      <label class="avpick" for="g-av"><span class="av" id="g-avp">＋</span><span>头像（可选）</span></label>
-      <input type="file" id="g-av" accept="image/*" hidden>
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
       <input class="sel" id="g-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
       <div class="row"><button class="btn-primary" id="g-login">登录</button><button class="toolbtn" id="g-reg">注册新账号</button></div>
@@ -2876,11 +2879,6 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     gateAvatar = '';
     if ($('g-close')) $('g-close').onclick = closeGate;
     if ($('g-guest')) $('g-guest').onclick = closeGate;
-    if ($('g-av')) $('g-av').onchange = (e) => pickAvatar(e.target.files[0], (url) => {
-      gateAvatar = url;
-      const p = $('g-avp');
-      if (p) p.outerHTML = `<img class="av" id="g-avp" src="${url}" alt="">`;
-    });
     $('g-login').onclick = () => authFrom('login', 'g-name', 'g-pass', afterLogin);
     $('g-reg').onclick = () => authFrom('reg', 'g-name', 'g-pass', afterLogin);
     if ($('g-forgot')) $('g-forgot').onclick = () => showRecoveryForm();
@@ -2968,8 +2966,16 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       setLoad(false);
       toast(kind === 'reg' ? `注册好了，欢迎 ${res.user.name}` : `已登录：${res.user.name}`);
       const finish = async () => {
-        if (after) { await syncNow({ auto: true }); after(); }
-        else { await syncNow({ auto: true }); if (location.hash.startsWith('#/me')) renderMe(); else renderMine(); }
+        // 换了账号：内存清空 → 读这个账号自己的本地空间 → 拉云端全量覆盖
+        S = defaultState();
+        loadLS();
+        lastSyncJson = '';
+        await syncNow({ auto: true, force: true });
+        registerImpTracks();
+        indexLibrary();
+        if (after) after();
+        // 换账号等于换了整个数据空间：整页重来一次最稳（曲库/首页/学词都按新账号重建）
+        location.reload();
       };
       if (res.recovery) showRecoveryCode(res.recovery, finish);
       else await finish();
