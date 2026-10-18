@@ -946,7 +946,14 @@ async function spotifyToken() {
 }
 async function spotifyGet(path) {
   const r = await httpGet('https://api.spotify.com' + path, { Authorization: 'Bearer ' + await spotifyToken() }, 15000);
-  if (r.status !== 200) throw new Error('Spotify 读不到 HTTP ' + r.status);
+  if (r.status !== 200) {
+    let why = '';
+    try { why = String((JSON.parse(r.body) || {}).error || (JSON.parse(r.body) || {}).error_description || ''); } catch { why = String(r.body || '').slice(0, 120); }
+    if (/premium subscription required/i.test(why)) throw new Error('Spotify 要求 App 所有者有 Premium 订阅（订阅生效后要等几小时）');
+    if (r.status === 401) throw new Error('Spotify 凭据无效或已过期');
+    if (r.status === 429) throw new Error('Spotify 限流，稍后再试');
+    throw new Error('Spotify 读不到 HTTP ' + r.status + (why ? '：' + why : ''));
+  }
   return JSON.parse(r.body);
 }
 const spTrack = (t) => ({
