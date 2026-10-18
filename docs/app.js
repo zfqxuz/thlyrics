@@ -72,16 +72,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   const saveAcc = () => { kvSetJson(ACC_KEY, ACC); };
   const isLoggedIn = () => !!(ACC && ACC.token);
   const needLogin = (msg) => { if (isLoggedIn()) return true; showGate(msg || ''); return false; };
+  /** 退出就是退出：切回游客空间，账号那份本机记录留着（不登录看不到） */
   function logoutFlow() {
-    showDialog({
-      title: '退出登录？',
-      actions: [
-        // 「仅退出」：回到游客空间，本账号缓存留着，下次登录还能秒开
-        { label: '仅退出', kind: 'main', onClick: () => { ACC = null; saveAcc(); location.hash = '#/home'; location.reload(); } },
-        // 「退出并清空」：只清这个账号在本机的缓存（云端不动，下次登录会重新拉）
-        { label: '退出并清空数据', onClick: () => { kvSet(lsKey(), '{}'); ACC = null; saveAcc(); location.hash = '#/home'; location.reload(); } },
-      ],
-    });
+    ACC = null; saveAcc();
+    location.hash = '#/home';
+    location.reload();
   }
   function loadLS() { const v = kvGetJson(lsKey(), null); if (v) S = Object.assign(S, v); S.known = S.known || {}; S.notes = S.notes || {}; S.audio = S.audio || {}; S.imp = S.imp || {}; S.del = S.del || {}; S.fav = S.fav || {}; S.sing = S.sing || {}; S.roma = S.roma || {}; S.words = S.words || {}; S.star = S.star || {}; S.rev = S.rev || {}; S.sep = S.sep || {}; S.sepOn = S.sepOn || {}; S.revModes = Object.assign({ pick: true, type: true, ctx: true, listen: false, meaning: false }, S.revModes || {});
     S.autoSync = S.autoSync !== false; if (!S.theme) S.theme = 'dark'; if (S.ui !== 'ios') S.ui = 'classic'; if (!S.tSort) S.tSort = 'new';
@@ -2934,7 +2929,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     d.hidden = false;
     d.innerHTML = `<div class="dlgcard">
       <div class="dlgt">恢复码</div>
+      <div class="gdesc">忘记密码时，用它把账号密码重设回来。</div>
       <div class="gcode">${esc(code)}</div>
+      <div class="gdesc">这串只显示这一次，服务器不保存原文，丢了就找不回。</div>
       <div class="row" style="margin-top:12px"><button class="toolbtn" id="rc-copy">复制</button><button class="toolbtn" id="rc-dl">下载</button></div>
       <label class="gcheck"><input type="checkbox" id="rc-ok"> 我已保存恢复码</label>
       <div class="dlga"><button class="btn-main" id="rc-done" disabled>完成</button></div>
