@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018zb';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zb';
-import { icon } from './icons.js?v=20261018zb';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale } from './i18n.js?v=20261018zb';
+import { V } from './version.js?v=20261018zf';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zf';
+import { icon } from './icons.js?v=20261018zf';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zf';
 
 (() => {
   'use strict';
@@ -18,6 +18,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   const fmt = (s) => (!s || !isFinite(s)) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const norm = (s) => String(s || '').toLowerCase().replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
   const asId = (x) => (typeof x === 'string' && /^\d+$/.test(x) ? Number(x) : x);   // 日语数字 ID / 英语 en:word 字符串 ID 兼容
+  /** 拼接文案：先用词表翻整句模板，再替换 {x} 占位符（"{n} 行歌词" → "18 lines"） */
+  const T = (s, vars) => {
+    let out = t(s);
+    if (vars) for (const k of Object.keys(vars)) out = out.split('{' + k + '}').join(String(vars[k]));
+    return out;
+  };
   const POSNAME = { n: '名词', v: '动词', a: '形容词', na: '形容动词', adv: '副词', prt: '助词', aux: '助动词', conj: '接续词', int: '感叹词', rent: '连体词', pref: '接头词', oth: '其他',
     pron: '代词', prep: '介词', det: '限定词', art: '冠词', num: '数词', phr: '短语', name: '专名', suf: '后缀', postp: '后置词', contr: '缩约形' };
   // 原生壳（Capacitor）里不显示「下载 App」；网页版才显示
@@ -38,7 +44,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (w.pos === '名詞' && w.detail === '形容動詞語幹') return 'na';
     return POS_KIND[w.pos] || 'oth';
   };
-  const brLabel = (v) => (v && v.br) ? `标日${v.br.bk} 第${v.br.l}课` : '';
+  const brLabel = (v) => (v && v.br) ? T('标日{bk} 第{n}课', { bk: T(v.br.bk), n: v.br.l }) : '';
   function level(v) {                       // 难度 1..5（点阵）
     if (v.br) return v.br.c <= 24 ? 1 : v.br.c <= 48 ? 2 : 3;
     if (v.jl >= 4) return 3;
@@ -119,7 +125,22 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const l = userLocale();
     if (document.documentElement) document.documentElement.lang = l.id;
     syncThemeColor();
-    loadLocaleDict(l.id).then(() => { applyI18n(); }).catch(() => {});
+    loadLocaleDict(l.id).then(() => { applyI18n(); ensureJaPairs(); }).catch(() => {});
+  }
+  /** 日语是内置词库，不走 ensureLangPack；它的语言对释义层单独拉一次 */
+  async function ensureJaPairs() {
+    const exp = userLang();
+    if (!exp || exp === 'zh') return;
+    const key = 'ja:' + exp;
+    if (PAIR_TRIED.has(key)) return;
+    PAIR_TRIED.add(key);
+    try {
+      const pj = await getJson(dataUrl(`ja/pairs/ja-${exp}.json`), { cache: 'force-cache' });
+      const g = (pj && pj.glosses) || {};
+      const m = new Map(Object.entries(g).map(([k, x]) => [k.toLowerCase(), x]));
+      if (m.size) PAIRS.set('ja', m);
+    } catch { /* 没有就退回中文释义 */ }
+    if (location.hash.startsWith('#/learn') || location.hash.startsWith('#/mine')) { try { renderLearn(); } catch { /* 忽略 */ } }
   }
   /** 载入界面文案表（zh-CN 直接用中文原文，不发请求） */
   async function loadLocaleDict(id) {
@@ -140,7 +161,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   }
   /** 学习语言不能等于用户区域语言（默认列表里会隐藏；这里只做兜底） */
   function learnLangList() { return LEARN_LANGS.filter((x) => x.id !== userLang()); }
-  function learnLangLabel() { const x = LEARN_LANGS.find((y) => y.id === S.learnLang); return x ? x.native : S.learnLang; }
+  function learnLangLabel() { return langLabel(S.learnLang, userLocale().id) || S.learnLang; }
   function trackLangs(t) {
     if (!t) return [];
     if (!Array.isArray(t.langs) || !t.langs.length) t.langs = detectTrackLangs(t.lines || [], t.primaryLang);
@@ -466,46 +487,60 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     await el.play();
   }
   let vpAudio = null, vpOjt = null, vpCheckedAt = 0;
-  async function activePacks() {
-    if (!IS_NATIVE || !voicePack.available) return { audio: null, ojt: null };
-    if (Date.now() - vpCheckedAt < 15000) return { audio: vpAudio, ojt: vpOjt };
-    vpCheckedAt = Date.now();
-    try { const r = await voicePack.status(VP_AUDIO); vpAudio = (r && r.installed) ? r : null; } catch { vpAudio = null; }
-    try { const r = await voicePack.status(VP_ID); vpOjt = (r && r.installed) ? r : null; } catch { vpOjt = null; }
-    return { audio: vpAudio, ojt: vpOjt };
+  let vpCatalog = null;                       // docs/data/voice-packs.json
+  async function packCatalog() {
+    if (vpCatalog) return vpCatalog;
+    try { const j = await getJson(dataUrl('voice-packs.json')); vpCatalog = (j && j.packs) || []; }
+    catch { vpCatalog = []; }
+    return vpCatalog;
+  }
+  /** 这门语言（ja/en/fr…）装了哪些包：音频包优先，其次合成包 */
+  async function packsForLang(langTag) {
+    const base = String(langTag || 'ja').toLowerCase().split('-')[0];
+    const list = await packCatalog();
+    const audio = [], ojt = [];
+    for (const p of list) {
+      const pl = String(p.lang || (p.kind === 'audio' ? 'ja' : 'ja')).toLowerCase().split('-')[0];
+      if (pl !== base) continue;
+      let st = null;
+      try { st = await voicePack.status(p.id); } catch { st = null; }
+      if (st && st.installed) (p.kind === 'audio' ? audio : ojt).push(st);
+    }
+    return { audio, ojt };
   }
   async function speak(t, silent, lang) {
     const text = String(t == null ? '' : t).trim();
     if (!text) return;
     const lg = lang || 'ja-JP';
-    // 非日语：先走系统/浏览器的对应语言嗓子（日语那套离线包读不了法语俄语）
-    if (!lg.toLowerCase().startsWith('ja')) {
+    // 网页版没有离线包，只能用浏览器嗓子（再不行才走在线合成）
+    if (!IS_NATIVE) {
       try {
         const r = await tts.speak(text, { lang: lg });
         if (r && r.ok && r.matched) return;
-      } catch { /* 落到在线合成 */ }
-      try { await speakOnline(text, lg); return; } catch { /* 在线也不行就报错 */ }
-      if (!silent) toast('发音失败');
+      } catch { /* 落到在线 */ }
+      try { await speakOnline(text, lg); } catch { if (!silent) toast('发音失败'); }
       return;
     }
-    if (!IS_NATIVE) { try { await speakOnline(text); } catch { if (!silent) toast('发音失败'); } return; }
-    const packs = await activePacks();
-    if (packs.audio) {
+    // 原生壳：只用「本地语音包」，不联网合成
+    const packs = await packsForLang(lg);
+    for (const p of packs.audio) {
       try {
-        const r = await voicePack.resolve(packs.audio.id, text);
+        const r = await voicePack.resolve(p.id, text);
         if (r && r.found && r.path) { await playSpeakSrc(capFileSrc(r.path)); return; }
-      } catch { /* 查表失败就往下走 */ }
+      } catch { /* 这个包查不到就试下一个 */ }
     }
-    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-      try { await speakOnline(text); return; } catch { /* 联网失败：继续兜底 */ }
-    }
-    if (packs.ojt) {
+    for (const p of packs.ojt) {
       try {
-        const r = await voicePack.synth(packs.ojt.id, text.slice(0, 300));
+        const r = await voicePack.synth(p.id, text.slice(0, 300));
         if (r && r.path) { await playSpeakSrc(capFileSrc(r.path)); return; }
-      } catch { /* 兜底也不行 */ }
+      } catch { /* 合成失败，继续 */ }
     }
-    if (!silent) toast('发音失败');
+    // 包里没有这个音 → 退到系统自带引擎（本机发声，不走我们的服务器）
+    try {
+      const r = await tts.speak(text, { lang: lg });
+      if (r && r.ok && r.matched) return;
+    } catch { /* 系统也没有 */ }
+    if (!silent) toast('语音包未安装');
   }
   /** 读词：日语读假名，其它语言读原词（不要读音标） */
   const speakWord = (v, silent) => {
@@ -518,13 +553,19 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   /** 首次打开：没装语音包就问一次「要不要装」，可「不再提醒」 */
   function voicePackPrompt() {
     if (!IS_NATIVE || !voicePack.available || S.vpNoAsk) return;
-    voicePack.status(VP_AUDIO).then((r) => {
-      if (r && r.installed) return;
+    packCatalog().then(async (list) => {
+      const def = list.filter((p) => ['ja', 'en'].indexOf(String(p.lang || 'ja').toLowerCase().split('-')[0]) >= 0);
+      const missing = [];
+      for (const p of def) {
+        try { const st = await voicePack.status(p.id); if (!(st && st.installed)) missing.push(p); } catch { /* 忽略 */ }
+      }
+      if (!missing.length) return;
+      const size = missing.reduce((n, p) => n + (p.size || 0), 0);
       showDialog({
-        title: '安装离线语音包？',
+        title: '安装默认语音包（日语 + 英语）',
         actions: [
-          { label: '去安装', kind: 'main', onClick: () => go('#/voicepack') },
-          { label: '不再提醒', onClick: () => { S.vpNoAsk = 1; save(); } },
+          { label: `安装 ${fmtSize(size)}`, kind: 'main', onClick: () => go('#/voicepack') },
+          { label: '以后再说', onClick: () => { S.vpNoAsk = 1; save(); } },
         ],
       });
     }).catch(() => {});
@@ -1107,12 +1148,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
 
   const EN_LEVEL_LABEL = { zhongkao: '中考', gaokao: '高考', cet4: 'CET-4', cet6: 'CET-6', kaoyan: '考研', ielts: 'IELTS', toefl: 'TOEFL', gre: 'GRE' };
   const levelName = (v) => {
-    if (v.br) return `标日${v.br.bk} 第${v.br.l}课`;
-    if (v.jl) return `JLPT N${v.jl}`;
+    if (v.br) return T('标日{bk} 第{n}课', { bk: T(v.br.bk), n: v.br.l });
+    if (v.jl) return T('JLPT N{n}', { n: v.jl });
     if (v.levels && v.levels.length) {
       return v.levels.map((x) => PACK_LIST_LABEL.get(x.list) || EN_LEVEL_LABEL[x.system] || x.system).slice(0, 3).join(' / ');
     }
-    return v.lang === 'en' ? '未分级' : '标日未收录';
+    return T(v.lang === 'en' ? '未分级' : '标日未收录');
   };
 
   function wordRow(v) {
@@ -1241,6 +1282,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     return [...list].sort((a, b) => a.diff - b.diff || a.id - b.id);
   }
 
+  /** 首页大标题：中文/日文保持原来的强调排版，其它语言用整句译文（别再拆成三个文本节点） */
+  function brandTitle() {
+    const lg = userLang();
+    if (lg === 'ja' || lg === 'zh') return '今日から、<span class="accent">東方</span>の<br>歌詞で言葉を学ぶ。';
+    return esc(t('今日から、東方の歌詞で言葉を学ぶ。'));
+  }
   /** 首页：只突出一条主路径——找歌 → 选歌 → 开始学唱；其他入口降级成小按钮 */
   function renderHome() {
     const last = (S.lastTrack && TRACK.get(S.lastTrack)) || null;
@@ -1249,7 +1296,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const withAudio = IDX.tracks.filter((t) => t.audio || t.audioOss).length;
     $('view-home').innerHTML = `
       <div class="herohead">
-        <div class="ht">今日から、<span class="accent">東方</span>の<br>歌詞で言葉を学ぶ。</div>
+        <div class="ht">${brandTitle()}</div>
         <div class="hs">——三首歌里挑五个词；先听懂，再背下。</div>
         ${IDX.tracks.length ? `<div class="hln">
           <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
@@ -1609,7 +1656,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   }
 
   function learnLangOptionsHtml(selected) {
-    return learnLangList().map((x) => `<option value="${x.id}"${x.id === selected ? ' selected' : ''}>${esc(x.native)}</option>`).join('');
+    // 语言名统一用「用户区域」的说法：英文界面里就该是 Japanese / French，而不是 日本語 / Français
+    return learnLangList().map((x) => `<option value="${x.id}"${x.id === selected ? ' selected' : ''}>${esc(langLabel(x.id, userLocale().id) || x.native)}</option>`).join('');
   }
   function renderLearn() {
     if (!IDX.tracks.length) {
@@ -1640,13 +1688,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const pct = libN ? Math.round((known / libN) * 100) : 0;
     $('view-learn').innerHTML = `
       <div class="sec-head learn-head">
-        <div class="serif learn-title">今日から、<span class="accent">${list.length}</span> つの言葉。</div>
+        <div class="serif learn-title">${T('今日から、')}<span class="accent">${list.length}</span> ${T('つの言葉。')}</div>
         <select class="sel" id="learn-lang" style="height:34px;flex:0 0 auto">${learnLangOptionsHtml(S.learnLang)}</select>
         <div class="learn-sub">已掌握 ${known} / ${libN} 词 · 进度 ${pct}%</div>
       </div>
       <div class="bar learn-bar"><i style="width:${pct}%"></i></div>
       ${dueWords().length
-        ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">今天 ${dueWords().length} 个</span><button class="go" id="d-duego">开始 ›</button></div>`
+        ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">${T('今天 {n} 个', { n: dueWords().length })}</span><button class="go" id="d-duego">${T('开始 ›')}</button></div>`
         : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收词 · 答错的重练</span></div>`}
       <div class="learn-filters">
         <div class="learn-filter-row">
@@ -1725,15 +1773,15 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function trackRow(t) {
     const isCur = !!(curTrack && String(curTrack.id) === String(t.id));
     const tags = [];
-    if (t.imp) tags.push('导入');
-    if (t.audio || t.audioOss || S.audio[t.id]) tags.push('有声'); else tags.push('无音源');
-    if (isFav(t.id)) tags.push(icon('heart', 'in') + '收藏');
-    if (isSing(t.id)) tags.push('会唱');
+    if (t.imp) tags.push(T('导入'));
+    if (t.audio || t.audioOss || S.audio[t.id]) tags.push(T('有声')); else tags.push(T('无音源'));
+    if (isFav(t.id)) tags.push(icon('heart', 'in') + T('收藏'));
+    if (isSing(t.id)) tags.push(T('会唱'));
     if (t.imp && t.audio && t.audio.type === 'tencent') tags.push('QQ音乐');
-    if ((S.audio[t.id] && S.audio[t.id].trial) || (t.audio && t.audio.trial)) tags.push('试听片段');
-    if (t.lines.some((l) => l.zh)) tags.push('中文');
+    if ((S.audio[t.id] && S.audio[t.id].trial) || (t.audio && t.audio.trial)) tags.push(T('试听片段'));
+    if (t.lines.some((l) => l.zh)) tags.push(T('中文'));
     const brN = (t.vocabIds || []).filter((i) => VBYID.get(i) && VBYID.get(i).br).length;
-    if (brN) tags.push(`标日 ${brN}`);
+    if (brN) tags.push(T('标日 {n}', { n: brN }));
     const ltags = trackLangs(t).map((id) => `<span class="langbadge">${esc(langLabel(id, userLocale().id))}</span>`).join('');
     // 只有真有封面素材才放图；没有就不放空占位框（不为了填满空间做装饰卡片）
     const cover = t.coverFile ? `<img class="cover" loading="lazy" src="data/${t.coverFile}" alt="">`
@@ -1743,7 +1791,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="col">
         <div class="l1">${esc(t.title)}${isCur ? '<span class="eqbars" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</div>
         <div class="l2">${esc(t.artist)}${t.base ? ' · ' + esc(t.base) : (t.album ? ' · ' + esc(t.album) : '')}</div>
-        <div class="l3">${ltags ? ltags + ' ' : ''}${t.lineCount} 行歌词${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
+        <div class="l3">${ltags ? ltags + ' ' : ''}${T('{n} 行歌词', { n: t.lineCount })}${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
       ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">${icon('play')}</button>` : ''}
       <button class="tick${isFav(t.id) ? ' on' : ''}" data-fav="${esc(t.id)}" title="收藏" aria-label="收藏">${icon('heart','in')}</button>
@@ -2609,7 +2657,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (syncErr) return '同步失败：' + esc(syncErr) + ' · ' + who;
     if (S.autoSync === false) return (syncDirty ? '待同步' : '自动同步已关') + ' · ' + who;
     if (syncDirty) return '待同步 · ' + who;
-    if (S.syncAt) return '已同步 ' + new Date(S.syncAt).toLocaleString('zh-CN', { hour12: false }).slice(5) + ' · ' + who;
+    if (S.syncAt) return T('已同步 {x}', { x: new Date(S.syncAt).toLocaleString(userLocale().id, { hour12: false }).slice(5) + ' · ' + who });
     return '等待同步… · ' + who;
   }
 
@@ -2619,7 +2667,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       return `<div class="accbox on">
         <div class="row" style="gap:10px;align-items:center">
           ${avatarHtml(ACC, 'av48')}
-          <div class="col"><div class="l1">已登录：${esc(ACC.name)}</div></div>
+          <div class="col"><div class="l1">${esc(T('已登录：{x}', { x: ACC.name }))}</div></div>
           <button class="toolbtn" id="acc-av">换头像</button>
           <input type="file" id="acc-avf" accept="image/*" hidden>
         </div>
@@ -3135,7 +3183,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="row" style="margin:2px 0 0">
         ${curTrack ? `<button class="toolbtn on" id="jump-cur">${icon('play','in')}正在播放</button>` : ''}
         <select id="langview" class="sel" style="height:34px;margin-left:auto">
-          <option value="learn"${langView === 'learn' ? ' selected' : ''}>学习语言 · ${esc(learnLangLabel())}</option>
+          <option value="learn"${langView === 'learn' ? ' selected' : ''}>${esc(T('学习语言 · {x}', { x: learnLangLabel() }))}</option>
           <option value="all"${langView === 'all' ? ' selected' : ''}>全部语言</option>
           ${SONG_LANGS.filter((x) => x.id !== 'other' && x.id !== 'unknown').map((x) => `<option value="${x.id}"${langView === x.id ? ' selected' : ''}>${esc(langLabel(x.id, userLocale().id))}</option>`).join('')}
         </select>
@@ -3225,7 +3273,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const chip = (v, sup) => `<span class="chip" data-w="${v.id}">${esc(v.word)}${sup ? `<i class="sup">${sup}</i>` : ''}</span>`;
     $('view-mine').innerHTML = `
       <div class="sec-head">
-        <div><div class="sec-title">我的词</div><div class="sec-sub">星标 ${starred.length} 词 · 错词 ${errs.length} 词 · 改过释义 ${noted.length} 词</div>
+        <div><div class="sec-title">我的词</div><div class="sec-sub">${esc(T('星标 {n} 词', { n: starred.length }))} · ${esc(T('错词 {n} 词', { n: errs.length }))} · ${esc(T('改过释义 {n} 词', { n: noted.length }))}</div>
         ${errs.length ? `<button class="toolbtn" id="m-errgo" style="margin-top:8px">练错词 ${errs.length}</button>` : ''}</div>
         <button class="toolbtn" id="m-review">开始复习</button>
       </div>
@@ -3392,7 +3440,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       ${isLoggedIn() ? `<div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">同步</button>
         <button class="toolbtn" id="m-pull">云端恢复…</button>
-        <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">自动同步：${S.autoSync !== false ? '开' : '关'}</button>
+        <button class="toolbtn ${S.autoSync !== false ? 'on' : ''}" id="m-auto">${esc(T(S.autoSync !== false ? '自动同步：开' : '自动同步：关'))}</button>
       </div>` : `<div class="setrow"><div class="k">登录后可用</div><button class="toolbtn on" id="m-login">登录 / 注册</button></div>`}
       ${IS_NATIVE ? `<div class="sect">更新</div>
       <div class="updrow"><div class="k"><b>当前版本</b><small>${V}${apkCheckedAt ? ' · ' + new Date(apkCheckedAt).toLocaleTimeString('zh-CN') : ''}</small></div>
@@ -3520,16 +3568,20 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     try { const j = await getJson(dataUrl('voice-packs.json')); packs = (j && j.packs) || []; } catch { packs = []; }
     if (!packs.length) { box.innerHTML = '<div class="empty">暂无</div>'; return; }
     const rows = [];
-    for (const p of packs) {
+    const sorted = [...packs].sort((a, b) => String(a.lang || 'ja').localeCompare(String(b.lang || 'ja')));
+    for (const p of sorted) {
       let st = null;
       try { st = await voicePack.status(p.id); } catch { st = null; }
       const installed = !!(st && st.installed);
       // 已装但版本落后 → 给「更新」入口（以前只判断装没装，1.0 永远看不到 1.1）
       const oldVer = installed ? String(st.version || '') : '';
       const canUpd = installed && oldVer && String(p.version) !== oldVer;
+      const langBase = String(p.lang || 'ja').toLowerCase().split('-')[0];
+      const defTag = ['ja', 'en'].indexOf(langBase) >= 0 ? ' · 默认' : '';
+      const cnt = p.count ? ` · ${p.count} 词` : '';
       rows.push(`<div class="item" data-pack="${esc(p.id)}">
-        <div class="col"><div class="l1">${esc(p.name)}</div>
-          <div class="l2">${installed ? (canUpd ? `已安装 ${esc(oldVer)} · 可更新 ${esc(p.version)}（${fmtSize(p.size)}）` : '已安装') : fmtSize(p.size)}</div>
+        <div class="col"><div class="l1">${esc(langLabel(langBase, userLocale().id))}${defTag}</div>
+          <div class="l2">${esc(p.name)}${cnt} · ${installed ? (canUpd ? `${esc(oldVer)} → ${esc(p.version)}` : '已安装') : fmtSize(p.size)}</div>
           <div class="bar" id="vp-bar-${esc(p.id)}" hidden><i style="width:0"></i></div></div>
         <div class="row" style="flex:0 0 auto">
           ${canUpd
@@ -3539,7 +3591,29 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
               : `<button class="toolbtn on" data-dl="${esc(p.id)}">下载</button>`}
         </div></div>`);
     }
+    const missingDefault = [];
+    for (const p of packs) {
+      const lb = String(p.lang || 'ja').toLowerCase().split('-')[0];
+      if (['ja', 'en'].indexOf(lb) < 0) continue;
+      let st = null; try { st = await voicePack.status(p.id); } catch { st = null; }
+      if (!(st && st.installed)) missingDefault.push(p);
+    }
+    if (missingDefault.length) {
+      const total = missingDefault.reduce((n, p) => n + (p.size || 0), 0);
+      rows.unshift(`<div class="row" style="margin-bottom:10px"><button class="btn-main" id="vp-default">装默认语音包（日语 + 英语 · ${fmtSize(total)}）</button></div>`);
+    }
     box.innerHTML = rows.join('');
+    if ($('vp-default')) $('vp-default').onclick = async () => {
+      $('vp-default').disabled = true;
+      for (const p of missingDefault) {
+        try {
+          await voicePack.install({ id: p.id, url: p.url, sha256: p.sha256, version: p.version, kind: p.kind || 'audio' }, () => {});
+        } catch { /* 单个失败不挡后面 */ }
+      }
+      vpCheckedAt = 0;
+      toast('已安装');
+      renderVoicepack();
+    };
     const byId = new Map(packs.map((x) => [x.id, x]));
     box.querySelectorAll('[data-dl]').forEach((el) => (el.onclick = async () => {
       const p = byId.get(el.dataset.dl); if (!p) return;
@@ -3570,10 +3644,18 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function renderVoiceLangs() {
     const host = $('vp-langs'); if (!host) return;
     let have = [];
-    try { have = await tts.langs(); } catch { have = []; }
     const web = !IS_NATIVE;
-    // 日语另有一套 App 内离线包（kokoro/openjtalk），装了就算“已安装”
-    try { const st = await voicePack.status(VP_AUDIO); if (st && st.installed && have.indexOf('ja') < 0) have = have.concat(['ja']); } catch { /* 忽略 */ }
+    if (web) { try { have = await tts.langs(); } catch { have = []; } }
+    // 原生壳：离线语音包 + 系统嗓子都算
+    try {
+      const list = await packCatalog();
+      for (const p of list) {
+        try { const st = await voicePack.status(p.id); if (st && st.installed) have.push(String(p.lang || 'ja').toLowerCase().split('-')[0]); } catch { /* 忽略 */ }
+      }
+      const sys = await tts.langs();
+      have = have.concat(sys || []);
+    } catch { /* 忽略 */ }
+    have = [...new Set(have)];
     const rows = LEARN_LANGS.map((L) => {
       const base = L.tts.split('-')[0].toLowerCase();
       const ok = have.indexOf(base) >= 0;
@@ -4793,6 +4875,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     setTimeout(() => gcLocalAudio(), 3000);            // 清掉没人认领的本机音频副本
     if (appUpdater.available && !window.__NO_BACKFILL) setTimeout(() => checkApk(false), 2500);   // 静默查一次新版本
     if (otaAvailable() && !window.__NO_OTA) setTimeout(() => checkOta(false), 3200);             // 静默查一次内容包
+    setTimeout(() => ensureJaPairs(), 600);
     setTimeout(voicePackPrompt, 1800);
     // 歌单体检：一天一次（静默，别打扰）；测试里用 window.__NO_PLCHECK 关掉
     if (!window.__NO_PLCHECK && impPlaylists().length && Date.now() - (S.plCheckAt || 0) > PL_CHECK_EVERY) {

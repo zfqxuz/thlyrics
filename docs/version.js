@@ -4,4 +4,4 @@
  * 同时更新 index.html 与这里的 V —— 用来绕过 GitHub Pages 的 10 分钟静态缓存。
  * DATA_V（data/*.json 的版本）也取自这里，保证两边永远一致。
  */
-export const V = '20261018zb';
+export const V = '20261018zf';

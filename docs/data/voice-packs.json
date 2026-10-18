@@ -9,7 +9,8 @@
       "size": 29430387,
       "sha256": "276ef19cb9dcbe8663e7375a583737808b13addb02756b74ba9540c2e7d2e84a",
       "source": "https://help.aliyun.com/zh/isi/",
-      "license": "阿里云智能语音交互（NLS）· voice=tomoka"
+      "license": "阿里云智能语音交互（NLS）· voice=tomoka",
+      "lang": "ja-JP"
     },
     {
       "id": "openjtalk-ja",
@@ -20,7 +21,21 @@
       "size": 25020966,
       "sha256": "cf3f7ed04564ede0472dfef159b7004c893afd88056626e83e70f31b9bc19228",
       "source": "https://github.com/icn-lab/htsvoice-tohoku-f01",
-      "license": "CC-BY 4.0"
+      "license": "CC-BY 4.0",
+      "lang": "ja-JP"
+    },
+    {
+      "id": "aliyun-en",
+      "name": "英语词音（有道/百度）",
+      "lang": "en-US",
+      "version": "20261018",
+      "kind": "audio",
+      "size": 23964546,
+      "sha256": "e231ead61881cc95a35edfaec73c09e23efb13b28164269ded223276a1b07569",
+      "url": "https://thlyrics-audio.oss-cn-hangzhou.aliyuncs.com/tts/aliyun-en-20261018.zip?OSSAccessKeyId=LTAI5t8G9o21bBa6P17h5n57&Expires=2107663393&Signature=f7vCEx%2FokOgobZC5FMvaD0HJMcc%3D",
+      "source": "有道/百度 TTS（一次性生成）",
+      "license": "生成语音，随包分发",
+      "count": 3000
     }
   ]
 }
