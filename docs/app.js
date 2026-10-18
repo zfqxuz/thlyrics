@@ -2823,9 +2823,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     d.hidden = false;
     d.innerHTML = `<div class="dlgcard">
       <div class="dlgt">网易云登录</div>
-      <div class="row" style="margin-top:10px"><button class="btn-main" id="qr-open" style="flex:1">在网易云里确认登录</button></div>
-      <div id="qrbox" style="margin-top:14px;text-align:center;min-height:200px"><img id="qrimg" alt="" style="width:180px;height:180px;border-radius:12px;background:var(--field)"></div>
+      <div id="qrbox" style="margin-top:12px;text-align:center"><img id="qrimg" alt="" style="width:240px;height:240px;border-radius:12px;background:var(--field)"></div>
       <div class="gdesc" id="qrmsg">加载中…</div>
+      <div class="row" style="margin-top:10px;justify-content:center">
+        <button class="toolbtn" id="qr-copy">复制登录链接</button>
+        <button class="toolbtn" id="qr-open">打开网易云</button>
+      </div>
       <div class="dlga"><button class="toolbtn" id="qr-close">关闭</button></div>
     </div>`;
     if ($('qr-close')) $('qr-close').onclick = closeQrPanel;
@@ -2837,16 +2840,15 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       const img = $('qrimg'); if (img) img.src = j.img;
       const link = 'https://music.163.com/login?codekey=' + encodeURIComponent(qrKey);
       // 手机上不能自己扫自己：优先「跳去网易云确认」，扫码留给另一台设备
-      if ($('qr-open')) $('qr-open').onclick = () => {
-        try { window.open(link, '_system'); } catch { /* 忽略 */ }
-        try {
-          const a = document.createElement('a');
-          a.href = link; a.target = '_blank'; a.rel = 'noopener';
-          document.body.appendChild(a); a.click(); a.remove();
-        } catch { /* 忽略 */ }
-        setMsg('在网易云里点「确认登录」');
+      if ($('qr-copy')) $('qr-copy').onclick = async () => {
+        try { await navigator.clipboard.writeText(link); toast('已复制'); } catch { toast('复制失败'); }
       };
-      setMsg('等待确认');
+      if ($('qr-open')) $('qr-open').onclick = () => {
+        // 网易云没有开放「确认登录」的深链，只能唤起 App；扫码走「扫一扫 → 相册」
+        try { window.open('orpheus://', '_system'); } catch { /* 忽略 */ }
+        setMsg('扫一扫 → 相册');
+      };
+      setMsg('长按保存二维码');
       if (qrTimer) clearInterval(qrTimer);
       qrTimer = setInterval(async () => {
         if (!qrKey) return;
