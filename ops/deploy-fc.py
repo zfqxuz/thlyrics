@@ -98,6 +98,16 @@ def main():
         'ROLE': 'auth',
         'SEP_FUNCTION': 'thlyrics-sep',
     }
+    # 网易云会员 cookie（可选）：~/.dsh/netease.cookie 一行 MUSIC_U=...; __csrf=...
+    nc = os.path.expanduser('~/.dsh/netease.cookie')
+    if os.path.exists(nc):
+        try:
+            v = open(nc, encoding='utf-8').read().strip()
+            if v:
+                env['NETEASE_COOKIE'] = v
+                print('· 已带上网易云 cookie')
+        except Exception as e:
+            print('· 网易云 cookie 读取失败：', e)
     # Spotify 凭据（可选）：~/.dsh/spotify.credentials.json = {"id": "...", "secret": "..."}
     sp = os.path.expanduser('~/.dsh/spotify.credentials.json')
     if os.path.exists(sp):

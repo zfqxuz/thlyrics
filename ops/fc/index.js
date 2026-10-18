@@ -1186,8 +1186,12 @@ const normTrack = (x) => ({
   al: { name: ((x.al || x.album || {}).name) || '', picUrl: ((x.al || x.album || {}).picUrl) || '' },
 });
 
+/** 网易云会员 cookie（可选）：没配就匿名请求，会员曲只会给 30 秒试听 */
+const netCookie = () => String(ENV.NETEASE_COOKIE || '').trim();
 async function netJson(url) {
-  const r = await httpGet(url, NET_HEADERS, 12000);
+  const cookie = netCookie();
+  const headers = cookie ? Object.assign({}, NET_HEADERS, { Cookie: NET_HEADERS.Cookie + '; ' + cookie }) : NET_HEADERS;
+  const r = await httpGet(url, headers, 12000);
   if (r.status !== 200) throw new Error('HTTP ' + r.status);
   try { return JSON.parse(r.body); } catch { throw new Error('返回不是 JSON'); }
 }

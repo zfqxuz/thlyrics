@@ -102,3 +102,18 @@ python3 ops/deploy-fc.py
 ```
 
 没配凭据时 `/api/resolve` 会返回「服务端没配 Spotify 凭据」，其它平台不受影响。
+
+## 网易云会员曲（30 秒试听）
+
+`/api/audio` 匿名请求网易云，会员/付费曲只会拿到 30 秒试听地址（前端会标「试听片段」）。
+要用完整音频，需要在函数里带上一个**会员账号的 cookie**：
+
+```bash
+# 1. 浏览器登录 music.163.com → F12 → Application → Cookies → 复制 MUSIC_U 和 __csrf
+# 2. 写成本机文件（不进仓库）
+echo 'MUSIC_U=xxxx; __csrf=yyyy' > ~/.dsh/netease.cookie
+# 3. 重新部署
+python3 ops/deploy-fc.py
+```
+
+没配 cookie 时：非会员曲照常完整播放，会员曲 30 秒试听，前端有「试听片段」标记。
