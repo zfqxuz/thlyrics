@@ -3,7 +3,7 @@
  * 分开的三个来源：自己的后端（函数计算）、第三方中继（gdstudio）、站内静态数据。
  * 原生壳里不需要 CORS，行为一致，所以也不需要分实现。
  */
-import { V } from '../version.js?v=20261018zzb';
+import { V } from '../version.js?v=20261019a';
 
 export const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 / 解析 / 分词
 export const GD = 'https://music-api.gdstudio.xyz/api.php';
@@ -40,9 +40,9 @@ export function getJson(url, { timeout = 20000, ...opts } = {}) {
 }
 
 /** 自己的后端：把后端给的 error 文案透出来（音频直链 / 歌词） */
-export function fcJson(path, { timeout = 20000 } = {}) {
+export function fcJson(path, { timeout = 20000, headers } = {}) {
   return withTimeout(async (signal) => {
-    const r = await fetch(API_BASE + path, { signal });
+    const r = await fetch(API_BASE + path, { signal, headers });
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || j.error) throw new Error((j && j.error) || ('HTTP ' + r.status));
     return j;

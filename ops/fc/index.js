@@ -1186,8 +1186,9 @@ const normTrack = (x) => ({
   al: { name: ((x.al || x.album || {}).name) || '', picUrl: ((x.al || x.album || {}).picUrl) || '' },
 });
 
-/** 网易云会员 cookie（可选）：没配就匿名请求，会员曲只会给 30 秒试听 */
-const netCookie = () => String(ENV.NETEASE_COOKIE || '').trim();
+/** 网易云 cookie：优先用「这次请求带上来的用户自己的 cookie」，其次才是服务端兜底的那份 */
+let REQ_COOKIE = '';
+const netCookie = () => REQ_COOKIE || String(ENV.NETEASE_COOKIE || '').trim();
 async function netJson(url) {
   const cookie = netCookie();
   const headers = cookie ? Object.assign({}, NET_HEADERS, { Cookie: NET_HEADERS.Cookie + '; ' + cookie }) : NET_HEADERS;
@@ -1266,6 +1267,8 @@ exports.handler = async (event) => {
   try {
     // 页面会从 OSS 的静态 JSON 里读这个地址，允许 ?action=xxx 这种便于排查
     const action = q.action ? '/' + q.action.replace(/^\/+/, '') : path.replace(/^\/api/, '');
+    // 用户自己的网易云 cookie（只作用于本次请求，不落库）；没带就用服务端兜底的那份
+    REQ_COOKIE = String((req.headers && (req.headers['x-net-cookie'] || req.headers['X-Net-Cookie'])) || '').slice(0, 2000);
 
     if (action === '/health' || path === '/' || path === '/health') {
       return reply(req, 200, { ok: true, service: 'thlyrics-auth', version: 1, time: new Date().toISOString() });
@@ -1289,6 +1292,33 @@ exports.handler = async (event) => {
     }
 
     // 音频直链 / 歌词：走自己的函数，前端不吃第三方限流和跨域（公开接口，不要求登录）
+    // ── 网易云扫码登录：拿到用户自己的 cookie（只在用户设备上保存） ──
+    if (action === '/netease/qr') {
+      const key = String(q.key || '').trim();
+      if (!key) {
+        try {
+          const r = await httpGet('https://music.163.com/api/login/qrcode/unikey?type=1', NET_HEADERS, 10000);
+          const j = JSON.parse(r.body);
+          if (!j.unikey) return reply(req, 502, { error: '取二维码失败' });
+          const target = 'https://music.163.com/login?codekey=' + encodeURIComponent(j.unikey);
+          const img = await httpGetBuf('https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=' + encodeURIComponent(target), {}, 12000);
+          const b64 = img.status === 200 ? 'data:image/png;base64,' + img.body.toString('base64') : '';
+          return reply(req, 200, { ok: true, key: j.unikey, img: b64 });
+        } catch (e) { return reply(req, 502, { error: '二维码生成失败：' + String((e && e.message) || e) }); }
+      }
+      try {
+        const r = await httpGet('https://music.163.com/api/login/qrcode/client/login?key=' + encodeURIComponent(key) + '&type=1', NET_HEADERS, 10000);
+        const j = JSON.parse(r.body);
+        const code = Number(j.code) || 0;
+        if (code !== 803) return reply(req, 200, { ok: true, code });
+        const raw = [].concat(r.headers['set-cookie'] || []).join('; ');
+        const musicU = (raw.match(/MUSIC_U=([^;\s]+)/) || [])[1] || '';
+        const csrf = (raw.match(/__csrf=([^;\s]+)/) || [])[1] || '';
+        if (!musicU) return reply(req, 200, { ok: true, code, error: '没拿到登录凭证' });
+        return reply(req, 200, { ok: true, code, cookie: 'MUSIC_U=' + musicU + (csrf ? '; __csrf=' + csrf : '') });
+      } catch (e) { return reply(req, 502, { error: '查询登录状态失败' }); }
+    }
+
     if (action === '/audio') {
       const src = String(q.source || 'netease');
       // 网易云是纯数字 id，QQ 是 songmid（字母数字混合），别用同一套校验

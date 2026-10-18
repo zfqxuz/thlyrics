@@ -718,7 +718,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const source = src || 'netease';
     const extra = source === 'tencent' ? '&source=tencent' : '';
     lastAudioMeta = null;
-    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`); if (j && j.url) { lastAudioMeta = { size: Number(j.size) || 0, br: Number(j.br) || 0 }; return j.url; } } catch {}
+    const hdr = S.netCookie ? { 'X-Net-Cookie': S.netCookie } : undefined;
+    try { const j = await fcJson(`/audio?id=${encodeURIComponent(nid)}&br=${br || 320}${extra}`, { headers: hdr }); if (j && j.url) { lastAudioMeta = { size: Number(j.size) || 0, br: Number(j.br) || 0 }; return j.url; } } catch {}
     if (source !== 'netease') return null;
     try { const j = await gdJson(`types=url&source=netease&id=${encodeURIComponent(nid)}&br=${br || 320}`); if (j && j.url) return j.url; } catch {}
     return null;
@@ -2810,6 +2811,50 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       </div></div>`;
   }
 
+  // ────────────── 网易云账号（只用来拿会员曲的完整音频） ──────────────
+  let qrTimer = null, qrKey = '';
+  function closeQrPanel() {
+    if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+    qrKey = '';
+    const d = $('dlg'); if (d) d.hidden = true;
+  }
+  async function neteaseLogin() {
+    const d = $('dlg'); if (!d) return;
+    d.hidden = false;
+    d.innerHTML = `<div class="dlgcard">
+      <div class="dlgt">网易云登录</div>
+      <div class="gdesc">用网易云 App 扫码。登录后会员曲才能放完整版。</div>
+      <div id="qrbox" style="margin-top:12px;text-align:center;min-height:200px"><img id="qrimg" alt="" style="width:200px;height:200px;border-radius:12px;background:var(--field)"></div>
+      <div class="gdesc" id="qrmsg">加载中…</div>
+      <div class="dlga"><button class="toolbtn" id="qr-close">关闭</button></div>
+    </div>`;
+    if ($('qr-close')) $('qr-close').onclick = closeQrPanel;
+    const setMsg = (t) => { const el = $('qrmsg'); if (el) el.textContent = t; };
+    try {
+      const j = await fcJson('/netease/qr');
+      if (!j.img) throw new Error('没有二维码');
+      qrKey = j.key;
+      const img = $('qrimg'); if (img) img.src = j.img;
+      setMsg('等待扫码');
+      if (qrTimer) clearInterval(qrTimer);
+      qrTimer = setInterval(async () => {
+        if (!qrKey) return;
+        try {
+          const st = await fcJson('/netease/qr?key=' + encodeURIComponent(qrKey));
+          if (st.code === 801) setMsg('已扫码，请在手机上确认');
+          else if (st.code === 802) { setMsg('二维码过期，请重新打开'); clearInterval(qrTimer); qrTimer = null; }
+          else if (st.code === 803 && st.cookie) {
+            clearInterval(qrTimer); qrTimer = null;
+            S.netCookie = st.cookie; save();
+            setMsg('已登录');
+            toast('网易云已登录');
+            setTimeout(() => { closeQrPanel(); renderMe(); }, 600);
+          }
+        } catch { /* 网络抖动，下一轮再试 */ }
+      }, 2000);
+    } catch (e) { setMsg('二维码加载失败'); }
+  }
+
   // ────────────── 管理员模式：看/删 OSS 上的文件 ──────────────
   let adminFiles = null, adminPrefix = 'sync/';
   const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(2) + 'MB' : (n / 1024).toFixed(1) + 'KB');
@@ -3575,6 +3620,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="meta" style="margin:-4px 0 4px">按勾选的方式出题</div>
       ${REV_MODES.filter(([k]) => S.learnLang === 'ja' || (k !== 'pick' && k !== 'type')).map(([k, t, d]) => `<div class="setrow"><div class="k">${t}<small>${d}</small></div>
         <button class="toolbtn swbtn ${revModeOn(k) ? 'on' : ''}" data-revmode="${k}" aria-pressed="${revModeOn(k)}">${revModeOn(k) ? '开' : '关'}</button></div>`).join('')}
+      <div class="sect">网易云</div>
+      <div class="setrow"><div class="k">${S.netCookie ? '已登录' : '未登录'}</div>
+        ${S.netCookie
+          ? `<button class="toolbtn" id="m-net-out">退出</button>`
+          : `<button class="toolbtn on" id="m-net-in">扫码登录</button>`}</div>
       <div class="sect">云同步</div>
       ${isLoggedIn() ? `<div class="row" style="margin-top:8px">
         <button class="toolbtn" id="m-push">同步</button>
@@ -3643,6 +3693,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('tts-packs')) $('tts-packs').onclick = () => go('#/voicepack');
     if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
     if ($('m-login')) $('m-login').onclick = () => showGate('');
+    if ($('m-net-in')) $('m-net-in').onclick = () => neteaseLogin();
+    if ($('m-net-out')) $('m-net-out').onclick = () => { S.netCookie = ''; save(); renderMe(); toast('已退出网易云'); };
     if ($('m-push')) $('m-push').onclick = () => pushCloud();
     if ($('m-pull')) $('m-pull').onclick = () => pullCloud();
     if ($('m-auto')) $('m-auto').onclick = () => {
