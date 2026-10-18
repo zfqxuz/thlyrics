@@ -1659,6 +1659,20 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     // 语言名统一用「用户区域」的说法：英文界面里就该是 Japanese / French，而不是 日本語 / Français
     return learnLangList().map((x) => `<option value="${x.id}"${x.id === selected ? ' selected' : ''}>${esc(langLabel(x.id, userLocale().id) || x.native)}</option>`).join('');
   }
+  let filtersOpen = false;          // 筛选区默认折叠，点「筛选」展开（不改任何视觉样式，只是收起/展开）
+  /** 折叠时用一句话概括当前筛选（没说就是不显示） */
+  function filterSummary() {
+    const parts = [];
+    const scope = (scopeOptions().find(([k]) => k === (S.scope || 'all')) || [])[1];
+    if (S.scope && S.scope !== 'all' && scope) parts.push(scope);
+    const pos = { '名詞': '名词', '動詞': '动词', '形容詞': '形容词', '副詞': '副词' }[S.dPos || 'all'];
+    if (pos) parts.push(pos);
+    const sort = { easy: '从易到难', freq: '最常见', az: '五十音 ↑', azd: '五十音 ↓' }[S.dSort || 'easy'];
+    if (S.dSort && S.dSort !== 'easy') parts.push(sort);
+    const tag = { undone: '', known: '已掌握', star: '星标', err: '错词' }[S.dTag || 'undone'];
+    if (tag) parts.push(tag);
+    return parts.join(' · ');
+  }
   function renderLearn() {
     if (!IDX.tracks.length) {
       $('view-learn').innerHTML = emptyBox('曲库是空的', '', [['e-limp', '导入歌曲']]);
@@ -1696,7 +1710,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       ${dueWords().length
         ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">${T('今天 {n} 个', { n: dueWords().length })}</span><button class="go" id="d-duego">${T('开始 ›')}</button></div>`
         : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收词 · 答错的重练</span></div>`}
-      <div class="learn-filters">
+      <div class="row" style="margin:8px 0 2px">
+        <button class="toolbtn${filtersOpen ? ' on' : ''}" id="d-ftoggle">筛选${filterSummary() ? ' · ' + esc(filterSummary()) : ''}</button>
+        ${filterSummary() ? `<button class="toolbtn" id="d-clear">清除</button>` : ''}
+      </div>
+      <div class="learn-filters"${filtersOpen ? '' : ' hidden'}>
         <div class="learn-filter-row">
           <span class="filter-label">范围</span>
           <div class="chips" id="d-range">
@@ -1726,7 +1744,6 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
             <button class="chip" data-v="star">${icon('star','in')}星标</button><button class="chip" data-v="err">错词</button>
           </div>
         </div>
-        <div class="row" style="margin-top:6px"><button class="toolbtn" id="d-clear">清除筛选</button></div>
       </div>
       <div class="list" id="deck">${list.slice(0, deckCount).map(wordRow).join('')}</div>
       ${list.length === 0 ? `<div class="empty">${libN ? '这个范围里的词都掌握了' : '曲库里没有可学的词'}</div>` : ''}
@@ -1755,6 +1772,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       renderLearn();
       if (location.hash.startsWith('#/songs')) renderSongs();
     };
+    if ($('d-ftoggle')) $('d-ftoggle').onclick = () => { filtersOpen = !filtersOpen; renderLearn(); };
     if ($('d-clear')) $('d-clear').onclick = () => { S.scope = 'all'; S.dPos = 'all'; S.dSort = 'easy'; S.dTag = 'undone'; deckCount = 30; save(); renderLearn(); };
     if ($('d-duego')) $('d-duego').onclick = () => { revFrom = '#/learn'; startReview(revCount()); go('#/review'); };
     if ($('d-more')) $('d-more').onclick = () => { deckCount += 30; renderLearn(); };
