@@ -2843,7 +2843,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div id="qrwrap" hidden>
         <div id="qrbox" style="margin-top:12px;text-align:center"><img id="qrimg" alt="" style="width:220px;height:220px;border-radius:12px;background:var(--field)"></div>
         <div class="gdesc" id="qrmsg"></div>
-        <div class="row" style="margin-top:8px;justify-content:center"><button class="toolbtn" id="qr-copy">复制登录链接</button></div>
+        <div class="row" style="margin-top:8px;justify-content:center">
+          <button class="btn-main" id="qr-save">保存二维码</button>
+          <button class="toolbtn" id="qr-copy">复制登录链接</button>
+        </div>
       </div>
       <div class="dlga"><button class="toolbtn" id="qr-close">关闭</button></div>
     </div>`;
@@ -2873,6 +2876,23 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         const link = 'https://music.163.com/login?codekey=' + encodeURIComponent(qrKey);
         if ($('qr-copy')) $('qr-copy').onclick = async () => {
           try { await navigator.clipboard.writeText(link); toast('已复制'); } catch { toast('复制失败'); }
+        };
+        if ($('qr-save')) $('qr-save').onclick = async () => {
+          const img = $('qrimg');
+          const data = img && img.src ? img.src : '';
+          const plugin = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ImageSave) || null;
+          try {
+            if (plugin) {
+              await plugin.save({ data, name: 'netease-login' });
+              setMsg('已存到相册 · 去网易云「扫一扫 → 相册」');
+              toast('已存到相册');
+            } else {
+              const a = document.createElement('a');
+              a.href = data; a.download = 'netease-login.png';
+              document.body.appendChild(a); a.click(); a.remove();
+              toast('已保存');
+            }
+          } catch { toast('保存失败'); }
         };
         setMsg('等待扫码');
         if (qrTimer) clearInterval(qrTimer);
