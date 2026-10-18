@@ -1,8 +1,8 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261018zi';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zi';
-import { icon } from './icons.js?v=20261018zi';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zi';
+import { V } from './version.js?v=20261018zj';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261018zj';
+import { icon } from './icons.js?v=20261018zj';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261018zj';
 
 (() => {
   'use strict';
@@ -654,7 +654,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     return `<div class="item exrow${hasA ? '' : ' noaudio'}" data-pv="${esc(ex.tid)}|${Number(ex.li) || 0}">
       <span class="exico"><span class="tri">▶</span><span class="eqbars"><i></i><i></i><i></i></span></span>
       <div class="col"><div class="l1" style="font-weight:400;font-size:14.5px;white-space:normal">${esc(ex.jp)}</div>
-      ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${esc(ex.zh)}</div>` : ''}
+      ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${userLang() !== 'zh' ? `<span class="zhtag">中文</span>` : ''}${esc(ex.zh)}</div>` : ''}
       <div class="l3">${ex.now ? '正在听 · ' : ''}${esc(ex.track || '')}${hasA ? '' : ' · 无音频'}</div></div>
     </div>`;
   }
@@ -3427,7 +3427,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="setrow"><div class="k">曲目排序</div>
         <select class="sel" id="me-tsort">${TRACK_SORTS.map(([k, t]) => `<option value="${k}"${(S.tSort || 'new') === k ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
       <div class="setrow"><div class="k">逐词罗马音</div><button class="toolbtn swbtn ${S.ruby !== false ? 'on' : ''}" id="me-ruby" aria-pressed="${S.ruby !== false}">${S.ruby !== false ? '开' : '关'}</button></div>
-      <div class="setrow"><div class="k">整句中文</div><button class="toolbtn swbtn ${S.zh !== false ? 'on' : ''}" id="me-zh" aria-pressed="${S.zh !== false}">${S.zh !== false ? '开' : '关'}</button></div>
+      <div class="setrow"><div class="k">整句翻译（源提供）</div><button class="toolbtn swbtn ${S.zh !== false ? 'on' : ''}" id="me-zh" aria-pressed="${S.zh !== false}">${S.zh !== false ? '开' : '关'}</button></div>
       <div class="setrow"><div class="k">逐词中文</div><button class="toolbtn swbtn ${S.gloss !== false ? 'on' : ''}" id="me-gloss" aria-pressed="${S.gloss !== false}">${S.gloss !== false ? '开' : '关'}</button></div>
       ${IS_NATIVE ? `<div class="sect">发音</div>
       <div class="setrow"><div class="k">离线语音包</div><button class="toolbtn" id="tts-packs">语音包</button></div>
@@ -3933,7 +3933,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         const txt = flat.join(' ').replace(/\s+/g, ' ').trim();
         if (txt) { const r = document.createElement('div'); r.className = 'romaji'; r.textContent = txt; block.appendChild(r); }
       }
-      if (l.zh && S.zh !== false) { const z = document.createElement('div'); z.className = 'zh'; z.textContent = l.zh; block.appendChild(z); }
+      if (l.zh && S.zh !== false) {
+        const z = document.createElement('div'); z.className = 'zh';
+        if (userLang() !== 'zh') { const b = document.createElement('span'); b.className = 'zhtag'; b.textContent = '中文'; z.appendChild(b); }
+        z.appendChild(document.createTextNode(l.zh));
+        block.appendChild(z);
+      }
       block.dataset.i = String(i);
       host.appendChild(block);
     });
