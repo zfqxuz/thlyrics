@@ -10,6 +10,27 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#A52628">
+<!-- 首屏提前并行取：不写这行的话，index.json 要等 HTML → app.js → 十几个模块全部到齐才开始下 -->
+<link rel="preconnect" href="https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run" crossorigin>
+<link rel="preload" as="fetch" href="data/index.json?v=20261019zd" crossorigin="anonymous">
+<link rel="modulepreload" href="app.js?v=20261019zd">
+<link rel="modulepreload" href="version.js?v=20261019zd">
+<link rel="modulepreload" href="icons.js?v=20261019zd">
+<link rel="modulepreload" href="i18n.js?v=20261019zd">
+<link rel="modulepreload" href="core/vault.js?v=20261019zd">
+<link rel="modulepreload" href="platform/index.js?v=20261019zd">
+<link rel="modulepreload" href="platform/kv.js?v=20261019zd">
+<link rel="modulepreload" href="platform/net.js?v=20261019zd">
+<link rel="modulepreload" href="platform/player.js?v=20261019zd">
+<link rel="modulepreload" href="platform/media-session.js?v=20261019zd">
+<link rel="modulepreload" href="platform/media-store.js?v=20261019zd">
+<link rel="modulepreload" href="platform/app-update.js?v=20261019zd">
+<link rel="modulepreload" href="platform/tts.js?v=20261019zd">
+<link rel="modulepreload" href="platform/voice-pack.js?v=20261019zd">
+<link rel="modulepreload" href="platform/ota.js?v=20261019zd">
+<link rel="modulepreload" href="platform/back.js?v=20261019zd">
+<link rel="modulepreload" href="platform/music.js?v=20261019zd">
+
 <style>
 /* ── 字体 ── */
 /* 衬线（标题/封面感）：优先 Hiragino Mincho / 思源宋 / 游明朝；中文 fallback 到 宋体/PingFang */
@@ -1901,6 +1922,6 @@ body.ui-ios .langbadge{background:var(--accent-soft);color:var(--accent);border:
   });
 })();
 </script>
-<script type="module" src="app.js?v=20261019zc"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.js?v=20261019zd"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

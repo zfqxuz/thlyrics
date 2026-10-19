@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261019zc';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261019zc';
-import * as Vault from './core/vault.js?v=20261019zc';
-import { icon } from './icons.js?v=20261019zc';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261019zc';
+import { V } from './version.js?v=20261019zd';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261019zd';
+import * as Vault from './core/vault.js?v=20261019zd';
+import { icon } from './icons.js?v=20261019zd';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261019zd';
 
 (() => {
   'use strict';
@@ -5078,9 +5078,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     IDX = data; VOCAB = data.vocab;
     for (const v of VOCAB) { if (!v.lang) v.lang = 'ja'; }
     for (const t of data.tracks) { if (!t.primaryLang) t.primaryLang = 'ja'; if (!Array.isArray(t.langs) || !t.langs.length) t.langs = ['ja']; if (!t.lineLangs) t.lineLangs = t.lines ? t.lines.map(() => 'ja') : []; }
-    // 读音兜底表只在有导入曲目时才拉（没有导入的用不上），而且要等它就绪，
-    // 否则导入的歌会用不完整的表分词 → 一堆本该有读音的汉字词没罗马音
-    if (Object.keys(S.imp || {}).length) await ensureReadings();
+    // 读音兜底表（~400KB）：有导入曲目就提前开始拉，但**不挡首屏** —— 导入那条路自己会 await 它，
+    // 这里等下去只会让人对着白屏多等一次往返
+    if (Object.keys(S.imp || {}).length) ensureReadings().catch(() => {});
     VBY = new Map(VOCAB.map((w) => [w.word, w]));
     VBYID = new Map(VOCAB.map((w) => [w.id, w]));
     for (const w of VOCAB) {
