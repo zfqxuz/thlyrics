@@ -314,6 +314,29 @@
 - 真机验证脚本：`.e2e/acc-real.mjs <url> [用户名]`（真 API；跑完记得删账号对象 + 重置 _index.json）。
   （旧的 `.e2e/sync-real.mjs` / `sync-probe.mjs` 随公开对象一起删了。）
 
+### 账号保险箱：平台凭据加密跟账号走（2026-10-19，已上线）
+
+- 需求（用户原话）：「网易云登录凭据无疑应该和账号绑定。但是登录仍然发生在本地。
+  这个绑定如果不带到网页版，那只能说没有实现数据互通。但是我又不能明文存储 token，
+  因此需要一些非对称加密来确保。」
+- 做法：`docs/core/vault.js`（**纯逻辑层**，node 里就能跑，`npm run check` 的分层门禁会管）。
+  - 密码 `PBKDF2-SHA256(310k)` → KEK，KEK 用 AES-GCM 包住 ECDH P-256 **私钥**（`privKeyEnc`）；公钥明文存。
+  - 每条凭据：随机 DEK 加密数据（AES-256-GCM），DEK 用公钥做 **ECDH-ES + HKDF** 包（`dekEnc`）。
+  - 服务端只见盐 / 公钥 / 两段密文，**没有密码就没有解密能力**；改密码只重包私钥（32 字节）。
+  - 恢复码重置拿不到旧密码 → `/api/recover` 把 vault 标成 `locked`，客户端重建（凭据要重绑）。
+- 服务端：`GET/PUT /api/vault`（`sync/users/<uid>/vault.json`，形状校验 + 64KB 上限；
+  ⚠ HTTP 触发器只放行 GET/POST/PUT，清空用 `POST {vault:null}`，`DELETE` 在触发器层就是 403）。
+- 客户端（`docs/app.js`）：
+  - 登录 / 注册 / 重置密码那一刻调 `vaultAfterLogin(pass)`：建或解锁保险箱 → 账号密文解到本机、本机凭据加密传上去。
+  - **加密只要公钥**，所以绑定时不追问密码；只有「账号里还没有保险箱」需要输一次登录密码（先打 `/login` 验一遍再建）。
+  - 凭据读取顺序 `ckOf()`：内存 → `sessionStorage` → 老版本的 `S.netCookie`。
+    网页版 `ckSet()` 只写会话存储，localStorage 里不再出现明文（`boot()` 会清掉老版本残留）。
+  - 「我的 → 音乐平台」四种态：已存入账号 / 仅本机（→存入账号）/ 已存入账号但本机没有（→解锁）/ 未绑定。
+- 验证：`.e2e/vault-e2e.mjs`（**本地脚本，`.e2e/` 不进 git**）14/14：
+  注册建箱、绑定上传、新设备登录解密、同设备重开网页后解锁、解绑、错密码；
+  另有 `node /tmp/vaulttest.mjs` 那一类纯 crypto 往返测试（node 18+ 自带 webcrypto）。
+  接口层另跑过一遍真 API：畸形 vault 被拒、被拒的写入不破坏原数据、`/password` 返回 vault 标记、`/recover` 标锁定。
+
 ### 必须登录 + 账号制（2026-10-14 深夜，已上线）
 
 - 用户要求「没注册没登录的人就不让用」。现在 `docs/index.html` 有个 `#gate` 全屏闸门：
