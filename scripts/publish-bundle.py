@@ -3,6 +3,7 @@
 
 用法：
   node scripts/bump-version.mjs
+  node scripts/build-frontend.mjs     # 打 app.bundle.js（网页版首屏只发一个 JS）
   node scripts/gen-sw.mjs
   python3 scripts/publish-bundle.py
   git add -A && git commit && git push

@@ -15,12 +15,16 @@
     "serve": "node scripts/serve.mjs 8848",
     "check": "node scripts/check-layers.mjs && node scripts/check-copy.mjs",
     "bump": "node scripts/bump-version.mjs",
-    "sw": "node scripts/gen-sw.mjs"
+    "sw": "node scripts/gen-sw.mjs",
+    "bundle": "node scripts/build-frontend.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
     "kuromoji": "^0.1.2",
     "mpg123-decoder": "^1.0.3",
     "onnxruntime-node": "^1.20.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

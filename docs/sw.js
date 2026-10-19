@@ -1,45 +1,29 @@
-/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 20261019zd） */
-const V = '20261019zd';
+/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 20261019ze） */
+const V = '20261019ze';
 const CACHE = 'thlyrics-' + V;
 const SHELL = [
   "index.html",
+  "app.bundle.js?v=20261019ze",
   "icon-192.png",
   "icon-512.png",
   "apple-touch-icon.png",
   "favicon.ico",
-  "manifest.webmanifest?v=20261019zd",
+  "manifest.webmanifest?v=20261019ze",
   "og-a.png",
   "og-b.png",
-  "data/index.json?v=20261019zd",
-  "data/readings.json?v=20261019zd",
-  "data/voice-packs.json?v=20261019zd",
-  "apk.json?v=20261019zd",
-  "app.js?v=20261019zd",
-  "core/vault.js?v=20261019zd",
-  "i18n.js?v=20261019zd",
-  "icons.js?v=20261019zd",
-  "locales/de.json?v=20261019zd",
-  "locales/en.json?v=20261019zd",
-  "locales/es.json?v=20261019zd",
-  "locales/fr.json?v=20261019zd",
-  "locales/ja.json?v=20261019zd",
-  "locales/ko.json?v=20261019zd",
-  "locales/pt.json?v=20261019zd",
-  "locales/ru.json?v=20261019zd",
-  "platform/app-update.js?v=20261019zd",
-  "platform/back.js?v=20261019zd",
-  "platform/index.js?v=20261019zd",
-  "platform/kv.js?v=20261019zd",
-  "platform/media-session.js?v=20261019zd",
-  "platform/media-store.js?v=20261019zd",
-  "platform/music.js?v=20261019zd",
-  "platform/net.js?v=20261019zd",
-  "platform/ota.js?v=20261019zd",
-  "platform/player.js?v=20261019zd",
-  "platform/tts.js?v=20261019zd",
-  "platform/voice-pack.js?v=20261019zd",
-  "update.json?v=20261019zd",
-  "version.js?v=20261019zd"
+  "data/index.json?v=20261019ze",
+  "data/readings.json?v=20261019ze",
+  "data/voice-packs.json?v=20261019ze",
+  "apk.json?v=20261019ze",
+  "locales/de.json?v=20261019ze",
+  "locales/en.json?v=20261019ze",
+  "locales/es.json?v=20261019ze",
+  "locales/fr.json?v=20261019ze",
+  "locales/ja.json?v=20261019ze",
+  "locales/ko.json?v=20261019ze",
+  "locales/pt.json?v=20261019ze",
+  "locales/ru.json?v=20261019ze",
+  "update.json?v=20261019ze"
 ];
 const SKIP = [/\/dl\//, /\.apk$/];
 

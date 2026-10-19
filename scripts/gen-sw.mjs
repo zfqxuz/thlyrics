@@ -24,7 +24,7 @@ const V = (fs.readFileSync(path.join(DOCS, 'version.js'), 'utf8').match(/V\s*=\s
 if (!V) { console.error('✗ 读不到 docs/version.js 里的 V'); process.exit(1); }
 
 const SKIP_DIRS = new Set(['data', 'vendor', 'dl', '_screenshots', 'node_modules']);
-const SHELL = ['index.html', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon.ico', 'manifest.webmanifest', 'og-a.png', 'og-b.png'];
+const SHELL = ['index.html', 'app.bundle.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon.ico', 'manifest.webmanifest', 'og-a.png', 'og-b.png'];
 // data/ 里只有首屏/常驻要用的这几个进外壳（大词库/音频包仍然按需）
 const SHELL_DATA = ['data/index.json', 'data/readings.json', 'data/voice-packs.json'];
 
@@ -39,7 +39,10 @@ function walk(dir, rel = '') {
   }
   return out;
 }
-const files = [...new Set([...SHELL, ...SHELL_DATA, ...walk(DOCS).filter((f) => f !== 'index.html')])];
+// 前端已经打成 app.bundle.js：源码模块不再由页面加载，别往缓存里塞
+const isSourceModule = (f) => f === 'version.js' || f === 'icons.js' || f === 'i18n.js'
+  || f.startsWith('platform/') || f.startsWith('core/') || f === 'app.js';
+const files = [...new Set([...SHELL, ...SHELL_DATA, ...walk(DOCS).filter((f) => f !== 'index.html' && !isSourceModule(f))])];
 const withV = files.map((f) => (/\.(js|json)$/.test(f) || f === 'manifest.webmanifest' ? `${f}?v=${V}` : f));
 
 const src = `/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 ${V}） */
