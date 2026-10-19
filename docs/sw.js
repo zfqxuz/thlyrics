@@ -1,5 +1,5 @@
-/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 20261019z） */
-const V = '20261019z';
+/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 20261019za） */
+const V = '20261019za';
 const CACHE = 'thlyrics-' + V;
 const SHELL = [
   "index.html",
@@ -7,39 +7,39 @@ const SHELL = [
   "icon-512.png",
   "apple-touch-icon.png",
   "favicon.ico",
-  "manifest.webmanifest?v=20261019z",
+  "manifest.webmanifest?v=20261019za",
   "og-a.png",
   "og-b.png",
-  "data/index.json?v=20261019z",
-  "data/readings.json?v=20261019z",
-  "data/voice-packs.json?v=20261019z",
-  "apk.json?v=20261019z",
-  "app.js?v=20261019z",
-  "core/vault.js?v=20261019z",
-  "i18n.js?v=20261019z",
-  "icons.js?v=20261019z",
-  "locales/de.json?v=20261019z",
-  "locales/en.json?v=20261019z",
-  "locales/es.json?v=20261019z",
-  "locales/fr.json?v=20261019z",
-  "locales/ja.json?v=20261019z",
-  "locales/ko.json?v=20261019z",
-  "locales/pt.json?v=20261019z",
-  "locales/ru.json?v=20261019z",
-  "platform/app-update.js?v=20261019z",
-  "platform/back.js?v=20261019z",
-  "platform/index.js?v=20261019z",
-  "platform/kv.js?v=20261019z",
-  "platform/media-session.js?v=20261019z",
-  "platform/media-store.js?v=20261019z",
-  "platform/music.js?v=20261019z",
-  "platform/net.js?v=20261019z",
-  "platform/ota.js?v=20261019z",
-  "platform/player.js?v=20261019z",
-  "platform/tts.js?v=20261019z",
-  "platform/voice-pack.js?v=20261019z",
-  "update.json?v=20261019z",
-  "version.js?v=20261019z"
+  "data/index.json?v=20261019za",
+  "data/readings.json?v=20261019za",
+  "data/voice-packs.json?v=20261019za",
+  "apk.json?v=20261019za",
+  "app.js?v=20261019za",
+  "core/vault.js?v=20261019za",
+  "i18n.js?v=20261019za",
+  "icons.js?v=20261019za",
+  "locales/de.json?v=20261019za",
+  "locales/en.json?v=20261019za",
+  "locales/es.json?v=20261019za",
+  "locales/fr.json?v=20261019za",
+  "locales/ja.json?v=20261019za",
+  "locales/ko.json?v=20261019za",
+  "locales/pt.json?v=20261019za",
+  "locales/ru.json?v=20261019za",
+  "platform/app-update.js?v=20261019za",
+  "platform/back.js?v=20261019za",
+  "platform/index.js?v=20261019za",
+  "platform/kv.js?v=20261019za",
+  "platform/media-session.js?v=20261019za",
+  "platform/media-store.js?v=20261019za",
+  "platform/music.js?v=20261019za",
+  "platform/net.js?v=20261019za",
+  "platform/ota.js?v=20261019za",
+  "platform/player.js?v=20261019za",
+  "platform/tts.js?v=20261019za",
+  "platform/voice-pack.js?v=20261019za",
+  "update.json?v=20261019za",
+  "version.js?v=20261019za"
 ];
 const SKIP = [/\/dl\//, /\.apk$/];
 
@@ -67,7 +67,8 @@ async function networkFirst(req) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 2500);
   try {
-    const r = await fetch(req, { signal: ac.signal });
+    // no-cache：每次都跟服务器核对 index.html（拿到新版本号），没变就是一次 304
+    const r = await fetch(req, { signal: ac.signal, cache: 'no-cache' });
     if (r && r.ok) c.put('index.html', r.clone());
     return r;
   } catch {

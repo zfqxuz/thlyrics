@@ -72,7 +72,8 @@ async function networkFirst(req) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 2500);
   try {
-    const r = await fetch(req, { signal: ac.signal });
+    // no-cache：每次都跟服务器核对 index.html（拿到新版本号），没变就是一次 304
+    const r = await fetch(req, { signal: ac.signal, cache: 'no-cache' });
     if (r && r.ok) c.put('index.html', r.clone());
     return r;
   } catch {
