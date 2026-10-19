@@ -57,6 +57,9 @@
 - 工作目录（宿主）：`/home/zfq/qqbot/thlyrics`
   （历史/容器内路径 `/data/qqbot/thlyrics` 不再使用）
 - GitHub：`https://github.com/zfqxuz/thlyrics`（Pages 从 `docs/` 发布）
+  - ⚠ `github.com` 直连在国内基本不通（DNS 给 20.205.243.166，443 超时）。仓库里已配
+    `git config --local http.proxy http://127.0.0.1:10808`（本机代理），push 秒过；
+    代理没开时会报 `Connection refused`，别再去手搓隧道。
 - 在线版：`https://zfqxuz.github.io/thlyrics/`
 - 技术：无后端；`docs/` 纯静态前端，`scripts/` Node 数据管道，`data/` 数据与中间产物。
 - 常用命令：
@@ -313,6 +316,23 @@
   （拦 `thlyrics-auth-*.cn-hangzhou.fcapp.run`），别让它打真 API。
 - 真机验证脚本：`.e2e/acc-real.mjs <url> [用户名]`（真 API；跑完记得删账号对象 + 重置 _index.json）。
   （旧的 `.e2e/sync-real.mjs` / `sync-probe.mjs` 随公开对象一起删了。）
+
+### 网页版刷新慢 → Service Worker 外壳缓存（2026-10-19，已上线）
+
+- 现象：用户问「页面每次刷新都耗时这么长？难道每次都在从云端下载东西？」
+- 实测（GitHub Pages，冷启动）：20 个请求 / 597KB 传输（解压后 2.7MB），
+  `data/index.json` 2.1MB（gzip 338KB）+ `app.js` 100KB + 19 个 ES 模块，
+  每个请求首字节 0.3s 左右（国内更差）→ 叠起来就是几秒。
+  **跟云函数无关**：账号接口只有 4 个 1KB 级的小请求（/api/me、/api/vault、/api/data/meta、/api/sep/quota）。
+- 解法：`docs/sw.js`（**自动生成，别手改**，由 `node scripts/gen-sw.mjs` 按当前 `V` 写外壳清单）。
+  - 导航（index.html）→ 网络优先 + `cache:'no-cache'`（保证拿到新版本号），2.5s 超时回缓存
+  - 同源静态（js/json/png/locales）→ 缓存优先（URL 自带 `?v=<版本>`，天然不可变）
+  - 跨域（云函数 / OSS / 封面）不接管；`dl/*.apk` 和大文件不接管
+  - activate 时删掉旧版本缓存；`updateViaCache:'none'` 保证 sw.js 本身不被 Pages 十分钟缓存挡住
+- 效果：线上 Pages 首次 1.5s，**之后每次刷新 ~90–110ms / 0KB 传输**（20 个资源全从本地缓存）。
+- 发布流程多了一步：`bump-version` → **`node scripts/gen-sw.mjs`** → `publish-bundle.py` → commit/push。
+  （`publish-bundle.py` 的注释里已写上；sw.js 会跟着内容包一起发，APK 里也带一份，App 内不注册 SW。）
+- 已验证版本更新的正确性：旧缓存 `thlyrics-<旧V>` → 刷新一次后变成 `thlyrics-<新V>`，页面拿到新 `?v=`，应用正常。
 
 ### 账号保险箱：平台凭据加密跟账号走（2026-10-19，已上线）
 
