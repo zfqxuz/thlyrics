@@ -15,5 +15,10 @@ export function kvGetJson(key, fallback = null) {
 }
 export function kvSetJson(key, val) { return kvSet(key, JSON.stringify(val)); }
 
+/** 会话级存储（关掉页面就没了）：网页版的平台凭据只放这里，不落 localStorage */
+export function kvSessionGet(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
+export function kvSessionSet(key, val) { try { sessionStorage.setItem(key, val); return true; } catch { return false; } }
+export function kvSessionDel(key) { try { sessionStorage.removeItem(key); } catch { /* 忽略 */ } }
+
 /** 清掉旧版本遗留的 IndexedDB（"本机音频绑定"功能已下线，别把垃圾留在用户机器上） */
 export function dropLegacyDB(name) { try { indexedDB.deleteDatabase(name); } catch { /* 无 IndexedDB 时忽略 */ } }

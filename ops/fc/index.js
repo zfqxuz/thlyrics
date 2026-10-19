@@ -17,6 +17,9 @@
  *   POST /api/recover   {name, code, new}
  *   GET  /api/data
  *   PUT  /api/data      {data}
+ *   GET  /api/vault                取账号保险箱（只有密文，服务端解不开）
+ *   PUT  /api/vault    {vault}     存账号保险箱
+ *   DELETE /api/vault              清掉保险箱
  */
 const crypto = require('node:crypto');
 const https = require('node:https');
@@ -43,6 +46,7 @@ function cleanAvatar(v) {
   return s.length <= AVATAR_MAX ? s : '';
 }
 const MAX_STORE = 12 * 1024 * 1024;    // 每个账号记录的存储上限
+const VAULT_MAX = 64000;               // 账号保险箱上限（ECDH 公钥 + 几条 AES-GCM 密文，几 KB）
 
 // ─────────── OSS 读写（V1 签名，手写，避免打包依赖） ───────────
 const b64 = (b) => Buffer.from(b).toString('base64');
@@ -156,7 +160,54 @@ function verifyToken(tok) {
 }
 const acctKey = (uid) => `${PREFIX}${uid}/account.json`;
 const dataKey = (uid) => `${PREFIX}${uid}/data.json`;
+const vaultKey = (uid) => `${PREFIX}${uid}/vault.json`;
 const INDEX_KEY = `${PREFIX}_index.json`;
+
+/**
+ * 账号保险箱（vault）：网易云 / QQ 音乐这类平台凭据的密文。
+ * 服务端只做「形状校验 + 原样存取」，没有密码解不出私钥，解不出数据密钥，也解不出凭据。
+ * 结构见 docs/core/vault.js：
+ *   { v:1, kdf:{algo,iter,salt}, pubKey, privKeyEnc:{iv,ct,iter,salt}, entries:{name:{iv,ct,dekEnc:{epk,iv,ct,salt},...}} }
+ */
+function cleanVault(v) {
+  const obj = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : null);
+  const str = (x, n) => (typeof x === 'string' && x.length <= n ? x : '');
+  const num = (x, lo, hi, dflt) => { const n = Number(x); return isFinite(n) && n >= lo && n <= hi ? Math.round(n) : dflt; };
+  const blob = (o, fields) => {
+    const b = obj(o); if (!b) return null;
+    const out = {};
+    for (const f of fields) { const v = str(b[f], 4096); if (!v) return null; out[f] = v; }
+    return out;
+  };
+  const root = obj(v); if (!root || root.v !== 1) return null;
+  const kdf = obj(root.kdf), pk = obj(root.privKeyEnc);
+  if (!kdf || !pk) return null;
+  const pubKey = str(root.pubKey, 2048);
+  if (!pubKey) return null;
+  const out = {
+    v: 1,
+    kdf: { algo: 'PBKDF2-SHA256', iter: num(kdf.iter, 1000, 4000000, 310000), salt: str(kdf.salt, 512) },
+    pubKey,
+    privKeyEnc: { iv: str(pk.iv, 512), ct: str(pk.ct, 8192), iter: num(pk.iter, 1000, 4000000, 310000), salt: str(pk.salt, 512) },
+    locked: !!root.locked,
+    entries: {},
+    updatedAt: new Date().toISOString(),
+  };
+  if (!out.kdf.salt || !out.privKeyEnc.iv || !out.privKeyEnc.ct || !out.privKeyEnc.salt) return null;
+  const entries = obj(root.entries) || {};
+  for (const name of Object.keys(entries).slice(0, 8)) {
+    if (!/^[a-z][a-z0-9_]{0,15}$/.test(name)) continue;
+    const e = obj(entries[name]); if (!e) continue;
+    const dek = blob(e.dekEnc, ['epk', 'iv', 'ct', 'salt']);
+    if (!dek || !str(e.iv, 512) || !str(e.ct, 8192)) continue;
+    out.entries[name] = {
+      iv: str(e.iv, 512), ct: str(e.ct, 8192), dekEnc: dek,
+      updatedAt: str(e.updatedAt, 40) || new Date().toISOString(),
+      device: str(e.device, 60),
+    };
+  }
+  return out;
+}
 
 // ─────────── 记录合并（和时间戳规则同前端：谁改得晚听谁的） ───────────
 const n0 = (v) => (Number(v) || 0);
@@ -244,7 +295,7 @@ function reply(event, statusCode, obj) {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': allow,
       'access-control-allow-headers': 'content-type, authorization',
-      'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'access-control-max-age': '86400',
       'cache-control': 'no-store',
     },
@@ -1509,8 +1560,15 @@ exports.handler = async (event) => {
       acct.salt = rid(16); acct.hash = hashPass(pass, acct.salt);
       acct.recoverySalt = rid(16); acct.recoveryHash = hashRecovery(rc, acct.recoverySalt);
       await ossPutJson(acctKey(uid), acct);
+      // 恢复码重置拿不到旧密码 → 保险箱私钥再也解不开，标记成待重绑（密文不删，等客户端重建）
+      const vault = await ossGetJson(vaultKey(uid)).catch(() => null);
+      if (vault) {
+        vault.locked = true; vault.lockedAt = new Date().toISOString();
+        await ossPutJson(vaultKey(uid), vault).catch(() => {});
+      }
       const adm = !!acct.admin || ADMINS.indexOf(String(acct.nameLower || '').toLowerCase()) >= 0;
-      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), recovery: fmtRecovery(rc), user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
+      return reply(req, 200, { ok: true, token: tokenFor(uid, acct.name), recovery: fmtRecovery(rc), vaultLocked: !!vault,
+        user: { uid, name: acct.name, admin: adm, avatar: acct.avatar || '' } });
     }
 
     // 临时：ONNX 分离器在 FC 上的速度标定（只有内部 token 能用）
@@ -1638,13 +1696,39 @@ exports.handler = async (event) => {
       return reply(req, done ? 200 : 500, { ok: done, key });
     }
 
+    // ── 账号保险箱：只存密文，服务端没有解密能力 ──
+    if (action === '/vault') {
+      if (method === 'GET') {
+        const v = await ossGetJson(vaultKey(me.sub)).catch(() => null);
+        return reply(req, 200, { ok: true, vault: v || null });
+      }
+      if (method === 'PUT' || method === 'POST') {
+        if (body.vault === null) {                 // 传 null = 清掉（HTTP 触发器只放行 GET/POST/PUT，DELETE 走不通）
+          await ossDelete(vaultKey(me.sub));
+          return reply(req, 200, { ok: true });
+        }
+        const v = cleanVault(body.vault);
+        if (!v) return reply(req, 400, { error: '保险箱格式不对' });
+        if (JSON.stringify(v).length > VAULT_MAX) return reply(req, 413, { error: '保险箱太大' });
+        await ossPutJson(vaultKey(me.sub), v);
+        return reply(req, 200, { ok: true, updatedAt: v.updatedAt, entries: Object.keys(v.entries) });
+      }
+      if (method === 'DELETE') {
+        await ossDelete(vaultKey(me.sub));
+        return reply(req, 200, { ok: true });
+      }
+      return reply(req, 405, { error: '方法不支持' });
+    }
+
     if (action === '/password' && method === 'POST') {
       const acct = await ossGetJson(acctKey(me.sub));
       if (!acct || hashPass(String(body.old || ''), acct.salt) !== acct.hash) return reply(req, 401, { error: '原密码不对' });
       if (String(body.new || '').length < 6) return reply(req, 400, { error: '新密码至少 6 位' });
       acct.salt = rid(16); acct.hash = hashPass(String(body.new), acct.salt);
       await ossPutJson(acctKey(me.sub), acct);
-      return reply(req, 200, { ok: true, token: tokenFor(me.sub, acct.name), user: { uid: me.sub, name: acct.name } });
+      // 保险箱的私钥是用「旧密码派生的密钥」包的，客户端拿到新 token 后要自己重新包一次
+      const vault = await ossGetJson(vaultKey(me.sub)).catch(() => null);
+      return reply(req, 200, { ok: true, token: tokenFor(me.sub, acct.name), vault: !!vault, user: { uid: me.sub, name: acct.name } });
     }
 
     // 只回一个「云端有没有变」的小哨兵：客户端启动时先问它，没变就不必传整份状态
