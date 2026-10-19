@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261019x';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, kvSessionGet, kvSessionSet, kvSessionDel, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261019x';
-import * as Vault from './core/vault.js?v=20261019x';
-import { icon } from './icons.js?v=20261019x';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261019x';
+import { V } from './version.js?v=20261019y';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261019y';
+import * as Vault from './core/vault.js?v=20261019y';
+import { icon } from './icons.js?v=20261019y';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261019y';
 
 (() => {
   'use strict';
@@ -66,7 +66,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   const defaultState = () => ({ known: {}, notes: {}, audio: {}, imp: {}, fav: {}, sing: {}, roma: {}, words: {}, star: {},
     rev: {}, sep: {}, sepOn: {}, revModes: { pick: true, type: true, ctx: true, listen: false, meaning: false },
     rate: 1, ruby: true, gloss: false, zh: true, mode: 'all', del: {}, autoSync: true,
-    vaultAt: '', vaultErr: '', vaultNames: [], vaultNote: '', vaultAsked: false,
+    vaultAt: '', vaultErr: '', vaultNames: [], vaultNote: '',
     theme: 'dark', ui: 'classic', tSort: 'new', userLocale: 'auto', learnLang: 'ja', songLangView: 'learn', scope: 'all' });
   let S = defaultState();
   let ACC = null;                                  // {token, name, uid, admin}
@@ -77,23 +77,21 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   // ────────────── 平台凭据（网易云 / QQ 音乐）──────────────
   // 谁登录读谁的空间；凭据本身只在本机内存 + 会话存储，账号里存的是保险箱密文
   const MEMCK = { netease: '', qq: '' };
-  const CK_SK = { netease: 'thlyrics.ck.netease', qq: 'thlyrics.ck.qq' };
   const ckName = (n) => (n === 'qq' ? 'qq' : 'netease');
-  /** 读凭据：内存 → 本次会话 → 老版本的明文记录 */
+  /** 读凭据：内存 → 本机（账号空间，不参与云同步） */
   function ckOf(name) {
     const k = ckName(name);
-    return MEMCK[k] || kvSessionGet(CK_SK[k]) || (k === 'qq' ? S.qqCookie : S.netCookie) || '';
+    return MEMCK[k] || (k === 'qq' ? S.qqCookie : S.netCookie) || '';
   }
-  /** 写凭据：内存 + 会话；App 里再存一份到本机（网页版不落 localStorage） */
+  /** 写凭据：内存 + 本机。本机这份不进云同步，云端只有保险箱里的密文 */
   function ckSet(name, val) {
     const k = ckName(name);
     MEMCK[k] = val || '';
-    if (val) kvSessionSet(CK_SK[k], val); else kvSessionDel(CK_SK[k]);
-    if (IS_NATIVE) { if (k === 'qq') S.qqCookie = val || ''; else S.netCookie = val || ''; save(); }
+    if (k === 'qq') S.qqCookie = val || ''; else S.netCookie = val || '';
+    save();
   }
   function ckClearAll() {
     MEMCK.netease = ''; MEMCK.qq = '';
-    kvSessionDel(CK_SK.netease); kvSessionDel(CK_SK.qq);
     if (S.netCookie || S.qqCookie) { delete S.netCookie; delete S.qqCookie; save(); }
   }
   const needLogin = (msg) => { if (isLoggedIn()) return true; showGate(msg || ''); return false; };
@@ -2890,7 +2888,6 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   // 加密不需要密码（用公钥就行），所以绑定时不会追问密码；只有「账号里还没有保险箱」才要建一次。
   // 服务端只见公钥 + 密文，见不到凭据；换设备 / 网页版登录同一账号，用密码就能解回来。
   let VK = null;                       // { vault, pubKey, privKey, pass }
-  let vaultSkip = false;               // 用户这次选了「稍后」：本会话不再追问密码（下次登录自动补传）
   const VAULT_DEVICE = IS_NATIVE ? 'App' : 'Web';
   const PLATFORM_LABEL = { netease: '网易云', qq: 'QQ 音乐' };
 
@@ -2978,31 +2975,18 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if ($('vp-pass')) $('vp-pass').onkeydown = (e) => { if (e.key === 'Enter') fin($('vp-pass').value); };
     });
   }
-  /** 用登录接口验一次密码（建保险箱前先确认，免得把保险箱锁在一串打错的密码上） */
-  async function verifyPassword(pass) {
-    try {
-      const r = await apiCall('/login', { method: 'POST', body: { name: ACC.name, pass } });
-      if (r && r.token) { ACC.token = r.token; saveAcc(); return true; }
-    } catch { /* 密码错就是 false */ }
-    return false;
-  }
-  /** 把一条凭据加密存进账号 */
+  /** 把一条凭据加密存进账号。加密只要公钥：绑定时直接做，不弹任何东西。
+   *  账号里还没有保险箱（功能上线前注册、还没重新登录过的老账号）就先放着，
+   *  等下次登录（那一下必然有密码）建箱后自动补传，用户不用做任何操作。 */
   async function vaultStore(name, cookie) {
-    if (!isLoggedIn() || !cookie || vaultSkip) return false;
+    if (!isLoggedIn() || !cookie) return false;
     try {
-      let base = (VK && VK.vault) || await vaultFetch();
-      if (!base || base.locked) {                 // 账户里还没有保险箱：建一个（这一步要密码）
-        const pass = await askPassword('存进账号');
-        if (!pass) { vaultSkip = true; return false; }
-        if (!(await verifyPassword(pass))) { toast('密码不对'); return false; }
-        base = await Vault.createVault(pass);
-        const sess = await Vault.openVault(base, pass);
-        VK = { vault: base, pubKey: sess.pubKey, privKey: sess.privKey, pass };
-      }
+      const base = (VK && VK.vault) || await vaultFetch();
+      if (!base || base.locked) return false;
       const next = await Vault.putEntry(base, { pubKey: base.pubKey }, name, cookie, VAULT_DEVICE);
       await vaultPut(next);
       return true;
-    } catch (e) { toast('保存失败：' + ((e && e.message) || e)); return false; }
+    } catch { return false; }
   }
   /** 「我的 → 音乐平台」的一行：已绑定 / 未绑定 / 解锁 / 解绑 */
   function platformRow(name) {
@@ -3033,6 +3017,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       await vaultStore(name, c);
       renderMe();
     }, 1500);
+  }
+  let vaultPushAt = 0;
+  async function vaultLazyPush() {
+    if (!isLoggedIn() || Date.now() - vaultPushAt < 60000) return;
+    vaultPushAt = Date.now();
+    const n = await vaultPushLocal();
+    if (n) renderMe();
   }
   async function unbindPlatform(name) {
     ckSet(name, '');
@@ -3999,6 +3990,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('tts-packs')) $('tts-packs').onclick = () => go('#/voicepack');
     if ($('tts-test')) $('tts-test').onclick = () => speak('こんにちは');
     if ($('m-login')) $('m-login').onclick = () => showGate('');
+    if (isLoggedIn()) setTimeout(vaultLazyPush, 200);
     if ($('m-net-in')) $('m-net-in').onclick = () => neteaseLogin();
     if ($('m-qq-in')) $('m-qq-in').onclick = () => qqLogin();
     if ($('m-net-out')) $('m-net-out').onclick = () => unbindPlatform('netease');
@@ -5053,21 +5045,16 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     loadAcc();
     migrateGuestToAccount();
     loadLS();
-    // 网页版：老版本写在 localStorage 里的明文凭据清掉（凭据只走会话 + 账号密文）
-    if (!IS_NATIVE && (S.netCookie || S.qqCookie)) { delete S.netCookie; delete S.qqCookie; kvSetJson(lsKey(), S); }
     if (isLoggedIn()) setTimeout(async () => {
       try {
         const v = await vaultFetch();
         if (v) {
           applying = true; S.vaultNames = Object.keys(v.entries || {}); S.vaultNote = v.locked ? 'locked' : '';
           save(); applying = false;
+        } else if ((S.vaultNames || []).length) {     // 账号里没有保险箱：别让本机还显示「已绑定」
+          applying = true; S.vaultNames = []; save(); applying = false;
         }
         const n = await vaultPushLocal();
-        // 老账号一次性迁移：本机已经绑过、账号里还没有保险箱 → 问一次密码建起来
-        if (!v && !S.vaultAsked) {
-          const name = ckOf('netease') ? 'netease' : (ckOf('qq') ? 'qq' : '');
-          if (name) { applying = true; S.vaultAsked = true; save(); applying = false; await vaultStore(name, ckOf(name)); }
-        }
         if (n || v) renderMe();
       } catch { /* 离线时静默 */ }
     }, 3000);

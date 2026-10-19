@@ -3,7 +3,7 @@
  * 分开的三个来源：自己的后端（函数计算）、第三方中继（gdstudio）、站内静态数据。
  * 原生壳里不需要 CORS，行为一致，所以也不需要分实现。
  */
-import { V } from '../version.js?v=20261019x';
+import { V } from '../version.js?v=20261019y';
 
 export const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 / 解析 / 分词
 export const GD = 'https://music-api.gdstudio.xyz/api.php';
