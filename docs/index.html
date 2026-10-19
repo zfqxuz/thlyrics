@@ -1889,6 +1889,18 @@ body.ui-ios .langbadge{background:var(--accent-soft);color:var(--accent);border:
   </button>
 </div>
 
-<script type="module" src="app.js?v=20261019y"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script>
+// 网页版：把外壳装进 Cache Storage，刷新时只剩 index.html 一个网络请求（App 内是本机文件，不需要）
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol !== 'https:' && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') return;
+  var cap = window.Capacitor;
+  if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) return;
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
+  });
+})();
+</script>
+<script type="module" src="app.js?v=20261019z"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>

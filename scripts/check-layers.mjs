@@ -21,6 +21,7 @@ const DOCS = path.join(ROOT, 'docs');
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
   const p = path.join(dir, e.name);
   if (e.isDirectory()) return (e.name === 'data' || e.name === 'vendor') ? [] : walk(p);   // data/ 与 vendor/（第三方）不参与分层检查
+  if (e.name === 'sw.js') return [];        // Service Worker 是独立上下文（自己就是网络层），不参与分层检查
   return e.name.endsWith('.js') ? [p] : [];
 });
 

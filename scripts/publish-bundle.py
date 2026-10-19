@@ -3,6 +3,7 @@
 
 用法：
   node scripts/bump-version.mjs
+  node scripts/gen-sw.mjs
   python3 scripts/publish-bundle.py
   git add -A && git commit && git push
 
