@@ -317,6 +317,25 @@
 - 真机验证脚本：`.e2e/acc-real.mjs <url> [用户名]`（真 API；跑完记得删账号对象 + 重置 _index.json）。
   （旧的 `.e2e/sync-real.mjs` / `sync-probe.mjs` 随公开对象一起删了。）
 
+### 网页版「第一次打开」为什么慢 → 打包 + 预取（2026-10-19，已上线）
+
+- 实测拆解（GitHub Pages，冷缓存）：
+  - **20 个请求**：1 HTML + 19 个 ES 模块（`app.js` → `platform/index.js` → 12 个平台模块，**三级串行**）
+  - **597KB 传输**（gzip）：vocab `data/index.json` 323KB + `app.js` 100KB + `ja-en.json` 122KB（只有非中文界面才拉）
+  - 每次往返首字节 0.35~1.4s（Pages/Fastly 国内就是这个量级），三级瀑布 = 纯等待 1~2s
+- 三处改动：
+  1. **`docs/app.bundle.js`**：`scripts/build-frontend.mjs`（esbuild，插件剥掉 import 里的 `?v=`）把 19 个模块打成一个
+     215KB / gzip 71KB 的文件。源码结构不动（分层/`.e2e` 仍按模块），只是发布物变了。
+  2. `index.html` 里 `<link rel="modulepreload" href="app.bundle.js?v=…">` + `<link rel="preload" as="fetch" href="data/index.json?v=…">`
+     + `preconnect` 到账号函数：三个请求并行，不再等 JS 到齐才去拿数据。
+  3. `boot()` 里 `await ensureReadings()`（389KB 读音表）改成不 await —— 导入那条路自己会 await，不该挡首屏。
+- 效果（本地同等限速 4Mbps/150ms）：load 1088→628ms，首绘 1142→682ms；
+  线上 Pages 冷开：请求 20→4，首绘 ~1.8s→~1.0s，load ~3.3s→~1.5s。
+- 发布流程：`bump-version` → **`node scripts/build-frontend.mjs`** → `node scripts/gen-sw.mjs` → `publish-bundle.py`。
+  （`npm run bundle` / `npm run sw`）
+- 还剩的大头：`data/index.json` 323KB（里面 `forms` 占 gzip 的 28%，可再拆一个延迟加载的文件）；
+  以及 Pages 本身的首字节（OSS 杭州 0.15s vs Pages 0.35~1.4s）。要继续压就得把静态资源/数据搬到国内 CDN。
+
 ### 网页版刷新慢 → Service Worker 外壳缓存（2026-10-19，已上线）
 
 - 现象：用户问「页面每次刷新都耗时这么长？难道每次都在从云端下载东西？」
