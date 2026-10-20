@@ -317,6 +317,32 @@
 - 真机验证脚本：`.e2e/acc-real.mjs <url> [用户名]`（真 API；跑完记得删账号对象 + 重置 _index.json）。
   （旧的 `.e2e/sync-real.mjs` / `sync-probe.mjs` 随公开对象一起删了。）
 
+### ⚠ 公开文件里禁止出现 OSSAccessKeyId（2026-10-20）
+
+- 事故：`docs/update.json`（155 个签名 URL）和 `docs/data/voice-packs.json`（9 个）里带着
+  `OSSAccessKeyId=LTAI5t…`。仓库是**公开**的，Pages 也直接对外发，所以 **AccessKeyId 泄露**了，
+  阿里云安全中心据此告警「AccessKey 明文存储」。
+- **Secret 没有泄露**：`git log -S<secret> --all` 全历史 0 命中，只有 ID（ID 单独不能签请求，拿不到任何东西）。
+- 现在的规矩：
+  1. `docs/update.json` 的 `download_url` 一律用 **Pages 直链**（`https://zfqxuz.github.io/thlyrics/<file>?v=<版本>`），
+     内容包文件本来就是 `docs/` 里的东西，不需要 OSS。
+  2. 必须走 OSS 的（整包 zip、语音包 `tts/*.zip`）写**中转地址**
+     `https://thlyrics-auth-…fcapp.run/api/ota-url?key=<oss key>`，客户端下载前用
+     `platform/net.js` 的 `resolveDownloadUrl()` 换一次签名 URL（1 小时有效）。
+     ⚠ 不能直接返回 302 到 OSS：FC 默认域名禁止外部跳转（`ExternalRedirectForbidden`）。
+  3. 任何时候都不要 `oss.sign()` 的结果写进 `docs/`。
+- 旧提交里仍有那个 AK ID；彻底消除要靠**轮换 AK**（换新 key 后同步改
+  `~/.dsh/aliyun.credentials.yml` + 重新部署 FC）。
+
+### OSS 空间清理（2026-10-20）
+
+- 清掉 320 个对象 ≈ 950MB：47 个历史整包 zip（796MB）、268 个已不在清单里的内容 blob（41MB）、
+  4 个旧语音包（kokoro-ja 1.0/1.1/2.0、openjtalk-ja 1.11，111MB）、1 个过期 APK（apk/，8MB）。
+- 桶从 1.34GB → 398MB。保留：当前版本 154 个内容文件、`voice-packs.json` 里在用的 9 个包、
+  `kuromoji/` 词典、`sep/models`（84MB，伴奏要用）、`sep/out` 用户生成的伴奏、`sync/` 用户数据。
+- 清理判据（可重复执行）：`bundles/files/*` 只留当前 `update.json` manifest 里的 hash；
+  `bundles/thlyrics-*.zip` 只留当前版本；`tts/*.zip` 只留 `voice-packs.json` 引用的。
+
 ### 网页版「第一次打开」为什么慢 → 打包 + 预取（2026-10-19，已上线）
 
 - 实测拆解（GitHub Pages，冷缓存）：
