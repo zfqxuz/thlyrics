@@ -17,6 +17,7 @@
  *   POST /api/recover   {name, code, new}
  *   GET  /api/data
  *   PUT  /api/data      {data}
+ *   GET  /api/ota-url?key=<oss key> 把 /bundles /tts 这类私有对象换成一个 1 小时签名地址（公开清单里不出现 AK）
  *   GET  /api/vault                取账号保险箱（只有密文，服务端解不开）
  *   PUT  /api/vault    {vault}     存账号保险箱
  *   DELETE /api/vault              清掉保险箱
@@ -1465,6 +1466,17 @@ exports.handler = async (event) => {
         const j = await netJson(`https://music.163.com/api/song/lyric?id=${id}&lv=-1&kv=-1&tv=-1`);
         return reply(req, 200, { ok: true, lyric: (j.lrc && j.lrc.lyric) || '', tlyric: (j.tlyric && j.tlyric.lyric) || '' });
       } catch (e) { return reply(req, 502, { error: '网易云读不到：' + String((e && e.message) || e) }); }
+    }
+
+    // OTA / 语音包下载地址解析：公开清单里只写这个中转地址，真正的签名地址在响应里现算（1 小时有效）。
+    // 好处：update.json / voice-packs.json 这些公开文件里再也不会出现 OSSAccessKeyId。
+    // （不能直接 302 到 OSS：FC 默认域名禁止外部跳转，会报 ExternalRedirectForbidden。）
+    if (action === '/ota-url') {
+      const key = decodeURIComponent(String(q.key || '')).replace(/^\/+/, '').slice(0, 200);
+      if (!/^(bundles|tts|apk|kuromoji|sep)\/[A-Za-z0-9._\/-]+$/.test(key) || key.indexOf('..') >= 0) {
+        return reply(req, 400, { error: 'key 不允许' });
+      }
+      return reply(req, 200, { ok: true, key, expiresIn: 3600, url: ossSign(key, 3600) });
     }
 
     // 网页版在线日语发音（原生 App 不用这条；限 60 字）

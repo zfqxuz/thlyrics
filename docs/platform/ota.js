@@ -9,6 +9,8 @@
  *   ② 静默拉清单 → 版本不同 → download() → next()（下次启动生效，不打断当前）
  *   ③ 手动「检查内容更新」→ download() + set()（立刻重载）
  */
+import { resolveDownloadUrl } from './net.js?v=20261020a';
+
 const plugin = () => {
   if (typeof window === 'undefined') return null;
   const C = window.Capacitor;
@@ -57,11 +59,13 @@ export async function otaCheck(manifestUrl, { current = '', apply = 'next', time
   } catch { return null; }
   if (!m || !m.version || !m.url) return null;
   if (!newer(m.version, current)) return null;
+  let zipUrl = '';
+  try { zipUrl = await resolveDownloadUrl(m.url); } catch { zipUrl = ''; }   // 兜底整包的地址
   const t0 = Date.now();
   // 有 manifest 就走增量：本地已有同 hash 的文件不会再下（词典 18MB 只在第一次出现）
   const opts = m.manifest && m.manifest.length
-    ? { url: m.url, version: String(m.version), manifest: m.manifest }
-    : { url: m.url, version: String(m.version), checksum: m.sha256 };
+    ? { url: zipUrl || m.url, version: String(m.version), manifest: m.manifest }
+    : { url: zipUrl, version: String(m.version), checksum: m.sha256 };
   let b = null;
   try {
     b = await Promise.race([
@@ -72,7 +76,7 @@ export async function otaCheck(manifestUrl, { current = '', apply = 'next', time
     if (!opts.manifest) throw e;
     // 增量失败就退回整包（别把更新卡死）
     b = await Promise.race([
-      p.download({ url: m.url, version: String(m.version), checksum: m.sha256 }),
+      p.download({ url: zipUrl, version: String(m.version), checksum: m.sha256 }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
     ]);
   }

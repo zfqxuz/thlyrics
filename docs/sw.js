@@ -1,29 +1,29 @@
-/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 20261019ze） */
-const V = '20261019ze';
+/* 自动生成，别手改：node scripts/gen-sw.mjs（版本 20261020a） */
+const V = '20261020a';
 const CACHE = 'thlyrics-' + V;
 const SHELL = [
   "index.html",
-  "app.bundle.js?v=20261019ze",
+  "app.bundle.js?v=20261020a",
   "icon-192.png",
   "icon-512.png",
   "apple-touch-icon.png",
   "favicon.ico",
-  "manifest.webmanifest?v=20261019ze",
+  "manifest.webmanifest?v=20261020a",
   "og-a.png",
   "og-b.png",
-  "data/index.json?v=20261019ze",
-  "data/readings.json?v=20261019ze",
-  "data/voice-packs.json?v=20261019ze",
-  "apk.json?v=20261019ze",
-  "locales/de.json?v=20261019ze",
-  "locales/en.json?v=20261019ze",
-  "locales/es.json?v=20261019ze",
-  "locales/fr.json?v=20261019ze",
-  "locales/ja.json?v=20261019ze",
-  "locales/ko.json?v=20261019ze",
-  "locales/pt.json?v=20261019ze",
-  "locales/ru.json?v=20261019ze",
-  "update.json?v=20261019ze"
+  "data/index.json?v=20261020a",
+  "data/readings.json?v=20261020a",
+  "data/voice-packs.json?v=20261020a",
+  "apk.json?v=20261020a",
+  "locales/de.json?v=20261020a",
+  "locales/en.json?v=20261020a",
+  "locales/es.json?v=20261020a",
+  "locales/fr.json?v=20261020a",
+  "locales/ja.json?v=20261020a",
+  "locales/ko.json?v=20261020a",
+  "locales/pt.json?v=20261020a",
+  "locales/ru.json?v=20261020a",
+  "update.json?v=20261020a"
 ];
 const SKIP = [/\/dl\//, /\.apk$/];
 

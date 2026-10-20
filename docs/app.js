@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261019ze';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, sepCall } from './platform/index.js?v=20261019ze';
-import * as Vault from './core/vault.js?v=20261019ze';
-import { icon } from './icons.js?v=20261019ze';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261019ze';
+import { V } from './version.js?v=20261020a';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261020a';
+import * as Vault from './core/vault.js?v=20261020a';
+import { icon } from './icons.js?v=20261020a';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261020a';
 
 (() => {
   'use strict';
@@ -2720,6 +2720,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   const apiCall = (path, opts = {}) => netApiCall(path, Object.assign({}, opts, { token: ACC && ACC.token }));
   /** 伴奏函数（独立域名，同样的 token） */
   const sepApi = (path, opts = {}) => sepCall(path, Object.assign({}, opts, { token: ACC && ACC.token }));
+  /** 清单里的地址可能是中转（/api/ota-url?key=…）：下载前先换成签名地址 */
+  const dlUrl = (u) => resolveDownloadUrl(u);
 
   /** 两份状态合并成一份：逐条按时间戳取胜，谁写过的都不丢 */
   function mergeStates(a, b) {
@@ -4104,7 +4106,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       $('vp-default').disabled = true;
       for (const p of missingDefault) {
         try {
-          await voicePack.install({ id: p.id, url: p.url, sha256: p.sha256, version: p.version, kind: p.kind || 'audio' }, () => {});
+          await voicePack.install({ id: p.id, url: await dlUrl(p.url), sha256: p.sha256, version: p.version, kind: p.kind || 'audio' }, () => {});
         } catch { /* 单个失败不挡后面 */ }
       }
       vpCheckedAt = 0;
@@ -4119,7 +4121,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       const fill = bar ? bar.querySelector('i') : null;
       if (bar) bar.hidden = false;
       try {
-        await voicePack.install({ id: p.id, url: p.url, sha256: p.sha256, version: p.version, kind: p.kind || 'ojt' }, (ev, d) => {
+        await voicePack.install({ id: p.id, url: await dlUrl(p.url), sha256: p.sha256, version: p.version, kind: p.kind || 'ojt' }, (ev, d) => {
           if (ev === 'progress' && fill && d && d.pct != null) fill.style.width = d.pct + '%';
         });
         vpCheckedAt = 0;

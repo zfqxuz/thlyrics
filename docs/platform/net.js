@@ -3,7 +3,7 @@
  * 分开的三个来源：自己的后端（函数计算）、第三方中继（gdstudio）、站内静态数据。
  * 原生壳里不需要 CORS，行为一致，所以也不需要分实现。
  */
-import { V } from '../version.js?v=20261019ze';
+import { V } from '../version.js?v=20261020a';
 
 export const API_BASE = 'https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run/api';   // 账号 / 同步 / 解析 / 分词
 export const GD = 'https://music-api.gdstudio.xyz/api.php';
@@ -25,6 +25,17 @@ export function getBlob(url, { timeout = 20000 } = {}) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.blob();
   }, timeout);
+}
+
+/** 清单里的下载地址可能是个中转（/api/ota-url?key=…），真地址要去问一次（1 小时有效的签名 URL）。
+ *  这样做是为了：公开的 update.json / voice-packs.json 里不出现 OSSAccessKeyId。 */
+export async function resolveDownloadUrl(url) {
+  const u = String(url || '');
+  if (!u || u.indexOf('/api/ota-url') < 0) return u;
+  const r = await fetch(u, { cache: 'no-store' });
+  const j = await r.json().catch(() => null);
+  if (!j || !j.url) throw new Error('下载地址解析失败');
+  return j.url;
 }
 
 /** 站内静态数据（带版本号，绕开 Pages 的 10 分钟缓存） */
