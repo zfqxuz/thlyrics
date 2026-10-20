@@ -1480,3 +1480,25 @@ paused=false、currentTime 6s 内推进 5.96s、duration 221s、readyState=4、�
 - 发音：`platform/tts.js` 按语言选嗓音；FC `/tts` 支持 `lang` 参数（百度/有道多语言），非日语词优先系统嗓子、失败走在线合成
 - 语音包页按语言列出状态与安装入口；`TtsPlugin` 之前在 `MainActivity` 里没注册（已补）
 - 文档：`docs/CONTENT-PACKS.md`（来源、许可、覆盖率、已知缺口）
+
+### 2026-10-20 13:08–13:45：UI/UX 走查 + 审美升级（内容包 20261020b；旧会话曾因切模型 400 死锁）
+
+- 上一轮（`session-8cf0bb05`）在不动核心交互契约的前提下修了 6 类问题（都有 Playwright 实机取证）：
+  深色模式补 `--field` / `--ink2` / `--ink3`（搜索框、`.sel`、`.pickitem`、`.revinp` 原本透明）；
+  顶栏去掉 `::after` 模糊脏影；`#d-tag` 高频标签从折叠抽屉提到词表上方（切词池 2 步→1 步）、筛选行单行横滑；
+  曲库行动作收进 `.item-acts`（30×30、gap 1px，曲名多出 55px）、删除键弱化；跟唱页 `#p-order` 与 `#b-display`
+  图标撞车（`#b-display` 换 `sliders` + 「显示」文字、点外自动收起）；同形异读词改「词面|读音」复合索引并优先取
+  当前歌词分片读音（`空` 显示 sora 不再是 kara）；复习页进入收起 `#minibar`、反馈条加 `#rev-speak`；
+  单曲页去掉 `‹ < 返回` 重复字符、主/次按钮改胶囊。
+- 变更：`docs/{app.js,index.html,icons.js}` + 生成物 `app.bundle.js` / `sw.js`，`V = 20261020b`；
+  `npm run check` 双绿；Playwright 29 条断言（classic/ios × warm/dark × 390×844/320×600）通过。
+- **已发布**：`python3 scripts/publish-bundle.py` → 154 文件 / 整包 26.1MB / 增量新传 9 个 0.64MB；
+  `docs/update.json` = `20261020b`，OSS `bundles/thlyrics-20261020b.zip`；commit + push 后 Pages 生效。
+- **APK 未重打**：本轮纯前端，App 走内容包热更新；`docs/apk.json` 仍是 `20261017z`（原生无改动）。
+  debug APK 43.9MB 是因为把 `docs/data/{de,en,es,fr,ko,pt,ru}` 多语言词典一起打进 assets（离线要用），
+  **不是 APK 套娃，别为了瘦身删这些目录**。
+- ⚠️ **切模型会把旧会话钉死**：13:49:56 把 `google/gemini-4-argon` 换成 `deepseek-official/deepseek-flash`（preset 也换了）后，
+  每轮请求都被 API 400 拒：`messages.1.5: tool_use ids ... without tool_result blocks immediately after:
+  call_229617, call_229631, call_229632, call_229640` —— 正好是第 1 轮第 1 步的 4 个调用；会话日志里 135 call / 135 result
+  都在，是重建请求时配对丢了，不是历史截断。错误落在历史最前面，重问/重试都在同一处失败，自动 handoff 也 skip（no-consumer），
+  只能新开会话。**以后遇到 INVALID_REQUEST 400 + tool_use/tool_result 报错，别反复重问，直接新开会话继续。**

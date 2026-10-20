@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261020a';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261020a';
-import * as Vault from './core/vault.js?v=20261020a';
-import { icon } from './icons.js?v=20261020a';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261020a';
+import { V } from './version.js?v=20261020b';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261020b';
+import * as Vault from './core/vault.js?v=20261020b';
+import { icon } from './icons.js?v=20261020b';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261020b';
 
 (() => {
   'use strict';
@@ -341,15 +341,18 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   // 形式名词 / 补助动词：写假名的是语法零件（てみる・ている・こと・もの…），写汉字的算实词照翻（見る・居る）
   const GLOSS_SKIP = { 'こと': 1, 'もの': 1, 'ため': 1, 'わけ': 1, 'はず': 1, 'つもり': 1, 'ほう': 1, 'ところ': 1, 'とおり': 1, 'よう': 1, 'そう': 1,
     'いる': 1, 'ある': 1, 'くる': 1, 'いく': 1, 'おく': 1, 'しまう': 1, 'みる': 1, 'くれる': 1, 'もらう': 1, 'あげる': 1, 'やる': 1, 'いただく': 1, 'くださる': 1 };
-  /** 这个词位配哪个词条：先按词典形查（最准），查不到再按表面形兜底（只认实词） */
+  /** 这个词位配哪个词条：优先按「词典形+读音」精确匹配同形异读词（如 空 そら/から），再按词典形，最后表面形兜底 */
   function wordForSeg(sg) {
     if (!sg || !sg.s || sg.k === 'sym') return null;
-    if (sg.w && sg.b) { const v = VBY.get(sg.b); if (v) return v; }
+    const r = norm(sg.r || '');
+    if (sg.w && sg.b) {
+      if (r) { const vr = VBY.get(sg.b + '|' + r); if (vr) return vr; }
+      const v = VBY.get(sg.b); if (v) return v;
+    }
     if (!CONTENT_KIND[sg.k]) return null;          // 助词/助动词不查词表：假名撞车全在这
-    const v = SURF.get(sg.s) || null;
+    const v = (r && VBY.get(sg.s + '|' + r)) || SURF.get(sg.s) || null;
     if (!v) return null;
     // 表面形兜底还要「读得通」：同形不同词的（一个「名」可能是 な/めい）宁可少显示也不张冠李戴
-    const r = norm(sg.r || '');
     const f = (v.forms || {})[sg.s];
     const want = norm((f && (f.readingHira || f.reading)) || v.reading || '');
     if (r && want && want !== r && !want.startsWith(r) && !r.startsWith(want)) return null;
@@ -679,7 +682,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const t = TRACK.get(String(ex.tid));
     const hasA = !!(t && (t.audioOss || t.audio || (S.audio || {})[t.id]));
     return `<div class="item exrow${hasA ? '' : ' noaudio'}" data-pv="${esc(ex.tid)}|${Number(ex.li) || 0}">
-      <span class="exico"><span class="tri">▶</span><span class="eqbars"><i></i><i></i><i></i></span></span>
+      <span class="exico"><span class="tri">${icon('play')}</span><span class="eqbars"><i></i><i></i><i></i></span></span>
       <div class="col"><div class="l1" style="font-weight:400;font-size:14.5px;white-space:normal">${esc(ex.jp)}</div>
       ${ex.zh ? `<div class="l2" style="color:var(--p-a);white-space:normal">${userLang() !== 'zh' ? `<span class="zhtag">中文</span>` : ''}${esc(ex.zh)}</div>` : ''}
       <div class="l3">${ex.now ? '正在听 · ' : ''}${esc(ex.track || '')}${hasA ? '' : ' · 无音频'}</div></div>
@@ -1212,9 +1215,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         <div class="l2">${esc(meaningOf(v) || '（还没释义）')}</div>
         <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · ${st ? st.tracks.size : 0} 首歌 / ${st ? st.n : 0} 次</div>
       </div>
-      ${dotsHtml(v)}
-      <button class="tick star ${starred ? 'on' : ''}" data-star="${v.id}" title="${starred ? '取消星标' : '星标'}" aria-label="星标">${icon(starred ? 'star-fill' : 'star','in')}</button>
-      <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握" aria-label="标为已掌握">${icon('check','in')}</button>
+      <div class="item-acts">
+        ${dotsHtml(v)}
+        <button class="tick star ${starred ? 'on' : ''}" data-star="${v.id}" title="${starred ? '取消星标' : '星标'}" aria-label="星标">${icon(starred ? 'star-fill' : 'star','in')}</button>
+        <button class="tick ${isKnown(v) ? 'on' : ''}" data-known="${v.id}" title="标为已掌握" aria-label="标为已掌握">${icon('check','in')}</button>
+      </div>
     </div>`;
   }
   function wireWords(root) {
@@ -1338,39 +1343,53 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   /** 首页：只突出一条主路径——找歌 → 选歌 → 开始学唱；其他入口降级成小按钮 */
   function renderHome() {
     const last = (S.lastTrack && TRACK.get(S.lastTrack)) || null;
-    const due = deckList().slice(0, 8);
+    const deck = deckList();
+    const due = deck.slice(0, 8);
+    const revDue = dueWords();
     const knownN = VOCAB.filter((v) => (v.lang || 'ja') === S.learnLang && isKnown(v)).length;
-    const withAudio = IDX.tracks.filter((t) => t.audio || t.audioOss).length;
+    const lastCover = last ? (last.coverFile ? `<img class="cover big" src="data/${last.coverFile}" alt="">`
+      : (last.coverUrl ? `<img class="cover big" src="${esc(httpsImg(last.coverUrl))}" alt="">` : '')) : '';
     $('view-home').innerHTML = `
       <div class="herohead">
         <div class="ht">${brandTitle()}</div>
         <div class="hs">——三首歌里挑五个词；先听懂，再背下。</div>
         ${IDX.tracks.length ? `<div class="hln">
-          <button id="h-songs" class="on">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
-          <button id="h-words">学词</button>
+          <button id="h-songs">曲库 <span class="cnt">${IDX.tracks.length}</span></button>
+          <button id="h-words">待学 <span class="cnt">${deck.length}</span></button>
           <button id="h-mine">学习记录 <span class="cnt">${knownN}</span></button>
         </div>` : ''}
       </div>
       ${last ? `<div class="nowcard">
         <div class="k">NOW LEARNING · 正在学习</div>
-        <div class="t">${esc(last.title)}</div>
-        <div class="a">${esc(last.artist)}${last.base ? ' · 原曲：' + esc(last.base) : ''}${(S.pos || {})[last.id] > 5 ? ` · 上次听到 ${fmt(S.pos[last.id])}` : ''}</div>
+        <div class="now-row">
+          ${lastCover}
+          <div class="col">
+            <div class="t">${esc(last.title)}</div>
+            <div class="a">${esc(last.artist)}${last.base ? ' · 原曲：' + esc(last.base) : ''}${(S.pos || {})[last.id] > 5 ? ` · 上次听到 ${fmt(S.pos[last.id])}` : ''}</div>
+          </div>
+        </div>
         <div class="acts"><button class="btn-main" id="h-continue">继续学唱</button><button class="btn-ghost" id="h-pick">换一首</button></div>
       </div>` : (IDX.tracks.length ? `<div class="nowcard">
         <div class="k">开始</div>
         <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入</button></div>
       </div>` : `<div class="nowcard">
         <div class="k">开始</div>
-        <div class="t">导入第一首歌</div>
+        <div class="t" style="margin-top:6px">导入第一首歌</div>
         <div class="acts"><button class="btn-main" id="h-imp">导入第一首歌</button></div>
       </div>`)}
+      ${revDue.length ? `<div class="homerev" id="h-rev"><span class="t">复习巩固 · ${T('今天 {n} 个', { n: revDue.length })}</span><span class="go">${T('开始 ›')}</span></div>` : ''}
       <div class="hair"></div>
       <div class="sec-sub">今天学这些</div>
-      <div class="wordstrip">${due.map((v) => { const ex = examplesFor(v, 1)[0]; return `<button data-w="${v.id}"><span style="color:var(--ink3)">${ex ? '♪' : '词'}</span> ${esc(v.word)}<span style="color:var(--ink3)"> ${esc(v.reading || '')}</span></button>`; }).join('') || '<span class="meta">暂无</span>'}</div>`;
+      <div class="wordstrip">${due.map((v) => {
+        const ex = examplesFor(v, 1)[0];
+        const m = meaningOf(v);
+        return `<button data-w="${v.id}"><span class="wtop"><b>${esc(v.word)}</b><span>${esc(v.reading || '')}</span>${ex ? `<span style="color:var(--accent)">♪</span>` : ''}</span>${m ? `<span class="wmean">${esc(m)}</span>` : ''}</button>`;
+      }).join('') || '<span class="meta">暂无</span>'}</div>`;
     const goHome = (h) => { location.hash = h; };
     if ($('h-songs')) $('h-songs').onclick = () => goHome('#/songs');
     if ($('h-words')) $('h-words').onclick = () => goHome('#/learn');
     if ($('h-mine')) $('h-mine').onclick = () => goHome('#/mine');
+    if ($('h-rev')) $('h-rev').onclick = () => { revFrom = '#/home'; startReview(revCount()); goHome('#/review'); };
     if ($('h-continue')) $('h-continue').onclick = () => { pendingPlayId = last.id; pendingResumeId = last.id; goHome('#/track/' + last.id); };
     if ($('h-pick')) $('h-pick').onclick = () => goHome('#/songs');
     if ($('h-imp')) $('h-imp').onclick = () => { impState.open = true; goHome('#/songs'); };
@@ -1660,10 +1679,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const tip = q.answer ? `<span class="fa">${esc(q.answer)}</span>` : '';
     const ex = examplesFor(q.v, 1)[0];
     const lyric = ex ? `<span class="fa">${esc(ex.jp)}</span>` : '';
-    const hear = ex ? `<button class="toolbtn" id="rev-hear" style="height:28px;margin-top:6px">听例句</button>` : '';
+    const acts = `<div class="row" style="gap:6px;margin-top:6px"><button class="toolbtn" id="rev-speak" style="height:28px">${icon('volume','in')}发音</button>${ex ? `<button class="toolbtn" id="rev-hear" style="height:28px">听例句</button>` : ''}</div>`;
     feed.innerHTML = `<span class="fi">${icon(ok ? 'circle-check' : 'close', 'in')}</span>`
-      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}${lyric}${hear}</span>`
+      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}${lyric}${acts}</span>`
       + `<button class="fnext" id="rev-next">继续</button>`;
+    if ($('rev-speak')) $('rev-speak').onclick = () => q.play(false);
     if (ex) { const hb = $('rev-hear'); if (hb) hb.onclick = () => pvPlay(ex.tid, ex.li); }
     $('rev-next').onclick = () => { revI++; revQ = null; renderReview(); };
     try { $('rev-next').focus(); } catch { /* ignore */ }
@@ -1716,8 +1736,6 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (pos) parts.push(pos);
     const sort = { easy: '从易到难', freq: '最常见', az: '五十音 ↑', azd: '五十音 ↓' }[S.dSort || 'easy'];
     if (S.dSort && S.dSort !== 'easy') parts.push(sort);
-    const tag = { undone: '', known: '已掌握', star: '星标', err: '错词' }[S.dTag || 'undone'];
-    if (tag) parts.push(tag);
     return parts.join(' · ');
   }
   function pickLearnLang(k) {
@@ -1760,9 +1778,15 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       ${dueWords().length
         ? `<div class="duebar" id="d-due"><span class="t">复习巩固</span><span class="n">${T('今天 {n} 个', { n: dueWords().length })}</span><button class="go" id="d-duego">${T('开始 ›')}</button></div>`
         : `<div class="duebar empty" id="d-due"><span class="t">复习巩固</span><span class="n">点歌词里的 ★ 收藏</span></div>`}
-      <div class="row" style="margin:8px 0 2px">
-        <button class="toolbtn${filtersOpen ? ' on' : ''}" id="d-ftoggle">筛选${filterSummary() ? ' · ' + esc(filterSummary()) : ''}</button>
-        ${filterSummary() ? `<button class="toolbtn" id="d-clear">清除</button>` : ''}
+      <div class="learn-barrow">
+        <div class="learn-tags" id="d-tag">
+          <button class="chip" data-v="undone">未掌握</button><button class="chip" data-v="known">已掌握</button>
+          <button class="chip" data-v="star">${icon('star','in')}星标</button><button class="chip" data-v="err">错词</button>
+        </div>
+        <div class="row" style="gap:6px;flex:0 0 auto">
+          <button class="toolbtn${filtersOpen || filterSummary() ? ' on' : ''}" id="d-ftoggle">筛选${filterSummary() ? ' · ' + esc(filterSummary()) : ''}</button>
+          ${(filterSummary() || (S.dTag && S.dTag !== 'undone')) ? `<button class="toolbtn" id="d-clear">清除</button>` : ''}
+        </div>
       </div>
       <div class="learn-filters"${filtersOpen ? '' : ' hidden'}>
         <div class="learn-filter-row">
@@ -1785,13 +1809,6 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
             <button class="chip" data-v="easy">从易到难</button><button class="chip" data-v="freq">最常见</button>
             <button class="chip" data-v="az">${S.learnLang === 'ja' ? '五十音 ↑' : 'A–Z'}</button>
             <button class="chip" data-v="azd">${S.learnLang === 'ja' ? '五十音 ↓' : 'Z–A'}</button>
-          </div>
-        </div>
-        <div class="learn-filter-row">
-          <span class="filter-label">标签</span>
-          <div class="chips" id="d-tag">
-            <button class="chip" data-v="undone">未掌握</button><button class="chip" data-v="known">已掌握</button>
-            <button class="chip" data-v="star">${icon('star','in')}星标</button><button class="chip" data-v="err">错词</button>
           </div>
         </div>
       </div>
@@ -1858,10 +1875,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         <div class="l2">${esc(t.artist)}${t.base ? ' · ' + esc(t.base) : (t.album ? ' · ' + esc(t.album) : '')}</div>
         <div class="l3">${ltags ? ltags + ' ' : ''}${T('{n} 行歌词', { n: t.lineCount })}${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
-      ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">${icon('play')}</button>` : ''}
-      <button class="tick${isFav(t.id) ? ' on' : ''}" data-fav="${esc(t.id)}" title="收藏" aria-label="收藏">${icon('heart','in')}</button>
-      <button class="tick${isSing(t.id) ? ' on' : ''}" data-sing="${esc(t.id)}" title="会唱" aria-label="会唱">${icon('check','in')}</button>
-      ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">${icon('close')}</button>` : `<span class="mini">${icon('chevron-right')}</span>`}
+      <div class="item-acts">
+        ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">${icon('play')}</button>` : ''}
+        <button class="tick${isFav(t.id) ? ' on' : ''}" data-fav="${esc(t.id)}" title="收藏" aria-label="收藏">${icon(isFav(t.id) ? 'heart-fill' : 'heart','in')}</button>
+        <button class="tick${isSing(t.id) ? ' on' : ''}" data-sing="${esc(t.id)}" title="会唱" aria-label="会唱">${icon('check','in')}</button>
+        ${t.imp ? `<button class="tick del" data-del="${esc(t.id)}" title="删除这首">${icon('close')}</button>` : `<span class="mini">${icon('chevron-right')}</span>`}
+      </div>
     </div>`;
   }
   // ────────────── 网易云歌单导入（纯前端，失败逐首报错） ──────────────
@@ -3212,7 +3231,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     g.hidden = false;
     document.body.classList.add('gated');
     g.innerHTML = `<div class="gatecard" style="position:relative">
-      <button class="gclose" id="g-close" aria-label="关闭">×</button>
+      <button class="gclose" id="g-close" aria-label="关闭">${icon('close')}</button>
       <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">登录 / 注册</div>
       
       <input class="sel" id="g-name" placeholder="用户名（2~20 位）" autocomplete="username">
@@ -3237,7 +3256,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     g.hidden = false;
     document.body.classList.add('gated');
     g.innerHTML = `<div class="gatecard" style="position:relative">
-      <button class="gclose" id="g-rclose" aria-label="关闭">×</button>
+      <button class="gclose" id="g-rclose" aria-label="关闭">${icon('close')}</button>
       <img class="glogo" src="icon-192.png" alt=""><div class="gtitle">找回密码</div>
       <input class="sel" id="g-rname" placeholder="用户名" autocomplete="username">
       <input class="sel" id="g-rcode" placeholder="恢复码" autocomplete="one-time-code">
@@ -3902,7 +3921,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="sec-head"><div><div class="sec-title">我的</div>
         <div class="sec-sub">导入 ${Object.keys(S.imp || {}).length} 首 · 收藏 ${favN} · 会唱 ${singN}</div></div></div>
       ${accHtml()}
-      <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px">${syncMsgHtml()}</div>
+      <div class="meta" id="syncmsg" style="color:var(--ink2);margin-top:10px"${isLoggedIn() ? '' : ' hidden'}>${syncMsgHtml()}</div>
       ${S.vaultNote === 'locked' ? '<div class="meta" style="color:var(--ink2);margin-top:6px">账号里的凭据已失效，需要重新绑定</div>' : ''}
       ${S.vaultErr ? `<div class="meta" style="color:var(--ink2);margin-top:6px">账号保险箱：${esc(S.vaultErr)}</div>` : ''}
       <div class="sect">外观</div>
@@ -4329,9 +4348,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     $('view-search').querySelectorAll('[data-base]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.base; go('#/search/' + encodeURIComponent(el.dataset.base)); }));
     $('view-search').querySelectorAll('[data-artist]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.artist; go('#/search/' + encodeURIComponent(el.dataset.artist)); }));
     $('view-search').querySelectorAll('[data-hist]').forEach((el) => (el.onclick = () => { $('q').value = el.dataset.hist; go('#/search/' + encodeURIComponent(el.dataset.hist)); }));
-    if ($('e-sc')) $('e-sc').onclick = () => { $('q').value = ''; go('#/home'); };
-    if ($('e-ssongs')) $('e-ssongs').onclick = () => go('#/songs');
-  }
+      if ($('e-sc')) $('e-sc').onclick = () => { $('q').value = ''; if ($('q-clear')) $('q-clear').hidden = true; go('#/home'); };
+      if ($('e-ssongs')) $('e-ssongs').onclick = () => go('#/songs');
+    }
 
   // ────────────── 单曲页 ──────────────
   function trackWords(t) {
@@ -4358,8 +4377,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           <div class="l2">${esc(meaningOf(v) || '（还没释义）')}</div>
           <div class="l3">${POSNAME[posKind(v)]} · ${esc(levelName(v))} · 本曲 ${n} 次</div>
         </div>
-        ${dotsHtml(v)}
-        ${li >= 0 ? `<button class="tick" data-line="${li}" title="跳到这句">${icon('arrow-turn')}</button>` : ''}
+        <div class="item-acts">
+          ${dotsHtml(v)}
+          ${li >= 0 ? `<button class="tick" data-line="${li}" title="跳到这句">${icon('arrow-turn')}</button>` : ''}
+        </div>
       </div>`;
     }).join('') : '<div class="empty">这个筛选下没有词</div>';
     host.querySelectorAll('[data-line]').forEach((el) => (el.onclick = (e) => {
@@ -4462,7 +4483,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           return;                              // ← 关键：直接结束，不开抽屉
         }
         // 当前句的词 → 开词条；showPop 里会暂停播放（续播交给收起抽屉）
-        const w = (wEl.dataset.w && VBY.get(wEl.dataset.w)) || SURF.get(wEl.dataset.s) || null;
+        const rNorm = norm(wEl.dataset.r || '');
+        const w = (wEl.dataset.w && ((rNorm && VBY.get(wEl.dataset.w + '|' + rNorm)) || VBY.get(wEl.dataset.w)))
+          || (rNorm && VBY.get(wEl.dataset.s + '|' + rNorm))
+          || SURF.get(wEl.dataset.s) || null;
         showPop(w, wEl.dataset.s, { r: wEl.dataset.r || '', y: wEl.dataset.y || '', li,
           ti: wEl.dataset.ti != null ? Number(wEl.dataset.ti) : null });
         return;
@@ -4516,7 +4540,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const zhN = t.lines.filter((l) => l.zh).length;
     $('view-track').innerHTML = `
       <div class="track-head">
-        <div class="track-back"><button id="b-back" class="tlink tlink-ghost">‹ ${icon('chevron-left','in')}返回</button></div>
+        <div class="track-back"><button id="b-back" class="tlink tlink-ghost">${icon('chevron-left','in')}返回</button></div>
         <div class="track-meta">
           ${t.coverFile ? `<img class="cover xl" src="data/${t.coverFile}" alt="">`
             : (t.coverUrl ? `<img class="cover xl" src="${esc(httpsImg(t.coverUrl))}" alt="">` : '<div class="cover xl"></div>')}
@@ -4527,9 +4551,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           </div>
         </div>
         <div class="track-actions">
-          <button class="tlink" id="t-sing">▶ 进入跟唱</button>
-          <button class="tlink-ghost tlink" id="t-fav">${isFav(t.id) ? '♥ 已收藏' : '♡ 收藏'}</button>
-          <button class="tlink-ghost tlink" id="t-mark">${isSing(t.id) ? '✓ 会唱' : '标记会唱'}</button>
+          <button class="tlink" id="t-sing">${icon('play','in')}进入跟唱</button>
+          <button class="tlink-ghost tlink${isFav(t.id) ? ' on' : ''}" id="t-fav">${icon(isFav(t.id) ? 'heart-fill' : 'heart','in')}${isFav(t.id) ? '已收藏' : '收藏'}</button>
+          <button class="tlink-ghost tlink${isSing(t.id) ? ' on' : ''}" id="t-mark">${icon('check','in')}${isSing(t.id) ? '会唱' : '标记会唱'}</button>
         </div>
       </div>
       <div id="t-vocab-pane">
@@ -4730,6 +4754,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     set('b-gloss', S.gloss !== false);
     set('b-zh', S.zh !== false);
     set('b-ruby', S.ruby !== false);
+    const r = Number(S.rate || 1);
+    const dt = $('b-display-t');
+    if (dt) dt.textContent = r !== 1 ? r.toFixed(1) + 'x' : '显示';
+    const bd = $('b-display');
+    if (bd) bd.classList.toggle('on', r !== 1 || !!($('displaybox') && $('displaybox').classList.contains('on')));
   }
   function openPlayer() {
     if (!curTrack) return;
@@ -4777,9 +4806,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     popWord = w;
     $('p-known').style.display = '';
     const sp = $('p-speak'); if (sp) sp.style.display = '';
+    const segRd = (seg && seg.r) ? norm(seg.r) : '';
+    const showRd = segRd || w.reading || '';
+    const showRm = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || (seg && seg.y) || (segRd ? kanaRomaji(segRd) : '') || w.romaji || '';
     $('p-word').textContent = w.word;
-    $('p-reading').textContent = w.reading ? '（' + w.reading + '）' : '';
-    $('p-romaji').textContent = (popPos && romaOf(popPos.tid, popPos.li, popPos.ti)) || w.romaji || '';
+    $('p-reading').textContent = showRd ? '（' + showRd + '）' : '';
+    $('p-romaji').textContent = showRm;
     $('p-meaning').textContent = meaningOf(w) || '没有释义';
     $('p-known').classList.toggle('on', !!isKnown(w));
     $('p-known').title = isKnown(w) ? '取消已掌握' : '标为已掌握';
@@ -4844,11 +4876,27 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function show(which) {
     try { pvStop(); } catch {}
     const avd = $('avdrop'); if (avd) avd.hidden = true;
+    const dbox = $('displaybox'); if (dbox) dbox.classList.remove('on');
     if ($('tabs')) $('tabs').hidden = false;   // 首页也保留四个主入口：否则「我的」在首页没有可达路径
     const slot = $('srcslot');
     if (slot) slot.hidden = !(which === 'view-me' || which === 'view-track');
+    const mb = $('minibar');
+    if (mb) {
+      if (which === 'view-review') mb.classList.remove('on');
+      else if (curTrack) mb.classList.add('on');
+    }
     VIEWS.forEach((v) => { const el = $(v); if (el) el.hidden = v !== which; });
-    const map = { 'view-learn': 'tab-learn', 'view-songs': 'tab-songs', 'view-mine': 'tab-mine', 'view-me': 'tab-me', 'view-admin': 'tab-me' };
+    const map = {
+      'view-learn': 'tab-learn',
+      'view-songs': 'tab-songs',
+      'view-track': 'tab-songs',
+      'view-mine': 'tab-mine',
+      'view-word': (lastMainHash === '#/mine') ? 'tab-mine' : 'tab-learn',
+      'view-review': (revFrom === '#/learn') ? 'tab-learn' : 'tab-mine',
+      'view-me': 'tab-me',
+      'view-admin': 'tab-me',
+      'view-voicepack': 'tab-me',
+    };
     ['tab-learn', 'tab-songs', 'tab-mine', 'tab-me'].forEach((t) => { const el = $(t); if (el) el.classList.toggle('on', map[which] === t); });
     window.scrollTo(0, 0);
   }
@@ -5020,7 +5068,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (v !== 'search') lastNonSearch = '#/' + path;
     if (v === 'word') { show('view-word'); return showWord(parts[1]); }
     if (v === 'track') { show('view-track'); return showTrack(parts[1], at != null && at !== '' ? Number(at) : null); }
-    if (v === 'search') { show('view-search'); $('q').value = parts.slice(1).join('/'); return showSearch(parts.slice(1).join('/')); }
+    if (v === 'search') {
+      show('view-search');
+      const sq = parts.slice(1).join('/');
+      $('q').value = sq;
+      if ($('q-clear')) $('q-clear').hidden = !sq.length;
+      return showSearch(sq);
+    }
     if (v === 'home') { show('view-home'); return renderHome(); }
     if (v === 'review') { show('view-review'); if (revDeck.length && revI >= revDeck.length) startReview(revCount()); return renderReview(); }
     if (v === 'songs') { show('view-songs'); return renderSongs(); }
@@ -5083,10 +5137,17 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     // 读音兜底表（~400KB）：有导入曲目就提前开始拉，但**不挡首屏** —— 导入那条路自己会 await 它，
     // 这里等下去只会让人对着白屏多等一次往返
     if (Object.keys(S.imp || {}).length) ensureReadings().catch(() => {});
-    VBY = new Map(VOCAB.map((w) => [w.word, w]));
+    VBY = new Map();
+    for (const w of VOCAB) {
+      if (!VBY.has(w.word)) VBY.set(w.word, w);   // 保留先出现的常见词条，不被后并入的同形异读词覆盖
+      if (w.reading) {
+        const rk = w.word + '|' + norm(w.reading);
+        if (!VBY.has(rk)) VBY.set(rk, w);
+      }
+    }
     VBYID = new Map(VOCAB.map((w) => [w.id, w]));
     for (const w of VOCAB) {
-      SURF.set(w.word, w);
+      if (!SURF.has(w.word)) SURF.set(w.word, w);
       // 只收「含汉字」的活用形：forms 里还塞着纯假名的读音（歯→は、田→た、空→から、詩→し），
       // 以前一并当表面形建索引 → 助词「は／から／た」被认成「牙齿／天空／田地」，
       // 逐词中文全是错的（用户反馈「中文逐字对照翻译准确性很差」的根因就是这个）
@@ -5106,7 +5167,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('brand')) $('brand').onclick = () => go('#/home');
     renderAv();
     if ($('btn-av')) $('btn-av').onclick = (e) => { e.stopPropagation(); const d = $('avdrop'); d.hidden = !d.hidden; if (!d.hidden) renderAv(); };
-    document.addEventListener('click', (e) => { const d = $('avdrop'); if (d && !d.hidden && !e.target.closest('.avwrap')) d.hidden = true; });
+    document.addEventListener('click', (e) => {
+      const d = $('avdrop'); if (d && !d.hidden && !e.target.closest('.avwrap')) d.hidden = true;
+      const db = $('displaybox'); if (db && db.classList.contains('on') && !e.target.closest('#displaybox') && !e.target.closest('#b-display')) { db.classList.remove('on'); applyDisplay(); }
+    });
     document.addEventListener('click', (e) => {
       const b = e.target.closest('[data-fretry]');
       if (b) { e.preventDefault(); e.stopPropagation(); retryOne(Number(b.dataset.fretry)); return; }
@@ -5119,7 +5183,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('tab-me')) $('tab-me').onclick = () => go('#/me');
     // 全局搜索：打字不重渲染输入框（输入法组字期间不触发），只重渲染下面的结果区
     let qt = null, qComposing = false;
+    const syncQClear = () => { const c = $('q-clear'); if (c) c.hidden = !(($('q') && $('q').value) || '').length; };
     const runQuery = (commit) => {
+      syncQClear();
       const v = ($('q').value || '');
       if (v.trim()) {
         if (commit) rememberSearch(v.trim());
@@ -5128,14 +5194,15 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       } else if (location.hash.startsWith('#/search')) go(lastNonSearch);
     };
     $('q').addEventListener('compositionstart', () => { qComposing = true; });
-    $('q').addEventListener('compositionend', () => { qComposing = false; clearTimeout(qt); qt = setTimeout(() => runQuery(false), 120); });
+    $('q').addEventListener('compositionend', () => { qComposing = false; syncQClear(); clearTimeout(qt); qt = setTimeout(() => runQuery(false), 120); });
     $('q').oninput = () => {
+      syncQClear();
       if (qComposing) return;                 // 中文/日文输入法组字中：别打断
       clearTimeout(qt);
       qt = setTimeout(() => runQuery(false), 180);
     };
     $('q').onkeydown = (e) => { if (e.key === 'Enter') { clearTimeout(qt); runQuery(true); } };
-    $('q-clear').onclick = () => { $('q').value = ''; if (location.hash.startsWith('#/search')) go(lastNonSearch); };
+    $('q-clear').onclick = () => { $('q').value = ''; syncQClear(); if (location.hash.startsWith('#/search')) go(lastNonSearch); };
 
     bindAudio();
     setupKeyboardAwareSheet();
@@ -5155,7 +5222,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     $('p-scope').onclick = () => { const to = mode === 'loop' ? 'all' : 'loop'; setMode(to); toast(to === 'loop' ? '单句循环' : '全曲播放'); };
     $('p-order').onclick = () => showPicker('播放顺序', [['seq', '顺序'], ['loop', '循环'], ['shuffle', '随机']], playOrder, (k) => setOrder(k));
     if ($('p-loopexit')) $('p-loopexit').onclick = () => { setMode('all'); toast('已退出单句循环'); };
-    $('b-display').onclick = (e) => { e.stopPropagation(); const b = $('displaybox'); b.classList.toggle('on'); };
+    $('b-display').onclick = (e) => { e.stopPropagation(); const b = $('displaybox'); b.classList.toggle('on'); applyDisplay(); };
     $('b-gloss').onclick = () => { S.gloss = S.gloss === false; save(); applyDisplay(); };
     $('b-zh').onclick = () => { S.zh = S.zh === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
     $('b-ruby').onclick = () => { S.ruby = S.ruby === false; save(); applyDisplay(); renderLyrics($('plyric'), curTrack); bindLyrics($('plyric')); highlight(true); };
@@ -5165,10 +5232,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       showPicker('倍速', rates.map((r) => [String(r), r.toFixed(1) + 'x']), String(Number(S.rate || 1)), (k) => {
         const r = Number(k);
         S.rate = r; save(); audio.playbackRate = r; $('p-rate').textContent = r.toFixed(1) + 'x';
+        applyDisplay();
         toast('语速 ' + r.toFixed(1) + 'x');
       });
     };
     $('p-rate').textContent = Number(S.rate || 1).toFixed(1) + 'x';
+    applyDisplay();
     if ($('p-help')) $('p-help').onclick = () => showDialog({
       title: '快捷键',
       body: '空格 播放/暂停<br>↑ ↓ 上/下一句<br>L 单句/全曲<br>O 播放顺序<br>Esc 收起播放器',
@@ -5177,7 +5246,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     applyControls();                       // 单句/全曲 + 播放顺序：进页面就显示当前档位
 
     if ($('p-speak')) $('p-speak').innerHTML = icon('volume');   // 圆图标里只放图标（以前把「发音」两个字也塞进来 → 喇叭下面挂字）
-    $('p-speak').onclick = () => (popWord ? speakWord(popWord) : speak((popSeg && popSeg.r) || popFallback));
+    $('p-speak').onclick = () => {
+      if (popSeg && popSeg.r && (!popWord || !popWord.lang || popWord.lang === 'ja')) return speak(norm(popSeg.r), false, 'ja-JP');
+      return popWord ? speakWord(popWord) : speak((popSeg && popSeg.r) || popFallback);
+    };
     $('p-close2').onclick = hidePop;
     // 底部「上拉看更多」：点一下展开到 75%；展开态再点标题栏区域可收回
     // 点释义就地改；点罗马音就地改 —— 取代原来那排「改释义 / 罗马音」链接
