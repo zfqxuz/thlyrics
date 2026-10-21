@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261022b';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261022b';
-import * as Vault from './core/vault.js?v=20261022b';
-import { icon } from './icons.js?v=20261022b';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261022b';
+import { V } from './version.js?v=20261022c';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261022c';
+import * as Vault from './core/vault.js?v=20261022c';
+import { icon } from './icons.js?v=20261022c';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261022c';
 
 (() => {
   'use strict';
@@ -1906,7 +1906,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function trackRow(t) {
     const isCur = !!(curTrack && String(curTrack.id) === String(t.id));
     const tags = [];
-    if (t.imp) tags.push(T('导入'));
+    if (t.imp) tags.push(T(t.plId === 'preset' ? '示例' : '导入'));
     if (t.via === 'spotify') tags.push('Spotify');
     else if (t.via === 'apple') tags.push('Apple Music');
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push(T('有声')); else tags.push(T('无音源'));
@@ -2582,6 +2582,32 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function wireRec(root) {
     root.querySelectorAll('[data-rec]').forEach((el) => (el.onclick = () => { const it = curatedItems()[Number(el.dataset.rec)]; if (it) importCuratedItem(it); }));
   }
+  /** 预设曲目：新用户打开就有歌，不用自己选/不用粘链接。
+   *  做法是把预设的那批歌走正常导入管线静默种进他自己的曲库（不托管音频/歌词，不涉及授权），
+   *  只在「曲库还是空的、且没种过」时跑一次；失败了不打扰，推荐条兜底让他手动重试。 */
+  async function seedPresets() {
+    if (S.presetDone) return false;
+    if (Object.keys(S.imp || {}).length) { S.presetDone = Date.now(); save(); return false; }
+    const items = curatedItems().slice(0, 3);
+    if (!items.length) return false;
+    setState('正在准备示例曲目…');
+    let n = 0;
+    for (const it of items) {
+      if (S.imp['i' + it.id]) continue;
+      try {
+        const tr = { id: String(it.id), name: it.title, ar: [{ name: it.artist || '' }], al: { name: '' } };
+        await importTracks([tr], '示例', 'preset', null, it.src || 'netease');
+        if (S.imp['i' + it.id]) n++;
+      } catch { /* 单首失败不影响其它 */ }
+    }
+    S.presetDone = Date.now(); save();
+    registerImpTracks(); indexLibrary();
+    if (location.hash === '' || location.hash === '#/' || location.hash.startsWith('#/home')) renderHome();
+    if (location.hash.startsWith('#/songs')) renderSongs();
+    if (n) toast(`已经准备好 ${n} 首示例曲目，直接挑一首学`);
+    return n > 0;
+  }
+
   /** 一键导入一条推荐（单曲）：交给正常导入管线，能力标记/换源/失败原因都跟手动导入一致 */
   async function importCuratedItem(it) {
     if (!it || importing) return;
@@ -5274,6 +5300,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     ensureCurated().then(() => {
       if (!IDX.tracks.length && (!location.hash || location.hash === '#/' || location.hash.startsWith('#/home'))) renderHome();
       if (location.hash.startsWith('#/songs')) renderSongs();
+      seedPresets().catch(() => {});
     }).catch(() => {});
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
