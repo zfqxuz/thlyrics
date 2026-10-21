@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261020b';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261020b';
-import * as Vault from './core/vault.js?v=20261020b';
-import { icon } from './icons.js?v=20261020b';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261020b';
+import { V } from './version.js?v=20261022a';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261022a';
+import * as Vault from './core/vault.js?v=20261022a';
+import { icon } from './icons.js?v=20261022a';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261022a';
 
 (() => {
   'use strict';
@@ -1494,14 +1494,43 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   }
   const shuffle = (arr) => arr.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
 
+  /** 歌词挖空：在「这一句的实际分词」里找到目标词的真实出现形式，再把它从原句里挖掉。
+   *  v.word 是词典形（歌う），歌词里往往是活用形（歌った）—— 直接 indexOf 词典形会找不到，
+   *  以前就退化成「整句原样显示」，等于没有空格、答案还摆在脸上。定位不到就返回 null，不出这道题。 */
+  function clozeFor(v, ex) {
+    const line = String((ex && ex.jp) || '');
+    const want = String((v && v.word) || '');
+    if (!line || !want) return null;
+    const tr = ex && TRACK.get(String(ex.tid));
+    const segs = (tr && tr.lines && tr.lines[ex.li] && tr.lines[ex.li].segs) || [];
+    // 候选：优先「辞书形/表面形对得上」的那个分片的表面形；再退到任何能对上的表面形
+    let idx = segs.findIndex((sg) => sg && sg.s && (sg.b === want || sg.w === want));
+    const cands = idx >= 0 ? [segs[idx].s] : segs.filter((sg) => sg && sg.s && (sg.b === want || sg.w === want)).map((sg) => sg.s);
+    for (const surf of cands) {
+      if (!surf) continue;
+      // 同一表面形可能在一句里出现多次：用前面分片推算起始偏移，避免挖错位置
+      let from = 0;
+      if (idx >= 0) for (let k = 0; k < idx; k++) { const s = segs[k] && segs[k].s; if (!s) continue; const p = line.indexOf(s, from); if (p >= 0) from = p + s.length; }
+      let at = line.indexOf(surf, from);
+      if (at < 0) at = line.indexOf(surf);
+      if (at < 0) continue;
+      return { masked: esc(line.slice(0, at)) + '<b class="blank">＿＿</b>' + esc(line.slice(at + surf.length)), surface: surf };
+    }
+    // 没有分词信息时的兜底：只有「整句里真的出现词典形」才敢挖
+    const at = line.indexOf(want);
+    if (at >= 0) return { masked: esc(line.slice(0, at)) + '<b class="blank">＿＿</b>' + esc(line.slice(at + want.length)), surface: want };
+    return null;
+  }
+
   /** 出一道题。四种题型按词的可出题条件挑，用 revI 轮着来（同一轮里不老是同一种） */
   function makeQuestion(v, i) {
     const ex = examplesFor(v, 1)[0];
     const hasReading = !!(v.reading && /^[\u3041-\u309f\u30a0-\u30ffー]+$/.test(v.reading));
+    const cloze = ex ? clozeFor(v, ex) : null;
     // 可用题型 = 用户勾选的 ∩ 这个词真出得来的
     let kinds = REV_MODES.map((m) => m[0]).filter((k) => revModeOn(k) && REV_AVAIL(k));
     kinds = kinds.filter((k) => {
-      if (k === 'ctx') return !!ex;
+      if (k === 'ctx') return !!cloze;                    // 定不到位就不出挖空题（宁缺毋滥）
       if (k === 'pick' || k === 'type') return S.learnLang === 'ja' && hasReading;
       return true;
     });
@@ -1528,15 +1557,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     }
     // ── 上下文向：歌词挖空选词（同一句中文可能对应好几个日语词，只有上下文能区分）──
     if (kind === 'ctx') {
+      if (!cloze) return makeQuestion(v, i + 1);         // 兜底：理论上到不了（kinds 已过滤）
       const wrong = distractors(v, (x) => String(x.word || '').trim(), 3).map((x) => x.word);
       const opts = shuffle([{ t: v.word, ok: true }].concat(wrong.map((t) => ({ t, ok: false }))));
-      const line = String(ex.jp || '');
-      const at = line.indexOf(v.word);
-      const masked = at >= 0
-        ? esc(line.slice(0, at)) + '<b class="blank">＿＿</b>' + esc(line.slice(at + v.word.length))
-        : esc(line);
       return { v, i, kind, head: '这句歌词里，缺的是哪个词？', input: false, opts,
-        prompt: `<b class="rw4">${masked}</b>${ex.zh ? `<i class="rw5">${esc(ex.zh)}</i>` : ''}`,
+        prompt: `<b class="rw4">${cloze.masked}</b>${ex.zh ? `<i class="rw5">${esc(ex.zh)}</i>` : ''}`,
         correct: v.word, answer: [readNote, meaning].filter(Boolean).join(' · '), done: false, picked: -1, play };
     }
     // ── 听音选词 ──
@@ -2870,6 +2895,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         applying = true;
         S.known = mergedAcc.known; S.notes = mergedAcc.notes; S.audio = mergedAcc.audio;
         S.imp = mergedAcc.imp; S.del = mergedAcc.del; S.fav = mergedAcc.fav; S.sing = mergedAcc.sing; S.roma = mergedAcc.roma; S.star = mergedAcc.star; S.rev = mergedAcc.rev; S.sep = mergedAcc.sep; S.sepOn = mergedAcc.sepOn;
+        S.words = mergedAcc.words;   // 自补词义：漏了这行就变成“云端存了、换设备拿不回来”
         S.clearedAt = mergedAcc.clearedAt;
         save(); applying = false;
         registerImpTracks();

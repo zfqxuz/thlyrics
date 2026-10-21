@@ -111,6 +111,27 @@ async function mergeBiaori(vocab, biaori, jlpt) {
   return { added, withJl };
 }
 
+/** 发布前用「实际数组」重算 stats：以前 stats.vocab 停在 build-index 时的 1358，
+ *  而合并《标日》之后实际有 6000+ 词；--empty-lib 之后 tracks/lines 等也要跟着归零。 */
+function recalcStats(idx) {
+  const vs = idx.vocab || [], ts = idx.tracks || [];
+  idx.stats = Object.assign({}, idx.stats, {
+    tracks: ts.length,
+    originals: (idx.originals || []).length,
+    withTiming: ts.filter((t) => t.timing).length,
+    tracksWithTiming: ts.filter((t) => t.timing).length,
+    lines: ts.reduce((n, t) => n + ((t.lines || []).length), 0),
+    withTranslations: ts.reduce((n, t) => n + (t.lines || []).filter((l) => l.zh).length, 0),
+    withOss: ts.filter((t) => t.audioOss).length,
+    withNetease: ts.filter((t) => t.audio && t.audio.type === 'netease').length,
+    vocab: vs.length,
+    withBiaori: vs.filter((v) => v.br).length,
+    withJlpt: vs.filter((v) => v.jl).length,
+    withMeaning: vs.filter((v) => v.hasMeaning).length,
+  });
+  return idx.stats;
+}
+
 async function main() {
   const idx = readJson(path.join(DATA, 'index.json'), null);
   if (!idx) throw new Error('缺 data/index.json，先跑 build-index.mjs');
@@ -263,10 +284,7 @@ async function main() {
   }
   idx.stats.withOss = withOss;
 
-  idx.stats.withNetease = merged;
-  idx.stats.withTranslations = withTrans;
-  idx.stats.tracksWithTiming = idx.tracks.filter((t) => t.timing).length;
-  idx.stats.withMeaning = idx.vocab.filter((v) => v.hasMeaning).length;
+  recalcStats(idx);                    // 用实际数组重算（vocab 已并入《标日》，不能再用 build-index 的旧值）
   idx.generatedAt = new Date().toISOString();
 
   fs.mkdirSync(WEB_DATA, { recursive: true });
@@ -328,9 +346,7 @@ async function main() {
     idx.tracks = [];
     idx.originals = [];
     for (const v of idx.vocab) delete v.examples;       // 例句指向已下线的内置曲目，前端改成从曲库现算
-    idx.stats.tracks = 0;
-    idx.stats.tracksWithTiming = 0;
-    idx.stats.withOss = 0;
+    recalcStats(idx);                  // 曲目清空后 tracks/lines/音频类计数一起归零
     fs.writeFileSync(path.join(WEB_DATA, 'index.json'), JSON.stringify(idx), 'utf8');
     console.log(`--empty-lib：站上不带内置曲目（去掉 ${n} 首 + 例句），词表 ${idx.vocab.length} 个保留做注解`);
   }
