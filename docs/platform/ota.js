@@ -9,7 +9,7 @@
  *   ② 静默拉清单 → 版本不同 → download() → next()（下次启动生效，不打断当前）
  *   ③ 手动「检查内容更新」→ download() + set()（立刻重载）
  */
-import { resolveDownloadUrl } from './net.js?v=20261022a';
+import { resolveDownloadUrl } from './net.js?v=20261022b';
 
 const plugin = () => {
   if (typeof window === 'undefined') return null;

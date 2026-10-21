@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "note": "推荐歌单 = 预先挑好的链接，站上不托管歌词/音频；点一下走正常导入进用户自己的曲库。",
+  "items": [
+    { "kind": "song", "src": "netease", "id": "22645196", "title": "Bad Apple!!", "artist": "のみこ", "note": "新手示例" },
+    { "kind": "song", "src": "netease", "id": "737955", "title": "Thank you for dears.", "artist": "GET IN THE RING", "note": "东方同人" },
+    { "kind": "song", "src": "netease", "id": "752043", "title": "魔理沙は大変なものを盗んでいきました", "artist": "ARM", "note": "东方同人" }
+  ]
+}

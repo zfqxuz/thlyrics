@@ -1,9 +1,9 @@
 /* 东方同人曲 学唱机 —— 前端 v2（词汇入手 · 迷你播放条 + 全屏跟唱页） */
-import { V } from './version.js?v=20261022a';   // 前端版本号（自更新比对用）
-import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261022a';
-import * as Vault from './core/vault.js?v=20261022a';
-import { icon } from './icons.js?v=20261022a';
-import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261022a';
+import { V } from './version.js?v=20261022b';   // 前端版本号（自更新比对用）
+import { kvGet, kvSet, kvKeys, kvGetJson, kvSetJson, dropLegacyDB, fcJson, apiCall as netApiCall, apiJson, gdJson, getJson, getBlob, dataUrl, createAudioEl, mediaSession, mediaStore, batteryExempt, appUpdater, voicePack, tts, musicNative, neteaseQrStart, neteaseQrPoll, qqQrStart, qqQrPoll, neteaseAudioUrl, qqAudioUrl, nativeBack, otaAvailable, otaReady, otaCurrent, otaCheck, resolveDownloadUrl, sepCall } from './platform/index.js?v=20261022b';
+import * as Vault from './core/vault.js?v=20261022b';
+import { icon } from './icons.js?v=20261022b';
+import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTextLang, detectTrackLangs, setDict, useLocale, hasDict, translateNode, currentLocale, t } from './i18n.js?v=20261022b';
 
 (() => {
   'use strict';
@@ -1117,6 +1117,12 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   function playFrom(i, forceLoop = true) {
     if (!curLines[i]) return;
     const t = curLines[i].t;
+    // 没有时间轴的歌（导入时 tm='none'）：可以整首播，但不能逐句 seek/单句循环
+    if (t == null) {
+      activeLine = i; highlight(false); armTapScroll();
+      toast('这首歌的歌词没有时间轴，不能跳句');
+      return;
+    }
     // forceLoop=false 用于「上一句 / 下一句」：只挪位置，别偷偷把模式切进单句
     const toLoop = forceLoop || mode === 'loop';
     const wasAll = mode !== 'loop';
@@ -1374,8 +1380,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
         <div class="acts"><button class="btn-main" id="h-pick">去曲库挑一首</button><button class="btn-ghost" id="h-imp">导入</button></div>
       </div>` : `<div class="nowcard">
         <div class="k">开始</div>
-        <div class="t" style="margin-top:6px">导入第一首歌</div>
-        <div class="acts"><button class="btn-main" id="h-imp">导入第一首歌</button></div>
+        <div class="t" style="margin-top:6px">${curatedItems()[0] ? '先试一首，或者导入自己的歌' : '导入第一首歌'}</div>
+        <div class="acts">${curatedItems()[0] ? `<button class="btn-main" data-rec="0">试听 ${esc(curatedItems()[0].title)}</button><button class="btn-ghost" id="h-imp">导入歌曲</button>` : `<button class="btn-main" id="h-imp">导入第一首歌</button>`}</div>
       </div>`)}
       ${revDue.length ? `<div class="homerev" id="h-rev"><span class="t">复习巩固 · ${T('今天 {n} 个', { n: revDue.length })}</span><span class="go">${T('开始 ›')}</span></div>` : ''}
       <div class="hair"></div>
@@ -1393,6 +1399,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if ($('h-continue')) $('h-continue').onclick = () => { pendingPlayId = last.id; pendingResumeId = last.id; goHome('#/track/' + last.id); };
     if ($('h-pick')) $('h-pick').onclick = () => goHome('#/songs');
     if ($('h-imp')) $('h-imp').onclick = () => { impState.open = true; goHome('#/songs'); };
+    wireRec($('view-home'));
     $('view-home').querySelectorAll('[data-w]').forEach((el) => (el.onclick = () => {
       // 点一个词 = 去它真正出现的那句（少一跳）
       const v = VBYID.get(asId(el.dataset.w));
@@ -1422,7 +1429,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   const revModes = () => Object.assign({}, REV_MODE_DEFAULT, S.revModes || {});
   const revModeOn = (k) => revModes()[k] !== false;
   const REV_AVAIL = (k) => k !== 'listen' || typeof navigator === 'undefined' || navigator.onLine !== false;
-  let revDeck = [], revI = 0, revQ = null, revStat = { ok: 0, bad: 0, requeue: 0 };
+  let revDeck = [], revI = 0, revQ = null, revStat = { ok: 0, bad: 0, requeue: 0 }, revNear = '';
   let revFrom = '#/mine', revSize = REVIEW_N;
   const revCount = () => (Number(revSize) > 0 ? Number(revSize) : 9999);
 
@@ -1437,14 +1444,20 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     revI = 0; revQ = null; revStat = { ok: 0, bad: 0, requeue: 0 };
   }
 
-  /** 用户填的读音算不算对：认平假名/片假名/罗马音，比较时抹掉长音符与促音（初学者常漏） */
-  function readingOk(input, v) {
-    const clean = (x) => norm(x).replace(/[\s\u3000.・·]/g, '').replace(/[ーっ]/g, '');
-    const got = clean(input);
-    if (!got) return false;
-    const cands = [v.reading, v.romaji].filter(Boolean).map(clean);
-    return cands.some((c) => c && (c === got || c.replace(/[んn]$/, '') === got.replace(/[んn]$/, '')));
+  /** 用户填的读音判分：'ok' 完全对 / 'near' 只差促音·长音（初学者常漏）/ 'bad' 错
+   *  以前一律抹掉「ーっ」再比，等于把促音和长音这两类最该练的区别都判成对；现在分开报。 */
+  function readingGrade(input, v) {
+    const tidy = (x) => norm(x).replace(/[\s\u3000.・·]/g, '');
+    const got = tidy(input);
+    if (!got) return 'bad';
+    const cands = [v.reading, v.romaji].filter(Boolean).map(tidy);
+    const loose = (x) => x.replace(/[ーっ]/g, '');
+    const near = (x) => x.replace(/[んn]$/, '');
+    if (cands.some((c) => c && c === got)) return 'ok';
+    if (cands.some((c) => c && (loose(c) === loose(got) || near(c) === near(got)))) return 'near';
+    return 'bad';
   }
+  const readingOk = (input, v) => readingGrade(input, v) !== 'bad';
 
   /** 读音干扰项：同首字的词（一字多音，最值得考）、长度接近、词性相近 */
   function readingDistractors(v, n) {
@@ -1706,11 +1719,11 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const lyric = ex ? `<span class="fa">${esc(ex.jp)}</span>` : '';
     const acts = `<div class="row" style="gap:6px;margin-top:6px"><button class="toolbtn" id="rev-speak" style="height:28px">${icon('volume','in')}发音</button>${ex ? `<button class="toolbtn" id="rev-hear" style="height:28px">听例句</button>` : ''}</div>`;
     feed.innerHTML = `<span class="fi">${icon(ok ? 'circle-check' : 'close', 'in')}</span>`
-      + `<span class="fm">${ok ? '正确' : '正确答案：' + esc(q.correct)}${tip}${lyric}${acts}</span>`
+      + `<span class="fm">${ok ? (revNear || '正确') : '正确答案：' + esc(q.correct)}${tip}${lyric}${acts}</span>`
       + `<button class="fnext" id="rev-next">继续</button>`;
     if ($('rev-speak')) $('rev-speak').onclick = () => q.play(false);
     if (ex) { const hb = $('rev-hear'); if (hb) hb.onclick = () => pvPlay(ex.tid, ex.li); }
-    $('rev-next').onclick = () => { revI++; revQ = null; renderReview(); };
+    $('rev-next').onclick = () => { revI++; revQ = null; revNear = ''; renderReview(); };
     try { $('rev-next').focus(); } catch { /* ignore */ }
     // 读音题答完顺手读一遍，把形和音钉在一起（静默，网页版可能被拦）
     setTimeout(() => { if (revQ === q) q.play(true); }, 160);
@@ -1728,7 +1741,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (!q || q.done || !q.input) return;
     const el = $('rev-input');
     if (!el) return;
-    finishQuestion(readingOk(el.value, q.v), -1);
+    const g = readingGrade(el.value, q.v);
+    revNear = g === 'near' ? '基本正确 · 漏了促音／长音' : '';
+    finishQuestion(g !== 'bad', -1);
   }
 
   // 网页版兼容：键盘 1234 选项、回车/空格继续（桌面浏览器也能用）
@@ -1875,6 +1890,19 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       el.classList.toggle('playing', isCur && playing);
     });
   }
+  /** 曲库行里回答「我现在适合学哪首」：还有多少没学的词、上次听到第几句 */
+  function learnMeta(t) {
+    const un = (t.vocabIds || []).filter((id) => { const v = VBYID.get(id); return v && /^ja$/.test(v.lang || 'ja') && !isKnown(v); }).length;
+    const pos = Number((S.pos || {})[t.id]) || 0;
+    let li = -1;
+    if (pos > 1 && t.tm !== 'none' && t.timing !== 'none') {
+      for (let i = 0; i < (t.lines || []).length; i++) { const tt = t.lines[i].t; if (tt == null) continue; if (tt <= pos + 1) li = i; else break; }
+    }
+    const bits = [];
+    if (un) bits.push(`还有 ${un} 个没学的词`);
+    if (li >= 0) bits.push(`上次第 ${li + 1} 句`);
+    return bits.join(' · ') + (bits.length ? ' · ' : '');
+  }
   function trackRow(t) {
     const isCur = !!(curTrack && String(curTrack.id) === String(t.id));
     const tags = [];
@@ -1882,6 +1910,8 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (t.via === 'spotify') tags.push('Spotify');
     else if (t.via === 'apple') tags.push('Apple Music');
     if (t.audio || t.audioOss || S.audio[t.id]) tags.push(T('有声')); else tags.push(T('无音源'));
+    if ((t.audio && t.audio.trial) || (S.audio[t.id] && S.audio[t.id].trial)) tags.push(T('仅试听'));
+    if (t.tm === 'none' || t.timing === 'none') tags.push(T('歌词未对齐'));
     if (isFav(t.id)) tags.push(icon('heart', 'in') + T('收藏'));
     if (isSing(t.id)) tags.push(T('会唱'));
     if (t.imp && t.audio && t.audio.type === 'tencent') tags.push('QQ音乐');
@@ -1898,7 +1928,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       <div class="col">
         <div class="l1">${esc(t.title)}${isCur ? '<span class="eqbars" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</div>
         <div class="l2">${esc(t.artist)}${t.base ? ' · ' + esc(t.base) : (t.album ? ' · ' + esc(t.album) : '')}</div>
-        <div class="l3">${ltags ? ltags + ' ' : ''}${T('{n} 行歌词', { n: t.lineCount })}${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
+        <div class="l3">${ltags ? ltags + ' ' : ''}${learnMeta(t)}${T('{n} 行歌词', { n: t.lineCount })}${tags.length ? ' · ' + tags.join(' · ') : ''}</div>
       </div>
       <div class="item-acts">
         ${isCur ? `<button class="mini curbtn" data-cur="${esc(t.id)}" title="回播放">${icon('play')}</button>` : ''}
@@ -2335,7 +2365,9 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       primaryLang: rec.primaryLang || (rec.langs && rec.langs[0]) || 'unknown',
       langs: rec.langs || detectTrackLangs(lines, rec.primaryLang),
       base: '', coverUrl: rec.cover || '', plName: rec.plName || '', plId: rec.plId || '',
-      audio: rec.noAudio ? null : { type: rec.src || 'netease', nid: rec.nid }, timing: rec.src || 'netease',
+      audio: (rec.noAudio || rec.au === 'none') ? null : { type: rec.src || 'netease', nid: rec.nid, trial: rec.au === 'trial' || undefined },
+      au: rec.au || (rec.noAudio ? 'none' : 'ok'), tm: rec.tm || 'ok',
+      timing: rec.tm === 'none' ? 'none' : (rec.src || 'netease'),
       via: rec.via || '',
       lineCount: lines.filter((l) => l.text.trim()).length,
       vocabIds: [...ids].map((w) => VBY.get(w)).filter(Boolean).map((v) => v.id), lines,
@@ -2371,6 +2403,16 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const uniq = out.filter((l) => (seen.has(l.t) ? false : (seen.add(l.t), true)));
     return mergeShortLines(uniq);
   }
+  /** 没有时间轴的纯文本歌词：LRC 里一个时间戳都没有时兜底用。
+   *  这类歌可以学词/查词/看翻译，但不能逐句跳转（导入时标记 timing='none'）。 */
+  function parsePlainLyric(text) {
+    const rows = String(text || '').split(/\r?\n/)
+      .map((x) => x.replace(/^\s*\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*/, '').replace(LRC_DECO, '').replace(/\s+/g, ' ').trim())
+      .filter((x) => x && /[\u3041-\u309f\u30a0-\u30ff\u4e00-\u9fffA-Za-z0-9]/.test(x))
+      .filter((x) => !LRC_META.test(x) && !/歌词来源|THB\s?WIKI|纯音乐/i.test(x));
+    return rows.map((text2) => ({ t: null, text: text2, zh: '' }));
+  }
+
   /** 有的 LRC 是逐字/逐拍一行一行的（唱到哪标到哪），跟唱时一行一个字很碎。
    *  把「连续几个都很短、且间隔很近」的行并回一句。 */
   function mergeShortLines(lines) {
@@ -2411,7 +2453,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
   async function importTracks(list, plName, pid, onStep, src) {
     const source = src || 'netease';
     const ok = [], fail = [], skip = [];
-    let done = 0, quota = false, noAudioN = 0, stopped = null;
+    let done = 0, quota = false, noAudioN = 0, noTimeN = 0, stopped = null;
     const report = (title, mark, kind, raw) => { done++; if (onStep) onStep(done, list.length, title, mark, kind, raw); };
     const one = async (tr) => {
       let nid = String(tr.id);
@@ -2422,7 +2464,7 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       if (S.imp['i' + nid]) { skip.push({ nid, title }); report(title, '已在库里', 'skip', tr); return; }
       const builtin = IDX.tracks.find((t) => !t.imp && ((t.audio && String(t.audio.nid) === nid) || norm(t.title) === norm(title)));
       if (builtin) { skip.push({ nid, title }); report(title, '曲库已有', 'skip', tr); return; }
-      let lines = [], why = '', noAudio = false, sourceAlt = '';
+      let lines = [], why = '', noAudio = false, sourceAlt = '', audioState = 'ok', timing = 'ok';
       try {
         // 歌词和音频地址并行取，快一点
         let ly = await resolveLyric(nid, source);
@@ -2439,13 +2481,13 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
             const q = await findAltOnQQ(srcName, artist);
             if (q) alt = { id: q.id, src: 'tencent' };
           }
+          const oldNid = nid;                       // 换源失败要退回原 id（以前写在 if 里，else 分支取不到）
           if (alt) {
             const ly2 = await resolveLyric(alt.id, alt.src || 'netease');
             const url2 = await resolveAudioUrl(alt.id, 320, alt.src || 'netease');
             const am2 = lastAudioMeta || {};
             const secs2 = (am2.size && am2.br) ? am2.size / (am2.br / 8) : 0;
             if (url2 && !(secs2 > 0 && secs2 < 60)) {
-              const oldNid = nid;
               nid = String(alt.id);
               sourceAlt = alt.src || 'netease';
               if (ly2 && ly2.lyric) ly = ly2;
@@ -2453,26 +2495,19 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
             } else { nid = oldNid; }
           }
         }
-        if (!url) {                    // 两家都拿不到音源：跳过
-          skip.push({ nid: tr.id, title });
-          report(title, '无音源', 'skip', tr);
-          return;
-        }
+        // 音源、歌词、时间轴是三件独立的事：任何一件缺失都不该把整首丢掉（见 spec/REVIEW 2026-10-21 P0-1）
         const am3 = lastAudioMeta || {};
         const secs3 = (am3.size && am3.br) ? am3.size / (am3.br / 8) : 0;
-        if (secs3 > 0 && secs3 < 60 && !ckOf((sourceAlt || source) === 'netease' ? 'netease' : 'qq')) {
-          skip.push({ nid: tr.id, title });
-          report(title, '会员曲', 'skip', tr);
-          return;
-        }
-        noAudio = false;
+        if (!url) audioState = 'none';                                       // 没音源：照样入库，只能学词
+        else if (secs3 > 0 && secs3 < 60 && !ckOf((sourceAlt || source) === 'netease' ? 'netease' : 'qq')) audioState = 'trial';  // 会员试听片段
+        else audioState = 'ok';
         if (!ly) why = '取不到歌词';
         else {
           lines = parseLrc(ly.lyric, ly.tlyric);
-          if (lines.length < 3 || lines[lines.length - 1].t <= 0) {   // 纯音乐 / 没有时间轴歌词：跳过，不算失败
-            skip.push({ nid, title });
-            report(title, '跳过（纯音乐／没有歌词）', 'skip', tr);
-            return;
+          if (lines.length < 3 || lines[lines.length - 1].t <= 0) {           // 没时间轴（或纯音乐）
+            const plain = parsePlainLyric(ly.lyric + '\n' + (ly.tlyric || ''));
+            if (plain.length >= 2) { lines = plain; timing = 'none'; }        // 有文字歌词 → 照样导入
+            else { skip.push({ nid, title }); report(title, '跳过（纯音乐／没有歌词）', 'skip', tr); return; }
           }
         }
       } catch (e) {
@@ -2500,17 +2535,18 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
       } catch { segs = lines.map((l) => [[l.text, '', 'sym', '']]); }
       S.imp['i' + nid] = { id: 'i' + nid, nid, src: sourceAlt || source, title, artist, album, cover, lines, segs, segV: SEG_V,
         langs: detectedLangs, lineLangs, primaryLang: detectedLangs[0] || 'unknown',
-        noAudio: noAudio ? 1 : 0, plId: pid, plName: plName || '', at: Date.now() };
-      if (noAudio) noAudioN++;
+        noAudio: audioState === 'none' ? 1 : 0, au: audioState, tm: timing, plId: pid, plName: plName || '', at: Date.now() };
+      if (audioState === 'none') noAudioN++;
+      if (timing === 'none') noTimeN++;
       try { save(); } catch { delete S.imp['i' + nid]; stopped = tr; quota = true; return; }
-      ok.push({ nid, title });
+      ok.push({ nid, title, au: audioState, tm: timing });
       report(title, '', 'ok', tr);
     };
     const queue = [...list];
     await Promise.all([0, 1, 2, 3].map(async () => {
       while (queue.length && !quota) { const tr = queue.shift(); await one(tr); }
     }));
-    return { ok, fail, skip, quota, noAudio: noAudioN, rest: quota ? [stopped].concat(queue).filter(Boolean) : [] };
+    return { ok, fail, skip, quota, noAudio: noAudioN, noTime: noTimeN, rest: quota ? [stopped].concat(queue).filter(Boolean) : [] };
   }
   /** 歌单：曲目表走解析接口（一次能拿整张） */
   async function importPlaylistById(pid, name, limit, onStep) {
@@ -2524,6 +2560,49 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     const res = await importTracks(list, name || pl.name || '', pid, onStep, 'netease');
     return Object.assign(res, { plName: name || pl.name || '', total: all.length, done: list.length, pid, kind: 'playlist', src: 'netease' });
   }
+  /** 「推荐歌单」= 我预先挑好的一批**链接**，不是预装曲目：
+   *  站上只放歌名/ID/平台，点一下走正常导入流程进用户自己的曲库；不托管歌词/音频，不涉及内容授权。
+   *  清单在 docs/data/curated.json（可随时改，不用动前端）。 */
+  let CURATED = null;
+  async function ensureCurated() {
+    if (CURATED) return CURATED;
+    try { CURATED = await getJson('data/curated.json?v=' + V); } catch { CURATED = { items: [] }; }
+    if (!CURATED || !Array.isArray(CURATED.items)) CURATED = { items: [] };
+    return CURATED;
+  }
+  const curatedItems = () => ((CURATED && CURATED.items) || []).filter((it) => it && it.id && it.title);
+  function curatedStripHtml() {
+    const items = curatedItems().filter((it) => !S.imp['i' + it.id]);
+    if (!items.length) return '';
+    return `<div class="recstrip"><span class="meta">推荐</span>${items.slice(0, 6).map((it) => {
+      const k = curatedItems().indexOf(it);
+      return `<button class="chip" data-rec="${k}">${esc(it.title)}${it.artist ? `<span class="meta"> ${esc(it.artist)}</span>` : ''}</button>`;
+    }).join('')}</div>`;
+  }
+  function wireRec(root) {
+    root.querySelectorAll('[data-rec]').forEach((el) => (el.onclick = () => { const it = curatedItems()[Number(el.dataset.rec)]; if (it) importCuratedItem(it); }));
+  }
+  /** 一键导入一条推荐（单曲）：交给正常导入管线，能力标记/换源/失败原因都跟手动导入一致 */
+  async function importCuratedItem(it) {
+    if (!it || importing) return;
+    importing = true;
+    toast('正在导入 ' + it.title);
+    try {
+      const tr = { id: String(it.id), name: it.title, ar: [{ name: it.artist || '' }], al: { name: '' } };
+      const res = await importTracks([tr], '推荐', 'curated', null, it.src || 'netease');
+      const tid = 'i' + it.id;
+      if (S.imp[tid]) {
+        registerImpTracks(); indexLibrary();
+        go('#/track/' + tid);
+        setTimeout(() => { const T2 = TRACK.get(tid); if (T2) playTrack(T2); }, 600);
+      } else {
+        const why = (res.fail && res.fail[0] && res.fail[0].why) || (res.skip && res.skip.length ? '平台那边取不到这首' : '导入失败');
+        toast(why + '，换一首或粘自己的链接试试');
+        if (location.hash.startsWith('#/songs') || !IDX.tracks.length) renderSongs();
+      }
+    } finally { importing = false; }
+  }
+
   const MX_NORM = (x) => String(x || '').toLowerCase()
     .replace(/[(（\[【].*?[)）\]】]/g, ' ')
     .replace(/feat\..*$/, '')
@@ -3606,12 +3685,14 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (res.via) 
     bits.push(`导入 ${res.ok.length} 首`);
     if (res.miss) bits.push(`${res.miss} 首没找到`);
-    if (res.noAudio) bits.push(`${res.noAudio} 首暂无音源`);
+    if (res.noAudio) bits.push(`${res.noAudio} 首可学但暂无音源`);
+    if (res.noTime) bits.push(`${res.noTime} 首歌词未对齐（不能跳句）`);
     if (res.skip.length) bits.push(`跳过 ${res.skip.length} 首`);
     if (res.fail.length) bits.push(`失败 ${res.fail.length} 首`);
     impState.msg = `${res.plName || ''} · 共 ${res.total} 首 · ` + bits.join(' · ') + (res.quota ? '（存储空间不足）' : '');
     impState.ctx = res.fail && res.fail.length ? { list: res.fail.map((f) => f.tr).filter(Boolean), plName: res.plName, pid: res.pid, src: res.src || 'netease' } : null;
     impState.rest = res.rest || [];
+    registerImpTracks(); indexLibrary();          // 导入成功后立刻挂进内存曲库，列表/学词/复习当场就有
     renderSongs();
     if ($('plstat')) $('plstat').textContent = impState.msg;
     if ($('pllist')) $('pllist').innerHTML = impRowsHtml();
@@ -3745,12 +3826,14 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
           <span class="meta" style="align-self:center">上次检查：${S.plCheckAt ? new Date(S.plCheckAt).toLocaleString('zh-CN', { hour12: false }).slice(5) : '还没检查过'}</span>
         </div>
       </details>
+      ${curatedStripHtml()}
       ${songView === 'list'
         ? `<div class="list" id="list">${sorted.map(trackRow).join('') || emptyBox(songQ ? `没有匹配「${songQ}」的曲目` : (IDX.tracks.length ? '这个筛选下没有曲目' : '曲库是空的'), '', IDX.tracks.length ? [['e-pick', '清空搜索与筛选']] : [['e-imp', '导入']])}</div>`
         : songView === 'album'
           ? `<div class="albumgrid">${albumGridHtml(sorted)}</div>${sorted.length ? '' : emptyBox('这个筛选下没有专辑', '', [['e-pick', '清空搜索与筛选']])}`
           : (groupsHtml(sorted) || emptyBox('这个筛选下没有曲目', '', [['e-pick', '清空搜索与筛选']]))}`;
     impState.open = false;
+    wireRec($('view-songs'));
     $('view-songs').querySelectorAll('.chip[data-f]').forEach((el) => (el.onclick = () => { filter = el.dataset.f; S.sFilter = filter; save(); renderSongs(); }));
     $('view-songs').querySelectorAll('.segtext button').forEach((el) => (el.onclick = () => { songView = el.dataset.v; S.sView = songView; save(); renderSongs(); }));
     if ($('qs-clear')) $('qs-clear').onclick = () => { songQ = ''; S.songQ = ''; save(); renderSongs(); };
@@ -5188,6 +5271,10 @@ import { UI_LOCALES, LEARN_LANGS, SONG_LANGS, resolveLocale, langLabel, detectTe
     if (S.learnLang !== 'ja') { try { await ensureLangPack(S.learnLang); } catch { /* 没装词库：学习页会显示入口 */ } }
     indexLibrary();
     updateHeadStat();
+    ensureCurated().then(() => {
+      if (!IDX.tracks.length && (!location.hash || location.hash === '#/' || location.hash.startsWith('#/home'))) renderHome();
+      if (location.hash.startsWith('#/songs')) renderSongs();
+    }).catch(() => {});
     $('genat').textContent = '数据生成于 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
 
     if ($('brand')) $('brand').onclick = () => go('#/home');

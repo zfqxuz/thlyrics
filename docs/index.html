@@ -12,8 +12,8 @@
 <meta name="theme-color" content="#A52628">
 <!-- 首屏提前并行取：不写这行的话，index.json 要等 HTML → app.js → 十几个模块全部到齐才开始下 -->
 <link rel="preconnect" href="https://thlyrics-auth-bybvhpggbp.cn-hangzhou.fcapp.run" crossorigin>
-<link rel="preload" as="fetch" href="data/index.json?v=20261022a" crossorigin="anonymous">
-<link rel="modulepreload" href="app.bundle.js?v=20261022a">
+<link rel="preload" as="fetch" href="data/index.json?v=20261022b" crossorigin="anonymous">
+<link rel="modulepreload" href="app.bundle.js?v=20261022b">
 
 <style>
 /* ── 字体 ── */
@@ -1782,6 +1782,11 @@ body.ui-ios .langbadge{background:var(--accent-soft);color:var(--accent);border:
 .tagless{opacity:.7}
 
 .chip .n{font-size:9.5px;opacity:.55;margin-left:3px;font-variant-numeric:tabular-nums}
+
+/* 推荐歌单：首页/曲库页的一排小胶囊（链接式，不是预装曲目） */
+.recstrip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 6px}
+.recstrip .meta{font-size:12px;color:var(--ink2)}
+.recstrip .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1977,6 +1982,6 @@ body.ui-ios .langbadge{background:var(--accent-soft);color:var(--accent);border:
   });
 })();
 </script>
-<script type="module" src="app.bundle.js?v=20261022a"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
+<script type="module" src="app.bundle.js?v=20261022b"></script>   <!-- 每次改完前端记得把 v 往后推一位，否则手机会被 Pages 的 10 分钟缓存挡住 -->
 </body>
 </html>
